@@ -64,15 +64,14 @@ services:
     volumes:
       - minio_data:/data
 
-  # Frontend service can be added when ready
-  # frontend:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/frontend/Dockerfile
-  #   ports:
-  #     - "80:80"
-  #   depends_on:
-  #     - api
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - api
 
 volumes:
   postgres_data:

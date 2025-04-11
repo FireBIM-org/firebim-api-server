@@ -111,8 +111,8 @@ async def upload_ids(
     """
     Upload an IDS file (XML-based) and save to S3.
     """
-    if not file.filename.lower().endswith('.xml'):
-        raise HTTPException(status_code=400, detail="File must be an XML file")
+    if not file.filename.lower().endswith('.ids'):
+        raise HTTPException(status_code=400, detail="File must be an .ids (XML) file")
     
     # Generate a unique ID for the IDS file
     ids_id = str(uuid.uuid4())

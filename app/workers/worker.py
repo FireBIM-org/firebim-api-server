@@ -91,7 +91,7 @@ async def check_model_with_ids(data: dict):
             )
             model_path = model_file.name
         
-        with tempfile.NamedTemporaryFile(suffix=".xml", delete=False) as ids_file:
+        with tempfile.NamedTemporaryFile(suffix=".ids", delete=False) as ids_file:
             s3_client.download_file(
                 Bucket=BUCKET_NAME,
                 Key=ids_s3_key,
