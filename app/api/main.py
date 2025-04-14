@@ -41,7 +41,7 @@ try:
 except:
     s3_client.create_bucket(Bucket=BUCKET_NAME)
 
-@app.post("/model", status_code=201)
+@app.post("/ifc_model", status_code=201)
 async def upload_model(
     file: UploadFile = File(...), 
     background_tasks: BackgroundTasks = BackgroundTasks(),
@@ -59,8 +59,8 @@ async def upload_model(
     content = await file.read()
     
     # Upload to S3
-    model_id = str(uuid.uuid4())  # Generate ID for S3 path
-    s3_key = f"models/{model_id}/{file.filename}"
+    id = str(uuid.uuid4())  # Generate ID for S3 path
+    s3_key = f"models/{id}/{file.filename}"
     s3_client.put_object(
         Bucket=BUCKET_NAME,
         Key=s3_key,
@@ -69,7 +69,7 @@ async def upload_model(
     
     # Create DB entry
     model = IfcModel(
-        id=model_id,
+        id=id,
         filename=file.filename,
         s3_key=s3_key,
         user_id=current_user.id
@@ -79,13 +79,13 @@ async def upload_model(
     db.refresh(model)
     
     # Send to worker for processing in the background
-    background_tasks.add_task(send_to_worker, model_id, s3_key)
+    background_tasks.add_task(send_to_worker, id, s3_key)
     
-    return {"model_id": model_id}
+    return {"id": id}
 
-@app.get("/model/{model_id}")
+@app.get("/ifc_model/{id}")
 async def get_model(
-    model_id: str, 
+    id: str, 
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -93,7 +93,7 @@ async def get_model(
     Download an IFC-STEP file by its ID.
     """
     # Get model from DB
-    model = db.query(IfcModel).filter(IfcModel.id == model_id).first()
+    model = db.query(IfcModel).filter(IfcModel.id == id).first()
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
     
@@ -115,7 +115,27 @@ async def get_model(
         media_type="application/octet-stream"
     )
 
-@app.post("/ids", status_code=201)
+@app.get("/ifc_models")
+async def get_models(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get all IFC models belonging to the current user.
+    """
+    models = db.query(IfcModel).filter(IfcModel.user_id == current_user.id).all()
+    
+    return [
+        {
+            "id": model.id,
+            "filename": model.filename,
+            "created_at": model.created_at,
+            "updated_at": model.updated_at
+        }
+        for model in models
+    ]
+
+@app.post("/ids_file", status_code=201)
 async def upload_ids(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -128,13 +148,13 @@ async def upload_ids(
         raise HTTPException(status_code=400, detail="File must be an .ids (XML) file")
     
     # Generate a unique ID for the IDS file
-    ids_id = str(uuid.uuid4())
+    id = str(uuid.uuid4())
     
     # Read the file content
     content = await file.read()
     
     # Upload to S3
-    s3_key = f"ids/{ids_id}/{file.filename}"
+    s3_key = f"ids/{id}/{file.filename}"
     s3_client.put_object(
         Bucket=BUCKET_NAME,
         Key=s3_key,
@@ -143,7 +163,7 @@ async def upload_ids(
     
     # Create DB entry
     ids_file = IdsFile(
-        id=ids_id,
+        id=id,
         filename=file.filename,
         s3_key=s3_key,
         user_id=current_user.id
@@ -152,11 +172,11 @@ async def upload_ids(
     db.commit()
     db.refresh(ids_file)
     
-    return {"ids_id": ids_id}
+    return {"id": id}
 
-@app.get("/ids/{ids_id}")
+@app.get("/ids_file/{id}")
 async def get_ids(
-    ids_id: str, 
+    id: str, 
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
@@ -164,7 +184,7 @@ async def get_ids(
     Download an IDS file by its ID.
     """
     # Get IDS file from DB
-    ids_file = db.query(IdsFile).filter(IdsFile.id == ids_id).first()
+    ids_file = db.query(IdsFile).filter(IdsFile.id == id).first()
     if not ids_file:
         raise HTTPException(status_code=404, detail="IDS file not found")
     
@@ -186,7 +206,27 @@ async def get_ids(
         media_type="application/xml"
     )
 
-@app.get("/ids/{ids_id}/check/{model_id}")
+@app.get("/ids_files")
+async def get_ids_files(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get all IDS files belonging to the current user.
+    """
+    ids_files = db.query(IdsFile).filter(IdsFile.user_id == current_user.id).all()
+    
+    return [
+        {
+            "id": ids_file.id,
+            "filename": ids_file.filename,
+            "created_at": ids_file.created_at,
+            "updated_at": ids_file.updated_at
+        }
+        for ids_file in ids_files
+    ]
+
+@app.get("/ids_files/{ids_id}/check/{model_id}")
 async def check_model_with_ids(
     ids_id: str, 
     model_id: str, 

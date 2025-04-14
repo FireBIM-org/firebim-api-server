@@ -24,11 +24,11 @@ async def process_model(data: dict):
     """
     Process an IFC model file.
     """
-    model_id = data.get("model_id")
+    id = data.get("id")
     s3_key = data.get("s3_key")
     
-    if not model_id or not s3_key:
-        raise HTTPException(status_code=400, detail="Missing required data: model_id or s3_key")
+    if not id or not s3_key:
+        raise HTTPException(status_code=400, detail="Missing required data: id or s3_key")
     
     try:
         # Download file from S3
@@ -53,7 +53,7 @@ async def process_model(data: dict):
                 stats[element_type] = 1
         
         # Save processing results to S3
-        result_key = f"results/{model_id}/stats.json"
+        result_key = f"results/{id}/stats.json"
         s3_client.put_object(
             Bucket=BUCKET_NAME,
             Key=result_key,
@@ -63,7 +63,7 @@ async def process_model(data: dict):
         # Clean up
         os.unlink(temp_path)
         
-        return {"status": "success", "model_id": model_id, "result_key": result_key}
+        return {"status": "success", "id": id, "result_key": result_key}
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing model: {str(e)}")

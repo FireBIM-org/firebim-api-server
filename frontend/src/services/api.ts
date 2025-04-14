@@ -19,12 +19,26 @@ apiClient.interceptors.request.use(config => {
 });
 
 // Types for API responses
+export interface IfcModelListItem {
+  id: string;
+  filename: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IdsFileListItem {
+  id: string;
+  filename: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ModelResponse {
   model_id: string;
 }
 
 export interface IdsResponse {
-  ids_id: string;
+  id: string;
 }
 
 export interface CheckResponse {
@@ -42,11 +56,11 @@ export interface CheckResponse {
 // API Functions
 
 // Upload an IFC model
-export const uploadModel = async (file: File): Promise<ModelResponse> => {
+export const uploadIfcModel = async (file: File): Promise<ModelResponse> => {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await apiClient.post<ModelResponse>('/model', formData, {
+  const response = await apiClient.post<ModelResponse>('/ifc_model', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -56,8 +70,8 @@ export const uploadModel = async (file: File): Promise<ModelResponse> => {
 };
 
 // Download an IFC model
-export const downloadModel = async (modelId: string): Promise<Blob> => {
-  const response = await apiClient.get(`/model/${modelId}`, {
+export const downloadIfcModel = async (modelId: string): Promise<Blob> => {
+  const response = await apiClient.get(`/ifc_model/${modelId}`, {
     responseType: 'blob',
   });
   
@@ -65,11 +79,11 @@ export const downloadModel = async (modelId: string): Promise<Blob> => {
 };
 
 // Upload an IDS file
-export const uploadIds = async (file: File): Promise<IdsResponse> => {
+export const uploadIdsFile = async (file: File): Promise<IdsResponse> => {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await apiClient.post<IdsResponse>('/ids', formData, {
+  const response = await apiClient.post<IdsResponse>('/ids_file', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -79,16 +93,28 @@ export const uploadIds = async (file: File): Promise<IdsResponse> => {
 };
 
 // Download an IDS file
-export const downloadIds = async (idsId: string): Promise<Blob> => {
-  const response = await apiClient.get(`/ids/${idsId}`, {
+export const downloadIdsFile = async (idsId: string): Promise<Blob> => {
+  const response = await apiClient.get(`/ids_file/${idsId}`, {
     responseType: 'blob',
   });
   
   return response.data;
 };
 
+// Get all IFC models for the current user
+export const getIfcModels = async (): Promise<IfcModelListItem[]> => {
+  const response = await apiClient.get<IfcModelListItem[]>('/ifc_models');
+  return response.data;
+};
+
+// Get all IDS files for the current user
+export const getIdsFiles = async (): Promise<IdsFileListItem[]> => {
+  const response = await apiClient.get<IdsFileListItem[]>('/ids_files');
+  return response.data;
+};
+
 // Check a model against an IDS file
 export const checkModelWithIds = async (idsId: string, modelId: string): Promise<CheckResponse> => {
-  const response = await apiClient.get<CheckResponse>(`/ids/${idsId}/check/${modelId}`);
+  const response = await apiClient.get<CheckResponse>(`/ids_file/${idsId}/check/${modelId}`);
   return response.data;
 };
