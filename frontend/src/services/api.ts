@@ -117,4 +117,4 @@ export const getIdsFiles = async (): Promise<IdsFileListItem[]> => {
 export const checkModelWithIds = async (idsId: string, modelId: string): Promise<CheckResponse> => {
   const response = await apiClient.get<CheckResponse>(`/ids_file/${idsId}/check/${modelId}`);
   return response.data;
-};
+}

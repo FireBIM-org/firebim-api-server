@@ -226,7 +226,7 @@ async def get_ids_files(
         for ids_file in ids_files
     ]
 
-@app.get("/ids_files/{ids_id}/check/{model_id}")
+@app.get("/ids_file/{ids_id}/check/{model_id}")
 async def check_model_with_ids(
     ids_id: str, 
     model_id: str, 

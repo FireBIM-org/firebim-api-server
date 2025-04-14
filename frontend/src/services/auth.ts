@@ -1,6 +1,9 @@
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || '/api';
+const authClient = axios.create({
+  baseURL: API_URL
+});
 
 export interface LoginCredentials {
   username: string;
@@ -19,7 +22,7 @@ export interface AuthResponse {
 }
 
 export interface UserProfile {
-  id: number;
+  id: string; // Updated to string to match backend
   username: string;
   email: string;
   is_active: boolean;
@@ -47,12 +50,17 @@ export const isAuthenticated = (): boolean => {
 
 // Login
 export const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
-  // Convert credentials to form data for OAuth2 compatibility
-  const formData = new FormData();
+  // Use URLSearchParams for proper form encoding
+  const formData = new URLSearchParams();
   formData.append('username', credentials.username);
   formData.append('password', credentials.password);
   
-  const response = await axios.post<AuthResponse>(`${API_URL}/token`, formData);
+  const response = await authClient.post<AuthResponse>('/token', formData, {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  });
+  
   if (response.data.access_token) {
     storeToken(response.data.access_token);
   }
@@ -61,7 +69,7 @@ export const login = async (credentials: LoginCredentials): Promise<AuthResponse
 
 // Register
 export const register = async (data: RegisterData): Promise<UserProfile> => {
-  const response = await axios.post<UserProfile>(`${API_URL}/register`, data);
+  const response = await authClient.post<UserProfile>('/register', data);
   return response.data;
 };
 
@@ -77,7 +85,7 @@ export const getCurrentUser = async (): Promise<UserProfile> => {
     throw new Error('No authentication token found');
   }
   
-  const response = await axios.get<UserProfile>(`${API_URL}/users/me`, {
+  const response = await authClient.get<UserProfile>('/users/me', {
     headers: {
       Authorization: `Bearer ${token}`
     }
