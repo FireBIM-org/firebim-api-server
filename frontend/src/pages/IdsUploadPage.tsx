@@ -53,9 +53,9 @@ const IdsUploadPage: React.FC = () => {
     setError(null);
     
     try {
-      const response = await api.uploadIds(file);
+      const response = await api.uploadIdsFile(file);
       toast.success('IDS file uploaded successfully!');
-      navigate(`/ids/${response.ids_id}`);
+      navigate(`/ids/${response.id}`);
     } catch (err) {
       console.error('Upload error:', err);
       setError('Failed to upload IDS file. Please try again.');

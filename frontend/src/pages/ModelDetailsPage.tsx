@@ -18,7 +18,7 @@ const ModelDetailsPage: React.FC = () => {
     setError(null);
     
     try {
-      const blob = await api.downloadModel(id);
+      const blob = await api.downloadIfcModel(id);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

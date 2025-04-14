@@ -53,7 +53,7 @@ const ModelUploadPage: React.FC = () => {
     setError(null);
     
     try {
-      const response = await api.uploadModel(file);
+      const response = await api.uploadIfcModel(file);
       toast.success('Model uploaded successfully!');
       navigate(`/model/${response.model_id}`);
     } catch (err) {
