@@ -4,8 +4,10 @@ WORKDIR /app
 
 # Install dependencies
 COPY requirements.txt .
+COPY docker/worker/requirements.txt requirements-worker.txt
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir ifcopenshell
+RUN pip install --no-cache-dir -r requirements-worker.txt
+# RUN pip install --no-cache-dir ifcopenshell
 
 # # Install ifcopenshell
 # RUN apt-get update && \

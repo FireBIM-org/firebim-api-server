@@ -68,6 +68,10 @@ async def process_model(data: dict):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing model: {str(e)}")
 
+import ifctester
+import ifctester.reporter
+import ifcopenshell
+
 @app.post("/check")
 async def check_model_with_ids(data: dict):
     """
@@ -100,24 +104,23 @@ async def check_model_with_ids(data: dict):
             ids_path = ids_file.name
         
         # Process with IfcOpenShell
-        model = ifcopenshell.open(model_path)
+        ifc_model = ifcopenshell.open(model_path)
         
         # In a real implementation, you would use IfcOpenShell's IDS checking capabilities
         # This is a simplified placeholder implementation
         check_id = str(uuid.uuid4())
-        
-        # Example check result
-        check_result = {
-            "id": check_id,
-            "ifc_model_id": model_id,
-            "ids_id": ids_id,
-            "status": "completed",
-            "summary": {
-                "total_elements": len(model.by_type("IfcElement")),
-                "passing": True,
-                "message": "All checks passed successfully"
-            }
-        }
+
+        ids = ifctester.open(ids_path, validate=True)
+        ids.validate(ifc_model)
+
+        reporter = ifctester.reporter.Json(ids)
+        reporter.report()
+
+        check_result = json.loads(reporter.to_string())
+
+        # reporter = ifctester.reporter.Bcf(ids)
+        # reporter.report()
+        # reporter.to_file("report.bcfzip")
         
         # Save check results to S3
         result_key = f"checks/{check_id}/result.json"
