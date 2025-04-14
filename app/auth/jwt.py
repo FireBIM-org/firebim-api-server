@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import jwt
 from typing import Optional
 import os
-from sqlalchemy.orm import Session
+from sqlmodel import Session
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 

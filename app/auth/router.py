@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
-import uuid
+from sqlmodel import Session
 from datetime import timedelta
 
 from models.database import get_db
@@ -57,10 +56,9 @@ async def register_user(user: UserCreate, db: Session = Depends(get_db)):
             detail="Email already registered"
         )
     
-    # Create new user
+    # Create new user with SQLModel
     hashed_password = get_password_hash(user.password)
     db_user = User(
-        id=str(uuid.uuid4()),
         username=user.username,
         email=user.email,
         hashed_password=hashed_password,

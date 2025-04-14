@@ -3,7 +3,7 @@ from fastapi.responses import FileResponse
 import uuid
 import os
 import boto3
-from sqlalchemy.orm import Session
+from sqlmodel import Session
 from typing import Optional
 import httpx
 
@@ -54,13 +54,12 @@ async def upload_model(
     if not file.filename.lower().endswith('.ifc'):
         raise HTTPException(status_code=400, detail="File must be an IFC (STEP) file")
     
-    # Generate a unique ID for the model
-    model_id = str(uuid.uuid4())
-    
+    # Generate a unique ID for the model - SQLModel will auto-generate the ID now
     # Read the file content
     content = await file.read()
     
     # Upload to S3
+    model_id = str(uuid.uuid4())  # Generate ID for S3 path
     s3_key = f"models/{model_id}/{file.filename}"
     s3_client.put_object(
         Bucket=BUCKET_NAME,
@@ -77,6 +76,7 @@ async def upload_model(
     )
     db.add(model)
     db.commit()
+    db.refresh(model)
     
     # Send to worker for processing in the background
     background_tasks.add_task(send_to_worker, model_id, s3_key)
@@ -150,6 +150,7 @@ async def upload_ids(
     )
     db.add(ids_file)
     db.commit()
+    db.refresh(ids_file)
     
     return {"ids_id": ids_id}
 
