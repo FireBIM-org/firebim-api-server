@@ -1,7 +1,22 @@
 import axios from 'axios';
+import { getToken } from './auth';
 
 // Base API URL
 const API_URL = process.env.REACT_APP_API_URL || '/api';
+
+// Create axios instance with auth header interceptor
+const apiClient = axios.create({
+  baseURL: API_URL
+});
+
+// Add auth token to requests if available
+apiClient.interceptors.request.use(config => {
+  const token = getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 // Types for API responses
 export interface ModelResponse {
@@ -31,7 +46,7 @@ export const uploadModel = async (file: File): Promise<ModelResponse> => {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await axios.post<ModelResponse>(`${API_URL}/model`, formData, {
+  const response = await apiClient.post<ModelResponse>('/model', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -42,7 +57,7 @@ export const uploadModel = async (file: File): Promise<ModelResponse> => {
 
 // Download an IFC model
 export const downloadModel = async (modelId: string): Promise<Blob> => {
-  const response = await axios.get(`${API_URL}/model/${modelId}`, {
+  const response = await apiClient.get(`/model/${modelId}`, {
     responseType: 'blob',
   });
   
@@ -54,7 +69,7 @@ export const uploadIds = async (file: File): Promise<IdsResponse> => {
   const formData = new FormData();
   formData.append('file', file);
   
-  const response = await axios.post<IdsResponse>(`${API_URL}/ids`, formData, {
+  const response = await apiClient.post<IdsResponse>('/ids', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -65,7 +80,7 @@ export const uploadIds = async (file: File): Promise<IdsResponse> => {
 
 // Download an IDS file
 export const downloadIds = async (idsId: string): Promise<Blob> => {
-  const response = await axios.get(`${API_URL}/ids/${idsId}`, {
+  const response = await apiClient.get(`/ids/${idsId}`, {
     responseType: 'blob',
   });
   
@@ -74,6 +89,6 @@ export const downloadIds = async (idsId: string): Promise<Blob> => {
 
 // Check a model against an IDS file
 export const checkModelWithIds = async (idsId: string, modelId: string): Promise<CheckResponse> => {
-  const response = await axios.get<CheckResponse>(`${API_URL}/ids/${idsId}/check/${modelId}`);
+  const response = await apiClient.get<CheckResponse>(`/ids/${idsId}/check/${modelId}`);
   return response.data;
 };
