@@ -113,6 +113,12 @@ export const getIdsFiles = async (): Promise<IdsFileListItem[]> => {
   return response.data;
 };
 
+// Get a single IDS file by ID
+export const getIdsFileById = async (idsId: string): Promise<IdsFileListItem> => {
+  const response = await apiClient.get<IdsFileListItem>(`/ids_file/${idsId}`);
+  return response.data;
+};
+
 // Check a model against an IDS file
 export const checkModelWithIds = async (idsId: string, modelId: string): Promise<CheckResponse> => {
   const response = await apiClient.get<CheckResponse>(`/ids_file/${idsId}/check/${modelId}`);
