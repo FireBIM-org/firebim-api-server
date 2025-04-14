@@ -109,7 +109,7 @@ async def check_model_with_ids(data: dict):
         # Example check result
         check_result = {
             "id": check_id,
-            "model_id": model_id,
+            "ifc_model_id": model_id,
             "ids_id": ids_id,
             "status": "completed",
             "summary": {

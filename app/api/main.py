@@ -8,7 +8,7 @@ from typing import Optional
 import httpx
 
 from models.database import get_db, init_db
-from models.models import Model, IdsFile, User
+from models.models import IfcModel, IdsFile, User
 from auth.router import router as auth_router
 from auth.jwt import get_current_active_user
 
@@ -68,7 +68,7 @@ async def upload_model(
     )
     
     # Create DB entry
-    model = Model(
+    model = IfcModel(
         id=model_id,
         filename=file.filename,
         s3_key=s3_key,
@@ -93,7 +93,7 @@ async def get_model(
     Download an IFC-STEP file by its ID.
     """
     # Get model from DB
-    model = db.query(Model).filter(Model.id == model_id).first()
+    model = db.query(IfcModel).filter(IfcModel.id == model_id).first()
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
     
@@ -205,7 +205,7 @@ async def check_model_with_ids(
     if ids_file.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to access this IDS file")
     
-    model = db.query(Model).filter(Model.id == model_id).first()
+    model = db.query(IfcModel).filter(IfcModel.id == model_id).first()
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
     

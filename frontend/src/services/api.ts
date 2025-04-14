@@ -14,7 +14,7 @@ export interface IdsResponse {
 
 export interface CheckResponse {
   id: string;
-  model_id: string;
+  ifc_model_id: string;
   ids_id: string;
   status: 'pending' | 'completed' | 'failed';
   summary: {

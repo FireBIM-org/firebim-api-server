@@ -105,12 +105,12 @@ const ModelCheckPage: React.FC = () => {
             
             <Row>
               <Col>
-                <Button onClick={() => window.location.href = `/model/${modelId}`} variant="outline-primary">
+                <Button onClick={() => window.location.href = `/model/${checkResult.ifc_model_id}`} variant="outline-primary">
                   View Model Details
                 </Button>
               </Col>
               <Col>
-                <Button onClick={() => window.location.href = `/ids/${idsId}`} variant="outline-primary">
+                <Button onClick={() => window.location.href = `/ids/${checkResult.ids_id}`} variant="outline-primary">
                   View IDS Details
                 </Button>
               </Col>

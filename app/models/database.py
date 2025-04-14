@@ -25,7 +25,7 @@ def get_db():
 def init_db():
     """Initialize the database by creating all tables"""
     # Import models here to avoid circular imports
-    from .models import Model, IdsFile, CheckResult, User
+    from .models import IfcModel, IdsFile, CheckResult, User
     
     # Create all tables
     SQLModel.metadata.create_all(bind=engine)
