@@ -16,14 +16,20 @@ const Navbar: React.FC = () => {
             <Nav.Link as={Link} to="/">Home</Nav.Link>
             {isAuthenticated && (
               <>
-                <Nav.Link as={Link} to="/upload-model">Upload Model</Nav.Link>
-                <Nav.Link as={Link} to="/upload-ids">Upload IDS</Nav.Link>
+                <NavDropdown title="Files" id="file-nav-dropdown">
+                  <NavDropdown.Item as={Link} to="/ifc-models">IFC Models</NavDropdown.Item>
+                  <NavDropdown.Item as={Link} to="/ids-files">IDS Files</NavDropdown.Item>
+                </NavDropdown>
+                <NavDropdown title="Upload" id="upload-nav-dropdown">
+                  <NavDropdown.Item as={Link} to="/upload-model">Upload Model</NavDropdown.Item>
+                  <NavDropdown.Item as={Link} to="/upload-ids">Upload IDS</NavDropdown.Item>
+                </NavDropdown>
               </>
             )}
           </Nav>
           <Nav>
             {isAuthenticated ? (
-              <NavDropdown title={user?.username || 'User'} id="user-dropdown">
+              <NavDropdown title={user?.username || 'User'} id="user-nav-dropdown">
                 <NavDropdown.Item as={Link} to="/profile">Profile</NavDropdown.Item>
                 <NavDropdown.Divider />
                 <NavDropdown.Item onClick={logout}>Logout</NavDropdown.Item>

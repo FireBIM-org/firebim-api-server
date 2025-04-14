@@ -15,6 +15,8 @@ import ModelCheckPage from './pages/ModelCheckPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
+import IfcModelsPage from './pages/IfcModelsPage';
+import IdsFilesPage from './pages/IdsFilesPage';
 
 const App: React.FC = () => {
   return (
@@ -31,6 +33,16 @@ const App: React.FC = () => {
             <Route path="/profile" element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            } />
+            <Route path="/ifc-models" element={
+              <ProtectedRoute>
+                <IfcModelsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/ids-files" element={
+              <ProtectedRoute>
+                <IdsFilesPage />
               </ProtectedRoute>
             } />
             <Route path="/upload-model" element={
