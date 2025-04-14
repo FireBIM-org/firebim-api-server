@@ -8,9 +8,14 @@ from typing import Optional
 import httpx
 
 from models.database import get_db, init_db
-from models.models import Model, IdsFile
+from models.models import Model, IdsFile, User
+from auth.router import router as auth_router
+from auth.jwt import get_current_active_user
 
 app = FastAPI(title="FireBIM API")
+
+# Include auth router
+app.include_router(auth_router)
 
 # Initialize database tables on startup
 @app.on_event("startup")
@@ -40,8 +45,8 @@ except:
 async def upload_model(
     file: UploadFile = File(...), 
     background_tasks: BackgroundTasks = BackgroundTasks(),
-    user_id: str = "default-user",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Upload an IFC-STEP file, save to S3, and process it with a worker.
@@ -68,7 +73,7 @@ async def upload_model(
         id=model_id,
         filename=file.filename,
         s3_key=s3_key,
-        user_id=user_id
+        user_id=current_user.id
     )
     db.add(model)
     db.commit()
@@ -79,7 +84,11 @@ async def upload_model(
     return {"model_id": model_id}
 
 @app.get("/model/{model_id}")
-async def get_model(model_id: str, db: Session = Depends(get_db)):
+async def get_model(
+    model_id: str, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Download an IFC-STEP file by its ID.
     """
@@ -87,6 +96,10 @@ async def get_model(model_id: str, db: Session = Depends(get_db)):
     model = db.query(Model).filter(Model.id == model_id).first()
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
+    
+    # Check if the model belongs to the current user
+    if model.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this model")
     
     # Download from S3
     local_path = f"/tmp/{model.filename}"
@@ -105,8 +118,8 @@ async def get_model(model_id: str, db: Session = Depends(get_db)):
 @app.post("/ids", status_code=201)
 async def upload_ids(
     file: UploadFile = File(...),
-    user_id: str = "default-user",
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Upload an IDS file (XML-based) and save to S3.
@@ -133,7 +146,7 @@ async def upload_ids(
         id=ids_id,
         filename=file.filename,
         s3_key=s3_key,
-        user_id=user_id
+        user_id=current_user.id
     )
     db.add(ids_file)
     db.commit()
@@ -141,7 +154,11 @@ async def upload_ids(
     return {"ids_id": ids_id}
 
 @app.get("/ids/{ids_id}")
-async def get_ids(ids_id: str, db: Session = Depends(get_db)):
+async def get_ids(
+    ids_id: str, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Download an IDS file by its ID.
     """
@@ -149,6 +166,10 @@ async def get_ids(ids_id: str, db: Session = Depends(get_db)):
     ids_file = db.query(IdsFile).filter(IdsFile.id == ids_id).first()
     if not ids_file:
         raise HTTPException(status_code=404, detail="IDS file not found")
+    
+    # Check if the ids file belongs to the current user
+    if ids_file.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this IDS file")
     
     # Download from S3
     local_path = f"/tmp/{ids_file.filename}"
@@ -165,7 +186,12 @@ async def get_ids(ids_id: str, db: Session = Depends(get_db)):
     )
 
 @app.get("/ids/{ids_id}/check/{model_id}")
-async def check_model_with_ids(ids_id: str, model_id: str, db: Session = Depends(get_db)):
+async def check_model_with_ids(
+    ids_id: str, 
+    model_id: str, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Send command to a worker to process the model with the IDS file.
     """
@@ -174,9 +200,17 @@ async def check_model_with_ids(ids_id: str, model_id: str, db: Session = Depends
     if not ids_file:
         raise HTTPException(status_code=404, detail="IDS file not found")
     
+    # Check if the ids file belongs to the current user
+    if ids_file.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this IDS file")
+    
     model = db.query(Model).filter(Model.id == model_id).first()
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
+    
+    # Check if the model belongs to the current user
+    if model.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this model")
     
     # Send request to worker
     try:
