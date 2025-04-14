@@ -46,8 +46,8 @@ async def upload_model(
     """
     Upload an IFC-STEP file, save to S3, and process it with a worker.
     """
-    if not file.filename.lower().endswith(('.ifc', '.step')):
-        raise HTTPException(status_code=400, detail="File must be an IFC or STEP file")
+    if not file.filename.lower().endswith('.ifc'):
+        raise HTTPException(status_code=400, detail="File must be an IFC (STEP) file")
     
     # Generate a unique ID for the model
     model_id = str(uuid.uuid4())
