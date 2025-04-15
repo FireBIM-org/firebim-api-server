@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, Button, Spinner, Alert, ListGroup, Badge, Modal } from 'react-bootstrap';
-import { IdsFileListItem, downloadIdsFile, getIdsFileById, getIfcModels, IfcModelListItem, checkModelWithIds, CheckResponse } from '../services/api';
+import { IdsFileListItem, downloadIdsFile, getIdsFiles, getIfcModels, IfcModelListItem, checkModelWithIds, CheckResponse } from '../services/api';
 import { formatDate } from '../utils/formatters';
 
 const IdsDetailsPage: React.FC = () => {
@@ -28,26 +28,31 @@ const IdsDetailsPage: React.FC = () => {
       
       try {
         setLoading(true);
-        const fileData = await getIdsFileById(id);
-        setIdsFile(fileData);
+        const idsFiles = await getIdsFiles();
+        const foundFile = idsFiles.find(file => file.id === id);
+        
+        if (foundFile) {
+          setIdsFile(foundFile);
+        } else {
+          setError('IDS file not found');
+        }
       } catch (err) {
-        console.error('Failed to fetch IDS file details:', err);
+        console.error('Failed to fetch IDS files:', err);
         setError('Failed to load the IDS file details. Please try again later.');
-        // Don't navigate away automatically - just show the error
       } finally {
         setLoading(false);
       }
     };
 
     fetchIdsFile();
-  }, [id, navigate]);
+  }, [id]);
 
   const handleDownload = async () => {
-    if (!idsFile) return;
+    if (!id || !idsFile) return;
     
     try {
       setDownloadingFile(true);
-      const blob = await downloadIdsFile(idsFile.id);
+      const blob = await downloadIdsFile(id);
       
       // Create download link
       const url = window.URL.createObjectURL(blob);

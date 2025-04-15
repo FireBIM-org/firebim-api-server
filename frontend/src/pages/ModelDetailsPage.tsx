@@ -1,18 +1,43 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { Card, Button, Alert, Spinner, ListGroup, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import * as api from '../services/api';
 
 const ModelDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filename, setFilename] = useState<string>('model.ifc');
+  const [model, setModel] = useState<api.IfcModelListItem | null>(null);
+
+  useEffect(() => {
+    const fetchModelDetails = async () => {
+      if (!id) return;
+      
+      try {
+        setLoading(true);
+        const modelData = await api.getIfcModels();
+        const foundModel = modelData.find(m => m.id === id);
+        
+        if (foundModel) {
+          setModel(foundModel);
+        } else {
+          setError('Model not found');
+        }
+      } catch (err) {
+        console.error('Failed to fetch model details:', err);
+        setError('Failed to load model details. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchModelDetails();
+  }, [id]);
 
   const handleDownload = async () => {
-    if (!id) return;
+    if (!id || !model) return;
     
     setDownloading(true);
     setError(null);
@@ -22,7 +47,7 @@ const ModelDetailsPage: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = filename;
+      a.download = model.filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -36,6 +61,27 @@ const ModelDetailsPage: React.FC = () => {
       setDownloading(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="text-center my-5">
+        <Spinner animation="border" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </Spinner>
+      </div>
+    );
+  }
+
+  if (!model) {
+    return (
+      <div>
+        <Alert variant="warning">Model not found</Alert>
+        <Link to="/ifc-models" className="btn btn-primary">
+          Back to Models
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -52,7 +98,7 @@ const ModelDetailsPage: React.FC = () => {
               <strong>Model ID:</strong> {id}
             </ListGroup.Item>
             <ListGroup.Item>
-              <strong>Filename:</strong> {filename}
+              <strong>Filename:</strong> {model.filename}
             </ListGroup.Item>
           </ListGroup>
           
@@ -61,7 +107,7 @@ const ModelDetailsPage: React.FC = () => {
               <Button 
                 variant="primary" 
                 onClick={handleDownload} 
-                disabled={downloading || loading}
+                disabled={downloading}
                 className="d-flex align-items-center"
               >
                 {downloading && (
@@ -78,12 +124,12 @@ const ModelDetailsPage: React.FC = () => {
               </Button>
             </Col>
             <Col className="text-end">
-              <Button 
-                onClick={() => window.location.href = "/"}
-                variant="outline-secondary"
+              <Link 
+                to="/ifc-models"
+                className="btn btn-outline-secondary"
               >
-                Back to Home
-              </Button>
+                Back to Models
+              </Link>
             </Col>
           </Row>
         </Card.Body>
