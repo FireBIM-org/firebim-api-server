@@ -1,22 +1,4 @@
-import axios from 'axios';
-import { getToken } from './auth';
-
-// Base API URL - Vite uses import.meta.env instead of process.env
-const API_URL = import.meta.env.VITE_API_URL || '/api';
-
-// Create axios instance with auth header interceptor
-const apiClient = axios.create({
-  baseURL: API_URL
-});
-
-// Add auth token to requests if available
-apiClient.interceptors.request.use(config => {
-  const token = getToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+import { DefaultService } from '../client';
 
 // Types for API responses
 export interface IfcModelListItem {
@@ -57,70 +39,115 @@ export interface CheckResponse {
 
 // Upload an IFC model
 export const uploadIfcModel = async (file: File): Promise<ModelResponse> => {
-  const formData = new FormData();
-  formData.append('file', file);
-  
-  const response = await apiClient.post<ModelResponse>('/ifc_model', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+  const response = await DefaultService.uploadModelIfcModelsPost({
+    body: {
+      file
+    }
   });
   
-  return response.data;
+  if (!response.data) {
+    throw new Error('Failed to upload IFC model');
+  }
+  
+  return response.data as ModelResponse;
 };
 
 // Download an IFC model
 export const downloadIfcModel = async (modelId: string): Promise<Blob> => {
-  const response = await apiClient.get(`/ifc_model/${modelId}`, {
-    responseType: 'blob',
+  const response = await DefaultService.getModelIfcModelsIdGet({
+    path: {
+      id: modelId
+    }
   });
   
-  return response.data;
+  if (!response.data) {
+    throw new Error('Failed to download IFC model');
+  }
+  
+  return response.data as Blob;
 };
 
 // Upload an IDS file
 export const uploadIdsFile = async (file: File): Promise<IdsResponse> => {
-  const formData = new FormData();
-  formData.append('file', file);
-  
-  const response = await apiClient.post<IdsResponse>('/ids_file', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+  const response = await DefaultService.uploadIdsIdsFilesPost({
+    body: {
+      file
+    }
   });
   
-  return response.data;
+  if (!response.data) {
+    throw new Error('Failed to upload IDS file');
+  }
+  
+  return response.data as IdsResponse;
 };
 
 // Download an IDS file
 export const downloadIdsFile = async (idsId: string): Promise<Blob> => {
-  const response = await apiClient.get(`/ids_file/${idsId}`, {
-    responseType: 'blob',
+  const response = await DefaultService.getIdsIdsFilesIdGet({
+    path: {
+      id: idsId
+    }
   });
   
-  return response.data;
+  if (!response.data) {
+    throw new Error('Failed to download IDS file');
+  }
+  
+  return response.data as Blob;
 };
 
 // Get all IFC models for the current user
 export const getIfcModels = async (): Promise<IfcModelListItem[]> => {
-  const response = await apiClient.get<IfcModelListItem[]>('/ifc_models');
-  return response.data;
+  const response = await DefaultService.getModelsIfcModelsGet();
+  
+  if (!response.data) {
+    return [];
+  }
+  
+  return response.data as IfcModelListItem[];
 };
 
 // Get all IDS files for the current user
 export const getIdsFiles = async (): Promise<IdsFileListItem[]> => {
-  const response = await apiClient.get<IdsFileListItem[]>('/ids_files');
-  return response.data;
+  const response = await DefaultService.getIdsFilesIdsFilesGet();
+  
+  if (!response.data) {
+    return [];
+  }
+  
+  return response.data as IdsFileListItem[];
 };
 
 // Get a single IDS file by ID
 export const getIdsFileById = async (idsId: string): Promise<IdsFileListItem> => {
-  const response = await apiClient.get<IdsFileListItem>(`/ids_file/${idsId}`);
-  return response.data;
+  const response = await DefaultService.getIdsIdsFilesIdGet({
+    path: {
+      id: idsId
+    }
+  });
+  
+  if (!response.data) {
+    throw new Error('Failed to get IDS file');
+  }
+  
+  return response.data as IdsFileListItem;
 };
 
 // Check a model against an IDS file
 export const checkModelWithIds = async (idsId: string, modelId: string): Promise<CheckResponse> => {
-  const response = await apiClient.get<CheckResponse>(`/ids_file/${idsId}/check/${modelId}`);
-  return response.data;
+  const response = await DefaultService.checkModelWithIdsIfcModelsModelIdCheckGet({
+    path: {
+      model_id: modelId
+    },
+    query: {
+      ids_id: idsId
+    }
+  });
+  
+  if (!response.data) {
+    throw new Error('Failed to check model with IDS');
+  }
+  
+  return response.data as CheckResponse;
 }

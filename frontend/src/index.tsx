@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './index.css';
+// Import the client configuration
+import './client/config';
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement

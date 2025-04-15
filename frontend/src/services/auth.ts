@@ -1,9 +1,5 @@
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || '/api';
-const authClient = axios.create({
-  baseURL: API_URL
-});
+import { AuthenticationService, type User } from '../client';
+import { updateAuthToken } from '../client/config';
 
 export interface LoginCredentials {
   username: string;
@@ -21,16 +17,12 @@ export interface AuthResponse {
   token_type: string;
 }
 
-export interface UserProfile {
-  id: string; // Updated to string to match backend
-  username: string;
-  email: string;
-  is_active: boolean;
-}
+export type UserProfile = User;
 
 // Store token in localStorage
 const storeToken = (token: string) => {
   localStorage.setItem('auth_token', token);
+  updateAuthToken(token);
 };
 
 // Get token from localStorage
@@ -41,6 +33,7 @@ export const getToken = (): string | null => {
 // Remove token from localStorage
 export const removeToken = () => {
   localStorage.removeItem('auth_token');
+  updateAuthToken(null);
 };
 
 // Check if user is authenticated
@@ -50,26 +43,31 @@ export const isAuthenticated = (): boolean => {
 
 // Login
 export const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
-  // Use URLSearchParams for proper form encoding
-  const formData = new URLSearchParams();
-  formData.append('username', credentials.username);
-  formData.append('password', credentials.password);
-  
-  const response = await authClient.post<AuthResponse>('/token', formData, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
+  const response = await AuthenticationService.loginForAccessTokenTokenPost({
+    body: {
+      username: credentials.username,
+      password: credentials.password
     }
   });
   
-  if (response.data.access_token) {
+  if (response.data && response.data.access_token) {
     storeToken(response.data.access_token);
+    return response.data;
   }
-  return response.data;
+  
+  throw new Error('Authentication failed');
 };
 
 // Register
 export const register = async (data: RegisterData): Promise<UserProfile> => {
-  const response = await authClient.post<UserProfile>('/register', data);
+  const response = await AuthenticationService.registerUserRegisterPost({
+    body: data
+  });
+  
+  if (!response.data) {
+    throw new Error('Registration failed');
+  }
+  
   return response.data;
 };
 
@@ -85,11 +83,11 @@ export const getCurrentUser = async (): Promise<UserProfile> => {
     throw new Error('No authentication token found');
   }
   
-  const response = await authClient.get<UserProfile>('/users/me', {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
+  const response = await AuthenticationService.readUsersMeUsersMeGet();
+  
+  if (!response.data) {
+    throw new Error('Failed to get user profile');
+  }
   
   return response.data;
 };
