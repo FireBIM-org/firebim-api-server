@@ -41,7 +41,7 @@ try:
 except:
     s3_client.create_bucket(Bucket=BUCKET_NAME)
 
-@app.post("/ifc_model", status_code=201)
+@app.post("/ifc-models", status_code=201)
 async def upload_model(
     file: UploadFile = File(...), 
     background_tasks: BackgroundTasks = BackgroundTasks(),
@@ -83,7 +83,7 @@ async def upload_model(
     
     return {"id": id}
 
-@app.get("/ifc_model/{id}")
+@app.get("/ifc-models/{id}")
 async def get_model(
     id: str, 
     db: Session = Depends(get_db),
@@ -115,7 +115,7 @@ async def get_model(
         media_type="application/octet-stream"
     )
 
-@app.get("/ifc_models")
+@app.get("/ifc-models")
 async def get_models(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -135,7 +135,7 @@ async def get_models(
         for model in models
     ]
 
-@app.post("/ids_file", status_code=201)
+@app.post("/ids-files", status_code=201)
 async def upload_ids(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -174,7 +174,7 @@ async def upload_ids(
     
     return {"id": id}
 
-@app.get("/ids_file/{id}")
+@app.get("/ids-files/{id}")
 async def get_ids(
     id: str, 
     db: Session = Depends(get_db),
@@ -206,7 +206,7 @@ async def get_ids(
         media_type="application/xml"
     )
 
-@app.get("/ids_files")
+@app.get("/ids-files")
 async def get_ids_files(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -226,10 +226,10 @@ async def get_ids_files(
         for ids_file in ids_files
     ]
 
-@app.get("/ids_file/{ids_id}/check/{model_id}")
+@app.get("/ifc-models/{model_id}/check")
 async def check_model_with_ids(
-    ids_id: str, 
-    model_id: str, 
+    model_id: str,
+    ids_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
