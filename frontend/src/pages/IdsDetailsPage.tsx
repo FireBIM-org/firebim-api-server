@@ -165,6 +165,11 @@ const IdsDetailsPage: React.FC = () => {
       }
       
       localStorage.setItem('checkResults', JSON.stringify(checkResults));
+      
+      // Navigate directly to the model check page instead of showing results in the modal
+      setShowCheckModal(false);
+      window.location.href = `/model-check/${result.id}`;
+      
     } catch (err) {
       console.error('Failed to check model against IDS:', err);
       setCheckError('Failed to perform the check. Please try again later.');
