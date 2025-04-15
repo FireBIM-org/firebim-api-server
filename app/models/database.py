@@ -1,12 +1,14 @@
 from sqlmodel import SQLModel, create_engine, Session
 import os
 
+from app.core.config import settings
+
 # Get PostgreSQL connection details from environment variables
-POSTGRES_USER = os.getenv("POSTGRES_USER", "postgres")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgres")
-POSTGRES_HOST = os.getenv("POSTGRES_HOST", "postgres")
-POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
-POSTGRES_DB = os.getenv("POSTGRES_DB", "firebim")
+POSTGRES_USER = settings.POSTGRES_USER
+POSTGRES_PASSWORD = settings.POSTGRES_PASSWORD
+POSTGRES_HOST = settings.POSTGRES_HOST
+POSTGRES_PORT = settings.POSTGRES_PORT
+POSTGRES_DB = settings.POSTGRES_DB
 
 DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 

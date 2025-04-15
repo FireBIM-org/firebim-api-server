@@ -1,11 +1,12 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import FileResponse
 import uuid
-import os
 import boto3
 from sqlmodel import Session
 from typing import Optional
 import httpx
+
+from app.core.config import settings
 
 from app.models.database import get_db, init_db
 from app.models.models import IfcModel, IdsFile, User
@@ -23,17 +24,21 @@ async def startup_event():
     init_db()
     print("Database tables created successfully")
 
+# endpoint_url=os.getenv("S3_ENDPOINT_URL", "http://minio:9000"),
+endpoint_url=settings.S3_ENDPOINT_URL
+print("Endpoint URL:", endpoint_url)
+
 # S3 Configuration
 s3_client = boto3.client(
     's3',
-    endpoint_url=os.getenv("S3_ENDPOINT_URL", "http://minio:9000"),
-    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID", "minioadmin"),
-    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin"),
-    region_name=os.getenv("AWS_REGION", "us-east-1"),
+    endpoint_url=settings.S3_ENDPOINT_URL,
+    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+    region_name=settings.AWS_REGION
 )
 
-BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "firebim")
-WORKER_URL = os.getenv("WORKER_SERVICE_URL", "http://worker-service:8000")
+BUCKET_NAME = settings.S3_BUCKET_NAME
+WORKER_URL = settings.WORKER_SERVICE_URL
 
 # Create bucket if it doesn't exist
 try:

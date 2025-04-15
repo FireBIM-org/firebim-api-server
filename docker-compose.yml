@@ -34,6 +34,8 @@ services:
       - AWS_SECRET_ACCESS_KEY=minioadmin
       - AWS_REGION=us-east-1
       - S3_BUCKET_NAME=firebim
+    ports:
+      - "8001:8000"
     volumes:
       - ./app/workers:/app
     depends_on:

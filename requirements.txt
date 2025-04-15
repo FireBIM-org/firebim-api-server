@@ -1,4 +1,5 @@
 fastapi==0.110.0
+fastapi-cli
 uvicorn==0.27.1
 pydantic==2.6.3
 python-multipart==0.0.9
@@ -11,3 +12,4 @@ uuid==1.30
 pyjwt==2.8.0
 passlib[bcrypt]
 email-validator==2.1.0
+pydantic-settings
