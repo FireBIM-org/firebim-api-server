@@ -89,8 +89,82 @@ const IdsDetailsPage: React.FC = () => {
     try {
       setCheckLoading(true);
       setCheckError(null);
-      const result = await checkModelWithIds(id, selectedModelId);
+      
+      // Get the raw API response
+      const response = await checkModelWithIds(id, selectedModelId);
+      
+      // Log the exact response for debugging
+      console.log('Raw API response:', response);
+      
+      // Process the response
+      let result = response;
+      
+      // If result is not an object or is null, create a default structure
+      if (!result || typeof result !== 'object') {
+        console.error('API returned invalid data format:', result);
+        result = {
+          id: `temp-${Date.now()}`, // Generate a temporary ID
+          ifc_model_id: selectedModelId,
+          ids_id: id,
+          status: 'completed',
+          summary: {
+            total_elements: 0,
+            passing: false,
+            message: 'Check completed with unknown result'
+          }
+        };
+      } 
+      // If result doesn't have an ID, add one
+      else if (!result.id) {
+        console.warn('API response missing ID, adding temporary ID');
+        result.id = `temp-${Date.now()}`;
+      }
+      
+      // Ensure other required fields exist
+      if (!result.summary) {
+        console.warn('Response missing summary, creating default');
+        result.summary = {
+          total_elements: 0,
+          passing: false,
+          message: 'Check completed, but no detailed results were returned'
+        };
+      }
+      
+      // Make sure all required IDs are present
+      if (!result.ifc_model_id) {
+        result.ifc_model_id = selectedModelId;
+      }
+      
+      if (!result.ids_id) {
+        result.ids_id = id;
+      }
+      
       setCheckResult(result);
+      
+      // Store the check result with a specific key pattern for direct access
+      localStorage.setItem(`checkResult_${result.id}`, JSON.stringify(result));
+      
+      // Also add to the array of all check results for backward compatibility
+      const savedResults = localStorage.getItem('checkResults');
+      let checkResults = [];
+      
+      if (savedResults) {
+        try {
+          checkResults = JSON.parse(savedResults);
+        } catch (e) {
+          console.error('Failed to parse saved check results', e);
+        }
+      }
+      
+      // Add the new result (or replace existing one with same ID)
+      const existingIndex = checkResults.findIndex(check => check.id === result.id);
+      if (existingIndex >= 0) {
+        checkResults[existingIndex] = result;
+      } else {
+        checkResults.push(result);
+      }
+      
+      localStorage.setItem('checkResults', JSON.stringify(checkResults));
     } catch (err) {
       console.error('Failed to check model against IDS:', err);
       setCheckError('Failed to perform the check. Please try again later.');

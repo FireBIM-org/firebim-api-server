@@ -134,6 +134,21 @@ export const getIdsFileById = async (idsId: string): Promise<IdsFileListItem> =>
   return response.data as IdsFileListItem;
 };
 
+// Get a single IFC model by ID
+export const getIfcModelById = async (modelId: string): Promise<IfcModelListItem> => {
+  const response = await DefaultService.getModelIfcModelsIdGet({
+    path: {
+      id: modelId
+    }
+  });
+  
+  if (!response.data) {
+    throw new Error('Failed to get IFC model');
+  }
+  
+  return response.data as IfcModelListItem;
+};
+
 // Check a model against an IDS file
 export const checkModelWithIds = async (idsId: string, modelId: string): Promise<CheckResponse> => {
   const response = await DefaultService.checkModelWithIdsIfcModelsModelIdCheckGet({
@@ -150,4 +165,53 @@ export const checkModelWithIds = async (idsId: string, modelId: string): Promise
   }
   
   return response.data as CheckResponse;
-}
+};
+
+// Get a check result by ID
+export const getCheckResultById = async (checkId: string): Promise<CheckResponse> => {
+  // Retrieve the check result directly from localStorage
+  const savedResult = localStorage.getItem(`checkResult_${checkId}`);
+  
+  if (savedResult) {
+    try {
+      return JSON.parse(savedResult) as CheckResponse;
+    } catch (e) {
+      console.error('Failed to parse saved check result', e);
+      throw new Error('Invalid check result data');
+    }
+  }
+  
+  // Fallback: try to get it from the array of all check results
+  const savedResults = localStorage.getItem('checkResults');
+  if (savedResults) {
+    try {
+      const checkResults = JSON.parse(savedResults) as CheckResponse[];
+      const checkResult = checkResults.find(check => check.id === checkId);
+      if (checkResult) {
+        return checkResult;
+      }
+    } catch (e) {
+      console.error('Failed to parse saved check results', e);
+    }
+  }
+  
+  throw new Error('Check result not found');
+};
+
+// Get all check results (stub implementation)
+export const getAllCheckResults = async (): Promise<CheckResponse[]> => {
+  // This would typically call an API endpoint, but we're using a simplified approach
+  // In a real implementation, this would call something like DefaultService.getCheckResultsChecksGet()
+  
+  // For now, we'll use local storage as a temporary cache for check results
+  const savedResults = localStorage.getItem('checkResults');
+  if (savedResults) {
+    try {
+      return JSON.parse(savedResults) as CheckResponse[];
+    } catch (e) {
+      console.error('Failed to parse saved check results', e);
+    }
+  }
+  
+  return [];
+};

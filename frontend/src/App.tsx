@@ -70,6 +70,11 @@ const App: React.FC = () => {
                 <ModelCheckPage />
               </ProtectedRoute>
             } />
+            <Route path="/model-check/:id" element={
+              <ProtectedRoute>
+                <ModelCheckPage />
+              </ProtectedRoute>
+            } />
           </Routes>
         </div>
         <ToastContainer position="bottom-right" />
