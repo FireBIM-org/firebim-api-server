@@ -2,6 +2,7 @@
   "name": "firebim-frontend",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "dependencies": {
     "axios": "^1.5.0",
     "bootstrap": "^5.3.1",
@@ -14,20 +15,14 @@
   "devDependencies": {
     "@types/react": "^18.3.20",
     "@types/react-dom": "^18.3.6",
-    "react-scripts": "5.0.1",
-    "typescript": "^4.9.5"
+    "@vitejs/plugin-react": "^4.4.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.0"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+    "start": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
   },
   "browserslist": {
     "production": [
@@ -40,6 +35,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "proxy": "http://localhost:8000"
+  }
 }

@@ -1,8 +1,8 @@
 import axios from 'axios';
 import { getToken } from './auth';
 
-// Base API URL
-const API_URL = process.env.REACT_APP_API_URL || '/api';
+// Base API URL - Vite uses import.meta.env instead of process.env
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 // Create axios instance with auth header interceptor
 const apiClient = axios.create({
