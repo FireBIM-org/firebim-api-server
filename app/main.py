@@ -7,10 +7,10 @@ from sqlmodel import Session
 from typing import Optional
 import httpx
 
-from models.database import get_db, init_db
-from models.models import IfcModel, IdsFile, User
-from auth.router import router as auth_router
-from auth.jwt import get_current_active_user
+from app.models.database import get_db, init_db
+from app.models.models import IfcModel, IdsFile, User
+from app.auth.router import router as auth_router
+from app.auth.jwt import get_current_active_user
 
 app = FastAPI(title="FireBIM API")
 

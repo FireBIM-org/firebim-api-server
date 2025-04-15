@@ -3,10 +3,10 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session
 from datetime import timedelta
 
-from models.database import get_db
-from models.models import User
-from schemas.auth import Token, UserCreate, User as UserSchema
-from auth.jwt import (
+from app.models.database import get_db
+from app.models.models import User
+from app.schemas.auth import Token, UserCreate, User as UserSchema
+from app.auth.jwt import (
     authenticate_user, 
     create_access_token, 
     get_password_hash,

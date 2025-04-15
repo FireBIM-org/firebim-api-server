@@ -7,9 +7,9 @@ from sqlmodel import Session
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-from models.database import get_db
-from models.models import User
-from schemas.auth import TokenData
+from app.models.database import get_db
+from app.models.models import User
+from app.schemas.auth import TokenData
 
 # Password hashing settings
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
