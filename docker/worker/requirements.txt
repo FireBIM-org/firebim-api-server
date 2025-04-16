@@ -1,0 +1,6 @@
+ifcopenshell==0.8.1.post1
+ifctester==0.8.1
+bcf-client==0.8.1
+celery==5.3.6
+sqlmodel
+boto3
