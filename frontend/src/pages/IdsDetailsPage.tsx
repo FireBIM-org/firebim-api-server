@@ -162,7 +162,7 @@ const IdsDetailsPage: React.FC = () => {
       }
       
       // Add the new result (or replace existing one with same ID)
-      const existingIndex = checkResults.findIndex(check => check.id === result.id);
+      const existingIndex = checkResults.findIndex((check: CheckResponse) => check.id === result.id);
       if (existingIndex >= 0) {
         checkResults[existingIndex] = result;
       } else {
