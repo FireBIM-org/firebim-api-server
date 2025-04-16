@@ -1,17 +1,20 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Depends
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Depends, Query
+from fastapi.responses import FileResponse, JSONResponse
 import uuid
 import boto3
-from sqlmodel import Session
+from sqlmodel import Session, select
 from typing import Optional
+import json
 import httpx
+import os
+import time
 
 from app.core.config import settings
-
 from app.models.database import get_db, init_db
-from app.models.models import IfcModel, IdsFile, User
+from app.models.models import IfcModel, IdsFile, User, CheckResult
 from app.auth.router import router as auth_router
 from app.auth.jwt import get_current_active_user
+from app.workers.celery_app import celery_app
 
 app = FastAPI(title="FireBIM API")
 
@@ -24,10 +27,6 @@ async def startup_event():
     init_db()
     print("Database tables created successfully")
 
-# endpoint_url=os.getenv("S3_ENDPOINT_URL", "http://minio:9000"),
-endpoint_url=settings.S3_ENDPOINT_URL
-print("Endpoint URL:", endpoint_url)
-
 # S3 Configuration
 s3_client = boto3.client(
     's3',
@@ -38,7 +37,6 @@ s3_client = boto3.client(
 )
 
 BUCKET_NAME = settings.S3_BUCKET_NAME
-WORKER_URL = settings.WORKER_SERVICE_URL
 
 # Create bucket if it doesn't exist
 try:
@@ -49,22 +47,22 @@ except:
 @app.post("/ifc-models", status_code=201)
 async def upload_model(
     file: UploadFile = File(...), 
-    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Upload an IFC-STEP file, save to S3, and process it with a worker.
+    Upload an IFC-STEP file, save to S3, and queue it for processing.
     """
     if not file.filename.lower().endswith('.ifc'):
         raise HTTPException(status_code=400, detail="File must be an IFC (STEP) file")
     
-    # Generate a unique ID for the model - SQLModel will auto-generate the ID now
     # Read the file content
     content = await file.read()
     
+    # Generate a unique ID for the model
+    id = str(uuid.uuid4())
+    
     # Upload to S3
-    id = str(uuid.uuid4())  # Generate ID for S3 path
     s3_key = f"models/{id}/{file.filename}"
     s3_client.put_object(
         Bucket=BUCKET_NAME,
@@ -77,16 +75,25 @@ async def upload_model(
         id=id,
         filename=file.filename,
         s3_key=s3_key,
-        user_id=current_user.id
+        user_id=current_user.id,
+        processing_status="pending"
     )
     db.add(model)
     db.commit()
     db.refresh(model)
     
-    # Send to worker for processing in the background
-    background_tasks.add_task(send_to_worker, id, s3_key)
+    # Queue task to process the model
+    task = celery_app.send_task(
+        "process_model",
+        args=[id, s3_key]
+    )
     
-    return {"id": id}
+    # Update model with task ID
+    model.task_id = task.id
+    model.processing_status = "processing"
+    db.commit()
+    
+    return {"id": id, "task_id": task.id, "status": "processing"}
 
 @app.get("/ifc-models/{id}")
 async def get_model(
@@ -135,7 +142,8 @@ async def get_models(
             "id": model.id,
             "filename": model.filename,
             "created_at": model.created_at,
-            "updated_at": model.updated_at
+            "updated_at": model.updated_at,
+            "status": model.processing_status
         }
         for model in models
     ]
@@ -231,15 +239,21 @@ async def get_ids_files(
         for ids_file in ids_files
     ]
 
-@app.get("/ifc-models/{model_id}/check")
-async def check_model_with_ids(
+# New endpoints that implement the required functionality
+
+@app.post("/async/check-model-with-ids", status_code=202)
+async def async_check_model_with_ids(
     model_id: str,
     ids_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Send command to a worker to process the model with the IDS file.
+    Asynchronously check a model against an IDS file.
+    Returns immediately with a task ID for polling the result.
+    
+    This endpoint demonstrates the first requested pattern:
+    "Call that returns immediately with id for polling if result is ready. Task is sent to worker."
     """
     # Validate that both IDS and Model exist
     ids_file = db.query(IdsFile).filter(IdsFile.id == ids_id).first()
@@ -258,35 +272,164 @@ async def check_model_with_ids(
     if model.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to access this model")
     
-    # Send request to worker
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{WORKER_URL}/check",
-                json={
-                    "ids_id": ids_id,
-                    "model_id": model_id,
-                    "ids_s3_key": ids_file.s3_key,
-                    "model_s3_key": model.s3_key
-                },
-                timeout=60.0  # Longer timeout as processing may take time
-            )
-            response.raise_for_status()
-            return response.json()
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+    # Create a check result record
+    check_result = CheckResult(
+        ifc_model_id=model_id,
+        ids_id=ids_id,
+        status="pending"
+    )
+    db.add(check_result)
+    db.commit()
+    db.refresh(check_result)
+    
+    # Send task to Celery worker
+    task = celery_app.send_task(
+        "check_model_with_ids",
+        args=[ids_id, model_id, ids_file.s3_key, model.s3_key]
+    )
+    
+    # Update check result with task ID
+    check_result.task_id = task.id
+    check_result.status = "processing"
+    db.commit()
+    
+    return {
+        "check_id": check_result.id,
+        "task_id": task.id,
+        "status": "processing",
+        "message": "Task has been queued. Use the check_id to poll for results."
+    }
 
-async def send_to_worker(model_id: str, s3_key: str):
+@app.get("/async/check-result/{check_id}")
+async def get_async_check_result(
+    check_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
-    Send a model to a worker for processing.
+    Get the result of an asynchronous check operation by its ID.
+    This is the polling endpoint to check if a result is ready.
     """
-    try:
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                f"{WORKER_URL}/process",
-                json={"model_id": model_id, "s3_key": s3_key},
-                timeout=30.0
-            )
-    except Exception as e:
-        print(f"Error sending model to worker: {str(e)}")
-        # In a real application, you might want to implement retry logic or error tracking
+    # Get check result from DB
+    check_result = db.query(CheckResult).filter(CheckResult.id == check_id).first()
+    if not check_result:
+        raise HTTPException(status_code=404, detail="Check result not found")
+    
+    # Verify ownership through model and IDS file
+    model = db.query(IfcModel).filter(IfcModel.id == check_result.ifc_model_id).first()
+    if not model or model.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this check result")
+    
+    # Check result status
+    if check_result.status == "completed" and check_result.result_json:
+        # Return the stored result
+        return JSONResponse(content=json.loads(check_result.result_json))
+    elif check_result.status == "failed":
+        return {"status": "failed", "message": "Check operation failed"}
+    elif check_result.task_id:
+        # Check task status with Celery
+        task_result = celery_app.AsyncResult(check_result.task_id)
+        
+        if task_result.ready():
+            result = task_result.get()
+            
+            # Update the database record
+            if result.get("status") == "success":
+                check_result.status = "completed"
+                check_result.result_json = json.dumps(result.get("check_result", {}))
+                check_result.result_key = result.get("result_key")
+                db.commit()
+                return result.get("check_result", {})
+            else:
+                check_result.status = "failed"
+                db.commit()
+                return {"status": "failed", "message": "Check operation failed"}
+                
+        return {
+            "status": "processing",
+            "check_id": check_id,
+            "message": "Still processing. Please check again later."
+        }
+    
+    return {"status": "unknown", "message": "Could not determine task status"}
+
+# @app.post("/sync/check-model-with-ids")
+@app.get("/ifc-models/{model_id}/check")
+async def sync_check_model_with_ids(
+    model_id: str,
+    ids_id: str,
+    timeout: int = Query(300, description="Timeout in seconds"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Synchronously check a model against an IDS file.
+    Waits for the worker to complete and returns the result.
+    
+    This endpoint demonstrates the second requested pattern:
+    "Call that waits for the worker to return with the result."
+    """
+    # Validate that both IDS and Model exist
+    ids_file = db.query(IdsFile).filter(IdsFile.id == ids_id).first()
+    if not ids_file:
+        raise HTTPException(status_code=404, detail="IDS file not found")
+    
+    # Check if the ids file belongs to the current user
+    if ids_file.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this IDS file")
+    
+    model = db.query(IfcModel).filter(IfcModel.id == model_id).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    
+    # Check if the model belongs to the current user
+    if model.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this model")
+    
+    # Create a check result record
+    check_result = CheckResult(
+        ifc_model_id=model_id,
+        ids_id=ids_id,
+        status="processing"
+    )
+    db.add(check_result)
+    db.commit()
+    db.refresh(check_result)
+    
+    # Send task to Celery worker
+    task = celery_app.send_task(
+        "check_model_with_ids",
+        args=[ids_id, model_id, ids_file.s3_key, model.s3_key]
+    )
+    
+    # Update check result with task ID
+    check_result.task_id = task.id
+    db.commit()
+    
+    # Wait for the result with timeout
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        # Check if task is complete
+        task_result = celery_app.AsyncResult(task.id)
+        if task_result.ready():
+            result = task_result.get()
+            
+            # Update the database record
+            if result.get("status") == "success":
+                check_result.status = "completed"
+                check_result.result_json = json.dumps(result.get("check_result", {}))
+                check_result.result_key = result.get("result_key")
+                db.commit()
+                return result.get("check_result", {})
+            else:
+                check_result.status = "failed"
+                db.commit()
+                raise HTTPException(status_code=500, detail="Check operation failed")
+                
+        # Wait a bit before checking again
+        time.sleep(1)
+    
+    # If we get here, we've timed out
+    check_result.status = "failed"
+    db.commit()
+    raise HTTPException(status_code=504, detail="Operation timed out")

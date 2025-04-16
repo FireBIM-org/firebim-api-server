@@ -14,7 +14,6 @@ data:
   POSTGRES_HOST: "postgres"
   POSTGRES_PORT: "5432"
   POSTGRES_DB: "firebim"
-  WORKER_SERVICE_URL: "http://worker-service:8000"
 ---
 apiVersion: apps/v1
 kind: Deployment

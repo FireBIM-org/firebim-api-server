@@ -136,7 +136,7 @@
       },
       "post": {
         "summary": "Upload Model",
-        "description": "Upload an IFC-STEP file, save to S3, and process it with a worker.",
+        "description": "Upload an IFC-STEP file, save to S3, and queue it for processing.",
         "operationId": "upload_model_ifc_models_post",
         "requestBody": {
           "content": {
@@ -323,11 +323,106 @@
         }
       }
     },
+    "/async/check-model-with-ids": {
+      "post": {
+        "summary": "Async Check Model With Ids",
+        "description": "Asynchronously check a model against an IDS file.\nReturns immediately with a task ID for polling the result.\n\nThis endpoint demonstrates the first requested pattern:\n\"Call that returns immediately with id for polling if result is ready. Task is sent to worker.\"",
+        "operationId": "async_check_model_with_ids_async_check_model_with_ids_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Model Id"
+            }
+          },
+          {
+            "name": "ids_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ids Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/async/check-result/{check_id}": {
+      "get": {
+        "summary": "Get Async Check Result",
+        "description": "Get the result of an asynchronous check operation by its ID.\nThis is the polling endpoint to check if a result is ready.",
+        "operationId": "get_async_check_result_async_check_result__check_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "check_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Check Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ifc-models/{model_id}/check": {
       "get": {
-        "summary": "Check Model With Ids",
-        "description": "Send command to a worker to process the model with the IDS file.",
-        "operationId": "check_model_with_ids_ifc_models__model_id__check_get",
+        "summary": "Sync Check Model With Ids",
+        "description": "Synchronously check a model against an IDS file.\nWaits for the worker to complete and returns the result.\n\nThis endpoint demonstrates the second requested pattern:\n\"Call that waits for the worker to return with the result.\"",
+        "operationId": "sync_check_model_with_ids_ifc_models__model_id__check_get",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -351,6 +446,18 @@
               "type": "string",
               "title": "Ids Id"
             }
+          },
+          {
+            "name": "timeout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "Timeout in seconds",
+              "default": 300,
+              "title": "Timeout"
+            },
+            "description": "Timeout in seconds"
           }
         ],
         "responses": {
@@ -384,7 +491,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^password$"
+                "pattern": "password"
               },
               {
                 "type": "null"

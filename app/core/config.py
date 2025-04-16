@@ -78,7 +78,8 @@ class Settings(BaseSettings):
     AWS_REGION: str
 
     # Worker
-    WORKER_SERVICE_URL: str
+    CELERY_BROKER_URL: str
+    CELERY_RESULT_BACKEND: str
 
     # SMTP_TLS: bool = True
     # SMTP_SSL: bool = False

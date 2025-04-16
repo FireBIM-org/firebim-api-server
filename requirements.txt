@@ -13,3 +13,4 @@ pyjwt==2.8.0
 passlib[bcrypt]
 email-validator==2.1.0
 pydantic-settings
+celery==5.3.6
