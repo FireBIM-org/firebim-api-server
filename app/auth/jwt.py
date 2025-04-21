@@ -7,6 +7,8 @@ from sqlmodel import Session
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
+from app.core.config import settings
+
 from app.models.database import get_db
 from app.models.models import User
 from app.schemas.auth import TokenData
@@ -15,7 +17,7 @@ from app.schemas.auth import TokenData
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT settings
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-for-development-only")
+SECRET_KEY = settings.SECRET_KEY.get_secret_value()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
