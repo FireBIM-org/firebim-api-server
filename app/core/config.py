@@ -8,6 +8,8 @@ from pydantic import (
     EmailStr,
     HttpUrl,
     PostgresDsn,
+    SecretStr,
+    Field,
     computed_field,
     model_validator,
 )
@@ -30,9 +32,10 @@ class Settings(BaseSettings):
         env_file="../.env",
         env_ignore_empty=True,
         extra="ignore",
+        secrets_dir='/run/secrets',
     )
     # API_V1_STR: str = "/api/v1"
-    SECRET_KEY: str = secrets.token_urlsafe(32)
+    SECRET_KEY: SecretStr = secrets.token_urlsafe(32)
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     # FRONTEND_HOST: str = "http://localhost:5173"
@@ -54,7 +57,8 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str
-    POSTGRES_PASSWORD: str = ""
+    POSTGRES_PASSWORD: SecretStr = Field(alias='db-password')
+    # POSTGRES_PASSWORD_FILE: str = ""
     POSTGRES_DB: str = ""
 
     @computed_field  # type: ignore[prop-decorator]
@@ -73,9 +77,10 @@ class Settings(BaseSettings):
     # S3
     S3_ENDPOINT_URL: str
     S3_BUCKET_NAME: str
-    AWS_ACCESS_KEY_ID: str
-    AWS_SECRET_ACCESS_KEY: str
-    AWS_REGION: str
+    S3_ACCESS_KEY_ID: str
+    S3_SECRET_ACCESS_KEY: SecretStr = Field(alias='s3-secret-key')
+    # S3_SECRET_ACCESS_KEY_FILE: str
+    S3_REGION: str
 
     # Worker
     CELERY_BROKER_URL: str
@@ -123,4 +128,4 @@ class Settings(BaseSettings):
         return self
 
 
-settings = Settings()  # type: ignore
+settings = Settings()
