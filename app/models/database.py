@@ -5,7 +5,7 @@ from app.core.config import settings
 
 # Get PostgreSQL connection details from environment variables
 POSTGRES_USER = settings.POSTGRES_USER
-POSTGRES_PASSWORD = settings.POSTGRES_PASSWORD
+POSTGRES_PASSWORD = settings.POSTGRES_PASSWORD.get_secret_value()
 POSTGRES_HOST = settings.POSTGRES_HOST
 POSTGRES_PORT = settings.POSTGRES_PORT
 POSTGRES_DB = settings.POSTGRES_DB
