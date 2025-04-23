@@ -21,6 +21,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://guest:guest@rabbitmq:5672//}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS-https://firebim.org,https://www.firebim.org,https://app.firebim.org,https://www.app.firebim.org}
     volumes:
       - ./app:/app
     depends_on:
