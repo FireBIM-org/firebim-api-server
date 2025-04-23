@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Depends, Query
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 import uuid
 import boto3
 from sqlmodel import Session, select
@@ -20,6 +21,29 @@ app = FastAPI(title="FireBIM API")
 
 # Include auth router
 app.include_router(auth_router)
+
+# CORS settings
+origins = settings.all_cors_origins
+
+if settings.ENVIRONMENT == "local":
+    origins.extend([
+        "http://localhost",
+        "https://localhost",
+        "http://localhost:80",
+        "https://localhost:443",
+        "http://localhost:3000",
+        "https://localhost:3000",
+    ])
+
+print("CORS origins:", origins)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Initialize database tables on startup
 @app.on_event("startup")
