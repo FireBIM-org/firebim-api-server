@@ -1,5 +1,7 @@
+'use client';
+
 import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { Card, Button, Alert, Spinner } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import * as api from '../services/api';
@@ -9,7 +11,7 @@ const IdsUploadPage: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0] || null;
@@ -55,7 +57,7 @@ const IdsUploadPage: React.FC = () => {
     try {
       const response = await api.uploadIdsFile(file);
       toast.success('IDS file uploaded successfully!');
-      navigate(`/ids/${response.id}`);
+      router.push(`/ids/${response.id}`);
     } catch (err) {
       console.error('Upload error:', err);
       setError('Failed to upload IDS file. Please try again.');

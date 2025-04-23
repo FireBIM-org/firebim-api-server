@@ -1,5 +1,7 @@
+'use client';
+
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import * as authService from '../services/auth';
 
@@ -19,14 +21,14 @@ interface AuthProviderProps {
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(authService.isAuthenticated());
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [user, setUser] = useState<authService.UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const navigate = useNavigate();
+  const router = useRouter();
 
   useEffect(() => {
     const loadUserProfile = async () => {
-      if (authService.isAuthenticated()) {
+      if (typeof window !== 'undefined' && authService.isAuthenticated()) {
         try {
           const userData = await authService.getCurrentUser();
           setUser(userData);
@@ -51,7 +53,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(userData);
       setIsAuthenticated(true);
       toast.success('Login successful!');
-      navigate('/');
+      router.push('/');
     } catch (error) {
       console.error('Login failed:', error);
       toast.error('Login failed. Please check your credentials.');
@@ -66,7 +68,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       await authService.register({ username, email, password });
       toast.success('Registration successful! Please log in.');
-      navigate('/login');
+      router.push('/login');
     } catch (error) {
       console.error('Registration failed:', error);
       toast.error('Registration failed. Please try again.');
@@ -80,7 +82,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setIsAuthenticated(false);
     setUser(null);
     toast.info('You have been logged out.');
-    navigate('/');
+    router.push('/');
   };
 
   return (

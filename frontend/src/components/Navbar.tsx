@@ -1,5 +1,7 @@
+'use client';
+
 import React from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { Navbar as BootstrapNavbar, Nav, Container, NavDropdown } from 'react-bootstrap';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -9,20 +11,20 @@ const Navbar: React.FC = () => {
   return (
     <BootstrapNavbar bg="dark" variant="dark" expand="lg">
       <Container>
-        <BootstrapNavbar.Brand as={Link} to="/">FireBIM</BootstrapNavbar.Brand>
+        <BootstrapNavbar.Brand href="/" as={Link}>FireBIM</BootstrapNavbar.Brand>
         <BootstrapNavbar.Toggle aria-controls="basic-navbar-nav" />
         <BootstrapNavbar.Collapse id="basic-navbar-nav">
           <Nav className="me-auto">
-            <Nav.Link as={Link} to="/">Home</Nav.Link>
+            <Nav.Link href="/" as={Link}>Home</Nav.Link>
             {isAuthenticated && (
               <>
                 <NavDropdown title="Files" id="file-nav-dropdown">
-                  <NavDropdown.Item as={Link} to="/ifc-models">IFC Models</NavDropdown.Item>
-                  <NavDropdown.Item as={Link} to="/ids-files">IDS Files</NavDropdown.Item>
+                  <NavDropdown.Item href="/ifc-models" as={Link}>IFC Models</NavDropdown.Item>
+                  <NavDropdown.Item href="/ids-files" as={Link}>IDS Files</NavDropdown.Item>
                 </NavDropdown>
                 <NavDropdown title="Upload" id="upload-nav-dropdown">
-                  <NavDropdown.Item as={Link} to="/upload-model">Upload Model</NavDropdown.Item>
-                  <NavDropdown.Item as={Link} to="/upload-ids">Upload IDS</NavDropdown.Item>
+                  <NavDropdown.Item href="/upload-model" as={Link}>Upload Model</NavDropdown.Item>
+                  <NavDropdown.Item href="/upload-ids" as={Link}>Upload IDS</NavDropdown.Item>
                 </NavDropdown>
               </>
             )}
@@ -30,14 +32,14 @@ const Navbar: React.FC = () => {
           <Nav>
             {isAuthenticated ? (
               <NavDropdown title={user?.username || 'User'} id="user-nav-dropdown">
-                <NavDropdown.Item as={Link} to="/profile">Profile</NavDropdown.Item>
+                <NavDropdown.Item href="/profile" as={Link}>Profile</NavDropdown.Item>
                 <NavDropdown.Divider />
                 <NavDropdown.Item onClick={logout}>Logout</NavDropdown.Item>
               </NavDropdown>
             ) : (
               <>
-                <Nav.Link as={Link} to="/login">Login</Nav.Link>
-                <Nav.Link as={Link} to="/register">Register</Nav.Link>
+                <Nav.Link href="/login" as={Link}>Login</Nav.Link>
+                <Nav.Link href="/register" as={Link}>Register</Nav.Link>
               </>
             )}
           </Nav>

@@ -1,5 +1,7 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { Table, Button, Spinner, Alert } from 'react-bootstrap';
 import { getIfcModels, IfcModelListItem, downloadIfcModel } from '../services/api';
 import { formatDate } from '../utils/formatters';
@@ -57,7 +59,7 @@ const IfcModelsPage: React.FC = () => {
     <div className="ifc-models-page">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1>IFC Models</h1>
-        <Link to="/upload-model" className="btn btn-primary">
+        <Link href="/upload-model" className="btn btn-primary">
           Upload New Model
         </Link>
       </div>
@@ -73,7 +75,7 @@ const IfcModelsPage: React.FC = () => {
       ) : models.length === 0 ? (
         <div className="text-center my-5">
           <p className="mb-4">You haven't uploaded any IFC models yet.</p>
-          <Link to="/upload-model" className="btn btn-primary">
+          <Link href="/upload-model" className="btn btn-primary">
             Upload Your First Model
           </Link>
         </div>
@@ -93,8 +95,7 @@ const IfcModelsPage: React.FC = () => {
                 <td>{formatDate(model.created_at)}</td>
                 <td>
                   <div className="btn-group">
-                    <Link 
-                      to={`/model/${model.id}`} 
+                    <Link href={`/model/${model.id}`} 
                       className="btn btn-sm btn-info"
                     >
                       View Details

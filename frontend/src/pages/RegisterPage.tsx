@@ -1,5 +1,7 @@
+'use client';
+
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { useAuth } from '../contexts/AuthContext';
 
 const RegisterPage: React.FC = () => {
@@ -93,7 +95,7 @@ const RegisterPage: React.FC = () => {
               </div>
             </form>
             <div className="mt-3 text-center">
-              <p>Already have an account? <Link to="/login">Login here</Link></p>
+              <p>Already have an account? <Link href="/login">Login here</Link></p>
             </div>
           </div>
         </div>

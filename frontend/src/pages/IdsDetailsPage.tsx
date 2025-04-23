@@ -1,12 +1,18 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, Button, Spinner, Alert, ListGroup, Badge, Modal } from 'react-bootstrap';
 import { IdsFileListItem, downloadIdsFile, getIdsFiles, getIfcModels, IfcModelListItem, checkModelWithIds, CheckResponse } from '../services/api';
 import { formatDate } from '../utils/formatters';
 
-const IdsDetailsPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+interface IdsDetailsPageProps {
+  id?: string;
+}
+
+const IdsDetailsPage: React.FC<IdsDetailsPageProps> = ({ id }) => {
+  const router = useRouter();
   
   const [idsFile, setIdsFile] = useState<IdsFileListItem | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -173,7 +179,7 @@ const IdsDetailsPage: React.FC = () => {
       
       // Navigate directly to the model check page instead of showing results in the modal
       setShowCheckModal(false);
-      window.location.href = `/model-check/${result.id}`;
+      router.push(`/model-check/${result.id}`);
       
     } catch (err) {
       console.error('Failed to check model against IDS:', err);
@@ -198,7 +204,7 @@ const IdsDetailsPage: React.FC = () => {
       <div>
         <Alert variant="danger">{error}</Alert>
         <div className="text-center mt-3">
-          <Link to="/ids-files" className="btn btn-primary">
+          <Link href="/ids-files" className="btn btn-primary">
             Back to IDS Files
           </Link>
         </div>
@@ -211,7 +217,7 @@ const IdsDetailsPage: React.FC = () => {
       <div>
         <Alert variant="warning">IDS file not found</Alert>
         <div className="text-center mt-3">
-          <Link to="/ids-files" className="btn btn-primary">
+          <Link href="/ids-files" className="btn btn-primary">
             Back to IDS Files
           </Link>
         </div>
@@ -224,7 +230,7 @@ const IdsDetailsPage: React.FC = () => {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1>IDS File Details</h1>
         <div>
-          <Link to="/ids-files" className="btn btn-outline-secondary me-2">
+          <Link href="/ids-files" className="btn btn-outline-secondary me-2">
             Back to IDS Files
           </Link>
           <Button 
@@ -301,7 +307,7 @@ const IdsDetailsPage: React.FC = () => {
             <Alert variant="info">
               You don't have any IFC models uploaded yet. Please upload a model first.
               <div className="mt-3">
-                <Link to="/upload-model" className="btn btn-primary">
+                <Link href="/upload-model" className="btn btn-primary">
                   Upload IFC Model
                 </Link>
               </div>
@@ -352,7 +358,7 @@ const IdsDetailsPage: React.FC = () => {
                   
                   <div className="text-center mt-3">
                     <Link 
-                      to={`/model-check/${checkResult.id}`} 
+                      href={`/model-check/${checkResult.id}`} 
                       className="btn btn-primary"
                       onClick={() => setShowCheckModal(false)}
                     >

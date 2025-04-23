@@ -1,11 +1,20 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, Button, Alert, Spinner, ListGroup, Row, Col, Badge, Tab, Tabs, Table } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import * as api from '../services/api';
 
-const ModelCheckPage: React.FC = () => {
-  const { idsId, modelId, id } = useParams<{ idsId?: string; modelId?: string; id?: string }>();
+interface ModelCheckPageProps {
+  id?: string;
+  idsId?: string;
+  modelId?: string;
+}
+
+const ModelCheckPage: React.FC<ModelCheckPageProps> = ({ id, idsId, modelId }) => {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkResult, setCheckResult] = useState<any>(null);
@@ -124,7 +133,7 @@ const ModelCheckPage: React.FC = () => {
         <Alert variant="danger">{error}</Alert>
         <div className="text-center mt-3">
           <Button 
-            onClick={() => window.location.href = "/"}
+            onClick={() => router.push("/")}
             className="btn btn-primary"
           >
             Back to Home
@@ -369,33 +378,33 @@ const ModelCheckPage: React.FC = () => {
       <Row className="mt-4">
         {checkResult?.ifc_model_id && (
           <Col>
-            <Button 
-              onClick={() => window.location.href = `/model/${checkResult.ifc_model_id}`}
-              variant="outline-primary"
+            <Link 
+              href={`/model/${checkResult.ifc_model_id}`}
+              className="btn btn-outline-primary"
             >
               View Model Details
-            </Button>
+            </Link>
           </Col>
         )}
         
         {checkResult?.ids_id && (
           <Col>
-            <Button 
-              onClick={() => window.location.href = `/ids/${checkResult.ids_id}`}
-              variant="outline-primary"
+            <Link 
+              href={`/ids/${checkResult.ids_id}`}
+              className="btn btn-outline-primary"
             >
               View IDS Details
-            </Button>
+            </Link>
           </Col>
         )}
         
         <Col className="text-end">
-          <Button 
-            onClick={() => window.location.href = "/"}
-            variant="outline-secondary"
+          <Link 
+            href="/"
+            className="btn btn-outline-secondary"
           >
             Back to Home
-          </Button>
+          </Link>
         </Col>
       </Row>
     </div>

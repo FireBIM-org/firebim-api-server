@@ -1,5 +1,7 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import { Table, Button, Spinner, Alert } from 'react-bootstrap';
 import { getIdsFiles, IdsFileListItem, downloadIdsFile } from '../services/api';
 import { formatDate } from '../utils/formatters';
@@ -57,7 +59,7 @@ const IdsFilesPage: React.FC = () => {
     <div className="ids-files-page">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1>IDS Files</h1>
-        <Link to="/upload-ids" className="btn btn-primary">
+        <Link href="/upload-ids" className="btn btn-primary">
           Upload New IDS File
         </Link>
       </div>
@@ -73,7 +75,7 @@ const IdsFilesPage: React.FC = () => {
       ) : idsFiles.length === 0 ? (
         <div className="text-center my-5">
           <p className="mb-4">You haven't uploaded any IDS files yet.</p>
-          <Link to="/upload-ids" className="btn btn-primary">
+          <Link href="/upload-ids" className="btn btn-primary">
             Upload Your First IDS File
           </Link>
         </div>
@@ -93,8 +95,7 @@ const IdsFilesPage: React.FC = () => {
                 <td>{formatDate(idsFile.created_at)}</td>
                 <td>
                   <div className="btn-group">
-                    <Link 
-                      to={`/ids/${idsFile.id}`} 
+                    <Link href={`/ids/${idsFile.id}`} 
                       className="btn btn-sm btn-info"
                     >
                       View Details

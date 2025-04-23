@@ -1,8 +1,13 @@
+'use client';
+
 import React from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, Row, Col, Button } from 'react-bootstrap';
 
 const HomePage: React.FC = () => {
+  const router = useRouter();
+  
   return (
     <div>
       <div className="jumbotron bg-light p-5 mb-4 rounded">
@@ -26,7 +31,7 @@ const HomePage: React.FC = () => {
                 The system will automatically analyze your models.
               </Card.Text>
               <Button 
-                onClick={() => window.location.href = "/upload-model"} 
+                onClick={() => router.push("/upload-model")} 
                 variant="primary"
               >
                 Upload Model
@@ -43,7 +48,7 @@ const HomePage: React.FC = () => {
                 requirements for your BIM models.
               </Card.Text>
               <Button 
-                onClick={() => window.location.href = "/upload-ids"} 
+                onClick={() => router.push("/upload-ids")} 
                 variant="primary"
               >
                 Upload IDS

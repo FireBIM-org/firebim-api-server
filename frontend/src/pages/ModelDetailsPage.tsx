@@ -1,14 +1,21 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, Button, Alert, Spinner, ListGroup, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import * as api from '../services/api';
 
-const ModelDetailsPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+interface ModelDetailsPageProps {
+  id?: string;
+}
+
+const ModelDetailsPage: React.FC<ModelDetailsPageProps> = ({ id }) => {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] =useState<string | null>(null);
   const [model, setModel] = useState<api.IfcModelListItem | null>(null);
 
   useEffect(() => {
@@ -76,7 +83,7 @@ const ModelDetailsPage: React.FC = () => {
     return (
       <div>
         <Alert variant="warning">Model not found</Alert>
-        <Link to="/ifc-models" className="btn btn-primary">
+        <Link href="/ifc-models" className="btn btn-primary">
           Back to Models
         </Link>
       </div>
@@ -125,7 +132,7 @@ const ModelDetailsPage: React.FC = () => {
             </Col>
             <Col className="text-end">
               <Link 
-                to="/ifc-models"
+                href="/ifc-models"
                 className="btn btn-outline-secondary"
               >
                 Back to Models
@@ -141,7 +148,7 @@ const ModelDetailsPage: React.FC = () => {
           <Card.Text>
             You can validate this model against an Information Delivery Specification (IDS) file to check compliance.
           </Card.Text>
-          <Button onClick={() => window.location.href = "/upload-ids"} variant="outline-primary">
+          <Button onClick={() => router.push("/upload-ids")} variant="outline-primary">
             Select an IDS File
           </Button>
         </Card.Body>
