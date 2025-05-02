@@ -126,6 +126,55 @@ async def get_model(
     current_user: User = Depends(get_current_active_user)
 ):
     """
+    Get metadata for an IFC model by its ID.
+    """
+    # Get model from DB
+    model = db.query(IfcModel).filter(IfcModel.id == id).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    
+    # Check if the model belongs to the current user
+    if model.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this model")
+    
+    # Return metadata
+    return {
+        "id": model.id,
+        "filename": model.filename,
+        "created_at": model.created_at,
+        "updated_at": model.updated_at,
+        "status": model.processing_status,
+        "task_id": model.task_id
+    }
+
+@app.get("/ifc-models")
+async def get_models(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get all IFC models belonging to the current user.
+    """
+    models = db.query(IfcModel).filter(IfcModel.user_id == current_user.id).all()
+    
+    return [
+        {
+            "id": model.id,
+            "filename": model.filename,
+            "created_at": model.created_at,
+            "updated_at": model.updated_at,
+            "status": model.processing_status
+        }
+        for model in models
+    ]
+
+@app.get("/ifc-models/{id}/download")
+async def download_model(
+    id: str, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
     Download an IFC-STEP file by its ID.
     """
     # Get model from DB
@@ -150,27 +199,6 @@ async def get_model(
         filename=model.filename,
         media_type="application/octet-stream"
     )
-
-@app.get("/ifc-models")
-async def get_models(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """
-    Get all IFC models belonging to the current user.
-    """
-    models = db.query(IfcModel).filter(IfcModel.user_id == current_user.id).all()
-    
-    return [
-        {
-            "id": model.id,
-            "filename": model.filename,
-            "created_at": model.created_at,
-            "updated_at": model.updated_at,
-            "status": model.processing_status
-        }
-        for model in models
-    ]
 
 @app.post("/ids-files", status_code=201)
 async def upload_ids(
@@ -218,6 +246,52 @@ async def get_ids(
     current_user: User = Depends(get_current_active_user)
 ):
     """
+    Get metadata for an IDS file by its ID.
+    """
+    # Get IDS file from DB
+    ids_file = db.query(IdsFile).filter(IdsFile.id == id).first()
+    if not ids_file:
+        raise HTTPException(status_code=404, detail="IDS file not found")
+    
+    # Check if the ids file belongs to the current user
+    if ids_file.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this IDS file")
+    
+    # Return metadata
+    return {
+        "id": ids_file.id,
+        "filename": ids_file.filename,
+        "created_at": ids_file.created_at,
+        "updated_at": ids_file.updated_at
+    }
+
+@app.get("/ids-files")
+async def get_ids_files(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get all IDS files belonging to the current user.
+    """
+    ids_files = db.query(IdsFile).filter(IdsFile.user_id == current_user.id).all()
+    
+    return [
+        {
+            "id": ids_file.id,
+            "filename": ids_file.filename,
+            "created_at": ids_file.created_at,
+            "updated_at": ids_file.updated_at
+        }
+        for ids_file in ids_files
+    ]
+
+@app.get("/ids-files/{id}/download")
+async def download_ids(
+    id: str, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
     Download an IDS file by its ID.
     """
     # Get IDS file from DB
@@ -242,26 +316,6 @@ async def get_ids(
         filename=ids_file.filename,
         media_type="application/xml"
     )
-
-@app.get("/ids-files")
-async def get_ids_files(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """
-    Get all IDS files belonging to the current user.
-    """
-    ids_files = db.query(IdsFile).filter(IdsFile.user_id == current_user.id).all()
-    
-    return [
-        {
-            "id": ids_file.id,
-            "filename": ids_file.filename,
-            "created_at": ids_file.created_at,
-            "updated_at": ids_file.updated_at
-        }
-        for ids_file in ids_files
-    ]
 
 # New endpoints that implement the required functionality
 
