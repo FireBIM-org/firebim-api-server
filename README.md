@@ -1,5 +1,6 @@
-# firebim-api-server
-FireBIM API server.
+# FireBIM API server
+[![FireBIM API CI/CD](https://github.com/FireBIM-org/firebim-api-server/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/FireBIM-org/firebim-api-server/actions/workflows/ci-cd.yml)
+
 
 This repository is solely for API-specific code for deployment to a server.
 FireBIM business logic does **not** belong in this repository.
