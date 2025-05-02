@@ -11,6 +11,8 @@ on:
     paths-ignore:
       - 'frontend/**'
       - '**.md'
+  workflow_dispatch:
+    # Allows manual triggering of the workflow
 
 env:
   REGISTRY: ghcr.io
