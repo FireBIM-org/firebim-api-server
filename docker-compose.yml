@@ -96,15 +96,6 @@ services:
     volumes:
       - minio_data:/data
 
-  frontend:
-    build:
-      context: .
-      dockerfile: docker/frontend/Dockerfile
-    ports:
-      - "80:80"
-    depends_on:
-      - api
-
   pgadmin:
     image: dpage/pgadmin4:latest
     environment:
