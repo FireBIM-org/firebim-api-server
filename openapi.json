@@ -178,8 +178,51 @@
     "/ifc-models/{id}": {
       "get": {
         "summary": "Get Model",
-        "description": "Download an IFC-STEP file by its ID.",
+        "description": "Get metadata for an IFC model by its ID.",
         "operationId": "get_model_ifc_models__id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ifc-models/{id}/download": {
+      "get": {
+        "summary": "Download Model",
+        "description": "Download an IFC-STEP file by its ID.",
+        "operationId": "download_model_ifc_models__id__download_get",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -283,8 +326,51 @@
     "/ids-files/{id}": {
       "get": {
         "summary": "Get Ids",
-        "description": "Download an IDS file by its ID.",
+        "description": "Get metadata for an IDS file by its ID.",
         "operationId": "get_ids_ids_files__id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ids-files/{id}/download": {
+      "get": {
+        "summary": "Download Ids",
+        "description": "Download an IDS file by its ID.",
+        "operationId": "download_ids_ids_files__id__download_get",
         "security": [
           {
             "OAuth2PasswordBearer": []
