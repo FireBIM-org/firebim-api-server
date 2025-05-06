@@ -9,6 +9,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY app/ /app/app
 
+# Add a non-root user to run the app
+RUN addgroup --system --gid 1001 appgroup && \
+    adduser --system --uid 1001 appuser
+
 # Create directory for temporary files
 RUN mkdir -p /tmp
 
@@ -16,6 +20,9 @@ RUN mkdir -p /tmp
 ENV PYTHONPATH=/
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+
+# Switch to non-root user
+USER appuser
 
 # Expose the port that FastAPI will run on
 EXPOSE 8000
