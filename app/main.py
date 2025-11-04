@@ -17,11 +17,13 @@ from app.models.models import IfcModel, IdsFile, User, CheckResult
 from app.auth.router import router as auth_router
 from app.auth.jwt import get_current_active_user
 from app.workers.celery_app import celery_app
+from app.api.graph import router as graph_router
 
 app = FastAPI(title="FireBIM API")
 
 # Include auth router
 app.include_router(auth_router)
+app.include_router(graph_router)
 
 # CORS settings
 origins = settings.all_cors_origins
