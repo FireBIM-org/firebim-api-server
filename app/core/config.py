@@ -127,5 +127,7 @@ class Settings(BaseSettings):
 
         return self
 
+    FUSEKI_HOST: str
+
 
 settings = Settings()

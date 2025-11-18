@@ -8,6 +8,13 @@ COPY docker/worker/requirements.txt requirements-worker.txt
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir -r requirements-worker.txt
 
+# Copy application code
+COPY app/ /app/app
+
+# Add a non-root user to run the app
+RUN addgroup --system --gid 1001 appgroup && \
+    adduser --system --uid 1001 appuser
+
 # Create directory for temporary files
 RUN mkdir -p /tmp
 
@@ -15,6 +22,9 @@ RUN mkdir -p /tmp
 ENV PYTHONPATH=/
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+
+# Switch to non-root user
+USER appuser
 
 # Command to run the Celery worker
 CMD ["celery", "-A", "app.workers.celery_worker", "worker", "--loglevel=info"]

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Depends, Query
+from fastapi import Response, status
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uuid
@@ -16,11 +17,13 @@ from app.models.models import IfcModel, IdsFile, User, CheckResult
 from app.auth.router import router as auth_router
 from app.auth.jwt import get_current_active_user
 from app.workers.celery_app import celery_app
+from app.api.graph import router as graph_router
 
 app = FastAPI(title="FireBIM API")
 
 # Include auth router
 app.include_router(auth_router)
+app.include_router(graph_router)
 
 # CORS settings
 origins = settings.all_cors_origins
@@ -381,8 +384,9 @@ async def async_check_model_with_ids(
 @app.get("/async/check-result/{check_id}")
 async def get_async_check_result(
     check_id: str,
+    response: Response,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     Get the result of an asynchronous check operation by its ID.
@@ -422,7 +426,8 @@ async def get_async_check_result(
                 check_result.status = "failed"
                 db.commit()
                 return {"status": "failed", "message": "Check operation failed"}
-                
+
+        response.status_code = status.HTTP_202_ACCEPTED
         return {
             "status": "processing",
             "check_id": check_id,
