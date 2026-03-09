@@ -8,9 +8,10 @@ class User(SQLModel, table=True):
     __tablename__ = "users"
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    authentik_sub: str = Field(unique=True, nullable=False, index=True)
     username: str = Field(unique=True, nullable=False)
-    email: str = Field(unique=True, nullable=False)
-    hashed_password: str = Field(nullable=False)
+    email: str = Field(nullable=False)
+    hashed_password: Optional[str] = Field(default=None, nullable=True)
     is_active: bool = Field(default=True)
     created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False))
     updated_at: datetime = Field(sa_column=Column(DateTime(timezone=True), onupdate=lambda: datetime.now(timezone.utc)))
