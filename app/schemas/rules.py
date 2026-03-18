@@ -18,12 +18,10 @@ class RuleNodePayload(BaseModel):
     label: Optional[str] = None
     config: dict = Field(default_factory=dict)
 
-
 class RuleSetValidateRequest(BaseModel):
     id: str
     entry: str
     nodes: List[RuleNodePayload]
-
 
 class RuleSetValidateResponse(BaseModel):
     valid: bool
@@ -36,3 +34,21 @@ class RuleSetCompileResponse(BaseModel):
     ruleset_id: str
     node_count: int
     ttl: str
+
+class RuleSetDecompileRequest(BaseModel):
+    ttl: str
+
+class RuleSetDecompileResponse(BaseModel):
+    ruleset: dict
+
+class RuleSetPublishRequest(BaseModel):
+    id: str
+    entry: str
+    nodes: List[RuleNodePayload]
+    graph_uri: Optional[str] = None
+
+class RuleSetPublishResponse(BaseModel):
+    published: bool
+    ruleset_id: str
+    graph_uri: str
+    node_count: int

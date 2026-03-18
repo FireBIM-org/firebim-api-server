@@ -4,10 +4,16 @@ from app.rules.dsl import Rule
 from app.rules.models import fbRuleElement
 from app.rules.ruleset import RuleSet
 from app.rules.shacl_builder import SHACLBuilder
+from app.rules.decompiler import decompile_ruleset_ttl
+from app.rules.publisher import publish_ttl_to_fuseki, default_ruleset_graph_uri
 from app.schemas.rules import (
     RuleSetValidateRequest,
     RuleSetValidateResponse,
     RuleSetCompileResponse,
+    RuleSetDecompileRequest,
+    RuleSetDecompileResponse,
+    RuleSetPublishRequest,
+    RuleSetPublishResponse,
 )
 
 
