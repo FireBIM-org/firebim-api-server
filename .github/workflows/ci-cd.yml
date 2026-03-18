@@ -109,39 +109,3 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-worker.outputs.tags }}
           labels: ${{ steps.meta-worker.outputs.labels }}
-
-  deploy:
-    name: Deploy to Kubernetes
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v3
-        
-      - name: Configure kubectl
-        uses: azure/k8s-set-context@v3
-        with:
-          method: kubeconfig
-          kubeconfig: ${{ secrets.KUBE_CONFIG }}
-          
-      - name: Update API Deployment Image
-        run: |
-          # Set the new image with the SHA tag from the build
-          NEW_API_IMAGE="${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:sha-${{ github.sha }}"
-          kubectl set image deployment/firebim-api-server api=${NEW_API_IMAGE} -n firebim
-          
-      - name: Update Worker Deployment Image
-        run: |
-          # Set the new image with the SHA tag from the build
-          NEW_WORKER_IMAGE="${{ env.REGISTRY }}/${{ env.WORKER_IMAGE_NAME }}:sha-${{ github.sha }}"
-          kubectl set image deployment/firebim-worker worker=${NEW_WORKER_IMAGE} -n firebim
-          
-      - name: Verify deployment
-        run: |
-          kubectl rollout status deployment/firebim-api-server -n firebim
-          kubectl rollout status deployment/firebim-worker -n firebim
