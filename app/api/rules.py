@@ -1,7 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-# 👇 this is the important part — proves your module loads
 from app.rules.dsl import Rule
+from app.rules.models import fbRuleElement
+from app.rules.ruleset import RuleSet
+from app.schemas.rules import RuleSetValidateRequest, RuleSetValidateResponse
 
 
 router = APIRouter(prefix="/rules", tags=["rules"])
@@ -33,3 +35,47 @@ def rules_health():
         "target": test_rule.target_class,
         "operator": test_rule.operator,
     }
+
+@router.post("/validate", response_model=RuleSetValidateResponse)
+def validate_ruleset(payload: RuleSetValidateRequest):
+    try:
+        ruleset = RuleSet(payload.id)
+
+        for node in payload.nodes:
+            element = fbRuleElement(
+                id=node.id,
+                target_class=node.target_class,
+                property_path=node.property_path,
+                operator=node.operator,
+                value=node.value,
+                true_path=node.true_path,
+                false_path=node.false_path,
+                unknown_path=node.unknown_path,
+                label=node.label,
+                node_type=node.node_type,
+                config=node.config,
+            )
+            ruleset.add(element)
+
+        ruleset.start(payload.entry)
+        ruleset.validate()
+
+        return RuleSetValidateResponse(
+            valid=True,
+            ruleset_id=ruleset.id,
+            entry=ruleset.entry,
+            node_count=len(ruleset.elements),
+            errors=[],
+        )
+
+    except ValueError as e:
+        return RuleSetValidateResponse(
+            valid=False,
+            ruleset_id=payload.id,
+            entry=payload.entry,
+            node_count=len(payload.nodes),
+            errors=[str(e)],
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

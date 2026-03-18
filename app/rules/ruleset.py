@@ -1,7 +1,4 @@
-# firebim/rules/ruleset.py
-
 class RuleSet:
-
     def __init__(self, rule_id):
         self.id = rule_id
         self.elements = {}
@@ -21,7 +18,6 @@ class RuleSet:
         return self.elements[element_id]
 
     def validate(self):
-
         if not self.entry:
             raise ValueError("RuleSet must define a start element")
 
