@@ -142,3 +142,43 @@ def decompile_ruleset_ttl(ttl_text: str) -> dict:
         "entry": entry,
         "nodes": nodes,
     }
+
+def decompile_rule_element_ttl(ttl_text: str) -> dict:
+    g = Graph()
+    g.parse(data=ttl_text, format="turtle")
+
+    shapes = list(g.subjects(RDF.type, SH.NodeShape))
+    if not shapes:
+        raise ValueError("No SHACL NodeShape found in TTL")
+
+    shape = shapes[0]
+    node_id = _local_name(shape)
+
+    target_obj = g.value(shape, SH.targetClass)
+    target_class = _local_name(target_obj) if target_obj else None
+
+    true_obj = g.value(shape, FB.truePath)
+    false_obj = g.value(shape, FB.falsePath)
+    unknown_obj = g.value(shape, FB.unknownPath)
+
+    rule_bnode = g.value(shape, SH.rule)
+    construct_text = g.value(rule_bnode, SH.construct) if rule_bnode else None
+
+    property_path = None
+    operator = None
+    value = None
+
+    if construct_text:
+        property_path, operator, value = _parse_construct_rule(str(construct_text))
+
+    return {
+        "id": node_id,
+        "node_type": "decision",
+        "target_class": target_class,
+        "property_path": property_path,
+        "operator": operator,
+        "value": value,
+        "true_path": _local_name(true_obj) if true_obj else None,
+        "false_path": _local_name(false_obj) if false_obj else None,
+        "unknown_path": _local_name(unknown_obj) if unknown_obj else None,
+    }

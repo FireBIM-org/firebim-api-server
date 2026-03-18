@@ -67,3 +67,46 @@ class RuleSetDeleteRequest(BaseModel):
 class RuleSetDeleteResponse(BaseModel):
     deleted: bool
     graph_uri: str
+
+class RuleElementPublishRequest(BaseModel):
+    id: str
+    node_type: str = "decision"
+
+    target_class: Optional[str] = None
+    property_path: Optional[str] = None
+    operator: Optional[str] = None
+    value: Optional[Any] = None
+
+    true_path: Optional[str] = None
+    false_path: Optional[str] = None
+    unknown_path: Optional[str] = None
+
+    label: Optional[str] = None
+    config: dict = Field(default_factory=dict)
+
+    graph_uri: Optional[str] = None
+
+class RuleElementPublishResponse(BaseModel):
+    published: bool
+    element_id: str
+    graph_uri: str
+    node_type: str
+
+class RuleElementFetchRequest(BaseModel):
+    graph_uri: str
+
+class RuleElementFetchResponse(BaseModel):
+    graph_uri: str
+    ttl: str
+    rule_element: dict | None = None
+
+class RuleElementDeleteRequest(BaseModel):
+    graph_uri: str
+
+class RuleElementDeleteResponse(BaseModel):
+    deleted: bool
+    graph_uri: str
+
+class RuleElementListResponse(BaseModel):
+    count: int
+    graph_uris: list[str]

@@ -4,12 +4,14 @@ from app.rules.dsl import Rule
 from app.rules.models import fbRuleElement
 from app.rules.ruleset import RuleSet
 from app.rules.shacl_builder import SHACLBuilder
-from app.rules.decompiler import decompile_ruleset_ttl
+from app.rules.decompiler import decompile_ruleset_ttl, decompile_rule_element_ttl
 from app.rules.publisher import (
     publish_ttl_to_fuseki,
     fetch_ttl_from_fuseki,
     delete_graph_from_fuseki,
     default_ruleset_graph_uri,
+    default_rule_element_graph_uri,
+    list_rule_element_graphs,
 )
 from app.schemas.rules import (
     RuleSetValidateRequest,
@@ -23,6 +25,13 @@ from app.schemas.rules import (
     RuleSetFetchResponse,
     RuleSetDeleteRequest,
     RuleSetDeleteResponse,
+    RuleElementPublishRequest,
+    RuleElementPublishResponse,
+    RuleElementFetchRequest,
+    RuleElementFetchResponse,
+    RuleElementDeleteRequest,
+    RuleElementDeleteResponse,
+    RuleElementListResponse,
 )
 
 
@@ -241,6 +250,109 @@ def delete_ruleset(payload: RuleSetDeleteRequest):
         return RuleSetDeleteResponse(
             deleted=True,
             graph_uri=payload.graph_uri,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/rule-elements", response_model=RuleElementPublishResponse)
+def publish_rule_element(payload: RuleElementPublishRequest):
+    try:
+        element = fbRuleElement(
+            id=payload.id,
+            target_class=payload.target_class,
+            property_path=payload.property_path,
+            operator=payload.operator,
+            value=payload.value,
+            true_path=payload.true_path,
+            false_path=payload.false_path,
+            unknown_path=payload.unknown_path,
+            label=payload.label,
+            node_type=payload.node_type,
+            config=payload.config,
+        )
+
+        builder = SHACLBuilder()
+        builder.add_rule_element(element)
+
+        ttl = builder.get_graph().serialize(format="turtle")
+        graph_uri = payload.graph_uri or default_rule_element_graph_uri(element.id)
+
+        publish_ttl_to_fuseki(
+            ttl_text=str(ttl),
+            dataset="rulebook",
+            graph_uri=graph_uri,
+        )
+
+        return RuleElementPublishResponse(
+            published=True,
+            element_id=element.id,
+            graph_uri=graph_uri,
+            node_type=element.node_type,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/rule-elements/fetch", response_model=RuleElementFetchResponse)
+def fetch_rule_element(payload: RuleElementFetchRequest):
+    try:
+        ttl = fetch_ttl_from_fuseki(
+            dataset="rulebook",
+            graph_uri=payload.graph_uri,
+        )
+
+        rule_element = None
+        try:
+            rule_element = decompile_rule_element_ttl(ttl)
+        except Exception:
+            rule_element = None
+
+        return RuleElementFetchResponse(
+            graph_uri=payload.graph_uri,
+            ttl=ttl,
+            rule_element=rule_element,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/rule-elements/delete", response_model=RuleElementDeleteResponse)
+def delete_rule_element(payload: RuleElementDeleteRequest):
+    try:
+        delete_graph_from_fuseki(
+            dataset="rulebook",
+            graph_uri=payload.graph_uri,
+        )
+
+        return RuleElementDeleteResponse(
+            deleted=True,
+            graph_uri=payload.graph_uri,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/rule-elements", response_model=RuleElementListResponse)
+def list_rule_elements():
+    try:
+        graph_uris = list_rule_element_graphs(dataset="rulebook")
+
+        return RuleElementListResponse(
+            count=len(graph_uris),
+            graph_uris=graph_uris,
         )
 
     except ValueError as e:

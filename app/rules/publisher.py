@@ -7,6 +7,8 @@ from app.core.config import settings
 def default_ruleset_graph_uri(ruleset_id: str) -> str:
     return f"https://firebim.org/graphs/rules/{ruleset_id}"
 
+def default_rule_element_graph_uri(element_id: str) -> str:
+    return f"https://firebim.org/graphs/rule-elements/{element_id}"
 
 def publish_ttl_to_fuseki(ttl_text: str, dataset: str, graph_uri: str) -> None:
     """
@@ -83,3 +85,47 @@ def delete_graph_from_fuseki(dataset: str, graph_uri: str) -> None:
         raise ValueError(
             f"Fuseki delete failed: {response.status_code} {response.text}"
         )
+
+def list_rule_element_graphs(dataset: str) -> list[str]:
+    """
+    List named graphs in Fuseki that look like rule-element graphs.
+    """
+    base = settings.FUSEKI_HOST.rstrip("/")
+    endpoint = f"{base}/{dataset}/sparql"
+
+    auth = None
+    if settings.FUSEKI_USER and settings.FUSEKI_PASSWORD:
+        auth = (settings.FUSEKI_USER, settings.FUSEKI_PASSWORD)
+
+    query = """
+    SELECT DISTINCT ?g
+    WHERE {
+      GRAPH ?g { ?s ?p ?o }
+      FILTER(STRSTARTS(STR(?g), "https://firebim.org/graphs/rule-elements/"))
+    }
+    ORDER BY ?g
+    """
+
+    response = httpx.post(
+        endpoint,
+        data={"query": query},
+        headers={"Accept": "application/sparql-results+json"},
+        auth=auth,
+        timeout=30.0,
+    )
+
+    if response.status_code != 200:
+        raise ValueError(
+            f"Fuseki list failed: {response.status_code} {response.text}"
+        )
+
+    data = response.json()
+    bindings = data.get("results", {}).get("bindings", [])
+
+    graph_uris = []
+    for row in bindings:
+        g = row.get("g", {}).get("value")
+        if g:
+            graph_uris.append(g)
+
+    return graph_uris
