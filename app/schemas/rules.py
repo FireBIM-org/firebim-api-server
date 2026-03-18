@@ -52,3 +52,11 @@ class RuleSetPublishResponse(BaseModel):
     ruleset_id: str
     graph_uri: str
     node_count: int
+
+class RuleSetFetchRequest(BaseModel):
+    graph_uri: str
+
+class RuleSetFetchResponse(BaseModel):
+    graph_uri: str
+    ttl: str
+    ruleset: dict | None = None

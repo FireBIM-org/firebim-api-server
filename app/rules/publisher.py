@@ -36,3 +36,28 @@ def publish_ttl_to_fuseki(ttl_text: str, dataset: str, graph_uri: str) -> None:
         raise ValueError(
             f"Fuseki publish failed: {response.status_code} {response.text}"
         )
+    
+def fetch_ttl_from_fuseki(dataset: str, graph_uri: str) -> str:
+    """
+    Fetch Turtle from a named graph in Fuseki using Graph Store Protocol.
+    """
+    base = settings.FUSEKI_HOST.rstrip("/")
+    endpoint = f"{base}/{dataset}/data?{urlencode({'graph': graph_uri})}"
+
+    auth = None
+    if settings.FUSEKI_USER and settings.FUSEKI_PASSWORD:
+        auth = (settings.FUSEKI_USER, settings.FUSEKI_PASSWORD)
+
+    response = httpx.get(
+        endpoint,
+        headers={"Accept": "text/turtle"},
+        auth=auth,
+        timeout=30.0,
+    )
+
+    if response.status_code != 200:
+        raise ValueError(
+            f"Fuseki fetch failed: {response.status_code} {response.text}"
+        )
+
+    return response.text

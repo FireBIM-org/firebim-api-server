@@ -5,7 +5,11 @@ from app.rules.models import fbRuleElement
 from app.rules.ruleset import RuleSet
 from app.rules.shacl_builder import SHACLBuilder
 from app.rules.decompiler import decompile_ruleset_ttl
-from app.rules.publisher import publish_ttl_to_fuseki, default_ruleset_graph_uri
+from app.rules.publisher import (
+    publish_ttl_to_fuseki,
+    fetch_ttl_from_fuseki,
+    default_ruleset_graph_uri,
+)
 from app.schemas.rules import (
     RuleSetValidateRequest,
     RuleSetValidateResponse,
@@ -14,6 +18,8 @@ from app.schemas.rules import (
     RuleSetDecompileResponse,
     RuleSetPublishRequest,
     RuleSetPublishResponse,
+    RuleSetFetchRequest,
+    RuleSetFetchResponse,
 )
 
 
@@ -186,6 +192,33 @@ def publish_ruleset(payload: RuleSetPublishRequest):
             ruleset_id=ruleset.id,
             graph_uri=graph_uri,
             node_count=len(ruleset.elements),
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/fetch", response_model=RuleSetFetchResponse)
+def fetch_ruleset(payload: RuleSetFetchRequest):
+    try:
+        ttl = fetch_ttl_from_fuseki(
+            dataset="rulebook",
+            graph_uri=payload.graph_uri,
+        )
+
+        ruleset = None
+        try:
+            ruleset = decompile_ruleset_ttl(ttl)
+        except Exception:
+            # keep fetch usable even if decompile fails
+            ruleset = None
+
+        return RuleSetFetchResponse(
+            graph_uri=payload.graph_uri,
+            ttl=ttl,
+            ruleset=ruleset,
         )
 
     except ValueError as e:
