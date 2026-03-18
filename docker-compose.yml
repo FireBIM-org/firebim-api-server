@@ -23,12 +23,24 @@ services:
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS-https://firebim.org,https://www.firebim.org,https://app.firebim.org,https://www.app.firebim.org}
       - FUSEKI_HOST=${FUSEKI_HOST-http://graph-demo.firebim.org:3030}
+      - FUSEKI_USER=${FUSEKI_USER}
+      - FUSEKI_PASSWORD=${FUSEKI_PASSWORD}
     volumes:
       - ./app:/app
     depends_on:
       - postgres
       - minio
       - rabbitmq
+      - fuseki
+ 
+  fuseki:
+    image: stain/jena-fuseki
+    ports:
+      - "3030:3030"
+    environment:
+      - ADMIN_PASSWORD=admin
+    volumes:
+      - fuseki_data:/fuseki
 
   celery-worker:
     build:
@@ -115,6 +127,7 @@ volumes:
   minio_data:
   pgadmin_data:
   rabbitmq_data:
+  fuseki_data:
 
 secrets:
   db-password:

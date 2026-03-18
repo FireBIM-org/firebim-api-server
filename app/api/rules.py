@@ -17,6 +17,7 @@ from app.schemas.rules import (
 )
 
 
+
 router = APIRouter(prefix="/rules", tags=["rules"])
 
 
@@ -124,6 +125,67 @@ def compile_ruleset(payload: RuleSetValidateRequest):
             ruleset_id=ruleset.id,
             node_count=len(ruleset.elements),
             ttl=str(ttl),
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/decompile", response_model=RuleSetDecompileResponse)
+def decompile_ruleset(payload: RuleSetDecompileRequest):
+    try:
+        ruleset = decompile_ruleset_ttl(payload.ttl)
+        return RuleSetDecompileResponse(ruleset=ruleset)
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/publish", response_model=RuleSetPublishResponse)
+def publish_ruleset(payload: RuleSetPublishRequest):
+    try:
+        ruleset = RuleSet(payload.id)
+
+        for node in payload.nodes:
+            element = fbRuleElement(
+                id=node.id,
+                target_class=node.target_class,
+                property_path=node.property_path,
+                operator=node.operator,
+                value=node.value,
+                true_path=node.true_path,
+                false_path=node.false_path,
+                unknown_path=node.unknown_path,
+                label=node.label,
+                node_type=node.node_type,
+                config=node.config,
+            )
+            ruleset.add(element)
+
+        ruleset.start(payload.entry)
+        ruleset.validate()
+
+        builder = SHACLBuilder()
+        builder.add_rule_set(ruleset)
+
+        ttl = builder.get_graph().serialize(format="turtle")
+        graph_uri = payload.graph_uri or default_ruleset_graph_uri(ruleset.id)
+
+        publish_ttl_to_fuseki(
+            ttl_text=str(ttl),
+            dataset="rulebook",
+            graph_uri=graph_uri,
+        )
+
+        return RuleSetPublishResponse(
+            published=True,
+            ruleset_id=ruleset.id,
+            graph_uri=graph_uri,
+            node_count=len(ruleset.elements),
         )
 
     except ValueError as e:

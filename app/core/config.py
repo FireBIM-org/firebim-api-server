@@ -52,6 +52,9 @@ class Settings(BaseSettings):
             # self.FRONTEND_HOST
         ]
 
+    FUSEKI_USER: str | None = None
+    FUSEKI_PASSWORD: str | None = None
+
     # PROJECT_NAME: str
     SENTRY_DSN: HttpUrl | None = None
     POSTGRES_HOST: str
