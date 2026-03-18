@@ -215,7 +215,6 @@ class SHACLBuilder:
     # --------------------------------------------------
 
     def add_rule_set(self, rule_set):
-
         
         ruleset_uri = self.EX[rule_set.id]
         entry_uri = self.EX[rule_set.entry]

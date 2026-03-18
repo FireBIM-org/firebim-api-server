@@ -31,3 +31,8 @@ class RuleSetValidateResponse(BaseModel):
     entry: Optional[str] = None
     node_count: int
     errors: List[str] = Field(default_factory=list)
+
+class RuleSetCompileResponse(BaseModel):
+    ruleset_id: str
+    node_count: int
+    ttl: str

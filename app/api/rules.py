@@ -3,7 +3,12 @@ from fastapi import APIRouter, HTTPException
 from app.rules.dsl import Rule
 from app.rules.models import fbRuleElement
 from app.rules.ruleset import RuleSet
-from app.schemas.rules import RuleSetValidateRequest, RuleSetValidateResponse
+from app.rules.shacl_builder import SHACLBuilder
+from app.schemas.rules import (
+    RuleSetValidateRequest,
+    RuleSetValidateResponse,
+    RuleSetCompileResponse,
+)
 
 
 router = APIRouter(prefix="/rules", tags=["rules"])
@@ -76,6 +81,47 @@ def validate_ruleset(payload: RuleSetValidateRequest):
             node_count=len(payload.nodes),
             errors=[str(e)],
         )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/compile", response_model=RuleSetCompileResponse)
+def compile_ruleset(payload: RuleSetValidateRequest):
+    try:
+        ruleset = RuleSet(payload.id)
+
+        for node in payload.nodes:
+            element = fbRuleElement(
+                id=node.id,
+                target_class=node.target_class,
+                property_path=node.property_path,
+                operator=node.operator,
+                value=node.value,
+                true_path=node.true_path,
+                false_path=node.false_path,
+                unknown_path=node.unknown_path,
+                label=node.label,
+                node_type=node.node_type,
+                config=node.config,
+            )
+            ruleset.add(element)
+
+        ruleset.start(payload.entry)
+        ruleset.validate()
+
+        builder = SHACLBuilder()
+        builder.add_rule_set(ruleset)
+
+        ttl = builder.get_graph().serialize(format="turtle")
+
+        return RuleSetCompileResponse(
+            ruleset_id=ruleset.id,
+            node_count=len(ruleset.elements),
+            ttl=str(ttl),
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
