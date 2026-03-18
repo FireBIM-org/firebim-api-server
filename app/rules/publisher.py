@@ -61,3 +61,25 @@ def fetch_ttl_from_fuseki(dataset: str, graph_uri: str) -> str:
         )
 
     return response.text
+
+def delete_graph_from_fuseki(dataset: str, graph_uri: str) -> None:
+    """
+    Delete a named graph from Fuseki using Graph Store Protocol.
+    """
+    base = settings.FUSEKI_HOST.rstrip("/")
+    endpoint = f"{base}/{dataset}/data?{urlencode({'graph': graph_uri})}"
+
+    auth = None
+    if settings.FUSEKI_USER and settings.FUSEKI_PASSWORD:
+        auth = (settings.FUSEKI_USER, settings.FUSEKI_PASSWORD)
+
+    response = httpx.delete(
+        endpoint,
+        auth=auth,
+        timeout=30.0,
+    )
+
+    if response.status_code not in (200, 202, 204):
+        raise ValueError(
+            f"Fuseki delete failed: {response.status_code} {response.text}"
+        )

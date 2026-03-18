@@ -60,3 +60,10 @@ class RuleSetFetchResponse(BaseModel):
     graph_uri: str
     ttl: str
     ruleset: dict | None = None
+
+class RuleSetDeleteRequest(BaseModel):
+    graph_uri: str
+
+class RuleSetDeleteResponse(BaseModel):
+    deleted: bool
+    graph_uri: str

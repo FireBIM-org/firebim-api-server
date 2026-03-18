@@ -8,6 +8,7 @@ from app.rules.decompiler import decompile_ruleset_ttl
 from app.rules.publisher import (
     publish_ttl_to_fuseki,
     fetch_ttl_from_fuseki,
+    delete_graph_from_fuseki,
     default_ruleset_graph_uri,
 )
 from app.schemas.rules import (
@@ -20,6 +21,8 @@ from app.schemas.rules import (
     RuleSetPublishResponse,
     RuleSetFetchRequest,
     RuleSetFetchResponse,
+    RuleSetDeleteRequest,
+    RuleSetDeleteResponse,
 )
 
 
@@ -219,6 +222,25 @@ def fetch_ruleset(payload: RuleSetFetchRequest):
             graph_uri=payload.graph_uri,
             ttl=ttl,
             ruleset=ruleset,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/delete", response_model=RuleSetDeleteResponse)
+def delete_ruleset(payload: RuleSetDeleteRequest):
+    try:
+        delete_graph_from_fuseki(
+            dataset="rulebook",
+            graph_uri=payload.graph_uri,
+        )
+
+        return RuleSetDeleteResponse(
+            deleted=True,
+            graph_uri=payload.graph_uri,
         )
 
     except ValueError as e:
