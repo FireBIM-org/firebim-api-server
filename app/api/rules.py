@@ -5,6 +5,12 @@ from app.rules.models import fbRuleElement
 from app.rules.ruleset import RuleSet
 from app.rules.shacl_builder import SHACLBuilder
 from app.rules.decompiler import decompile_ruleset_ttl, decompile_rule_element_ttl
+from app.rules.composer import (
+    connect_ruleset_nodes,
+    disconnect_ruleset_node_branch,
+    check_ruleset_completeness,
+    force_end_ruleset,
+)
 from app.rules.publisher import (
     publish_ttl_to_fuseki,
     fetch_ttl_from_fuseki,
@@ -32,6 +38,15 @@ from app.schemas.rules import (
     RuleElementDeleteRequest,
     RuleElementDeleteResponse,
     RuleElementListResponse,
+    RuleSetDraft,
+    RuleConnectRequest,
+    RuleConnectResponse,
+    RuleDisconnectRequest,
+    RuleDisconnectResponse,
+    RuleCompletenessRequest,
+    RuleCompletenessResponse,
+    RuleForceEndRequest,
+    RuleForceEndResponse,
 )
 
 
@@ -353,6 +368,97 @@ def list_rule_elements():
         return RuleElementListResponse(
             count=len(graph_uris),
             graph_uris=graph_uris,
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/connect", response_model=RuleConnectResponse)
+def connect_rules(payload: RuleConnectRequest):
+    try:
+        result = connect_ruleset_nodes(
+            ruleset=payload.ruleset.model_dump(),
+            source_id=payload.source_id,
+            branch=payload.branch,
+            target_id=payload.target_id,
+        )
+
+        return RuleConnectResponse(
+            updated=result["updated"],
+            overwritten=result["overwritten"],
+            previous_target_id=result["previous_target_id"],
+            ruleset=result["ruleset"],
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/disconnect", response_model=RuleDisconnectResponse)
+def disconnect_rules(payload: RuleDisconnectRequest):
+    try:
+        result = disconnect_ruleset_node_branch(
+            ruleset=payload.ruleset.model_dump(),
+            source_id=payload.source_id,
+            branch=payload.branch,
+        )
+
+        return RuleDisconnectResponse(
+            updated=result["updated"],
+            previous_target_id=result["previous_target_id"],
+            ruleset=result["ruleset"],
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/check-completeness", response_model=RuleCompletenessResponse)
+def check_completeness(payload: RuleCompletenessRequest):
+    try:
+        result = check_ruleset_completeness(
+            ruleset=payload.ruleset.model_dump(),
+        )
+
+        return RuleCompletenessResponse(
+            complete=result["complete"],
+            open=result["open"],
+            broken=result["broken"],
+            entry_ok=result["entry_ok"],
+            missing_entry=result["missing_entry"],
+            missing_nodes=result["missing_nodes"],
+            open_branches=result["open_branches"],
+            errors=result["errors"],
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/force-end", response_model=RuleForceEndResponse)
+def force_end(payload: RuleForceEndRequest):
+    try:
+        result = force_end_ruleset(
+            ruleset=payload.ruleset.model_dump(),
+            mode=payload.mode,
+            node_type=payload.node_type,
+            label_prefix=payload.label_prefix,
+        )
+
+        return RuleForceEndResponse(
+            updated=result["updated"],
+            filled_count=result["filled_count"],
+            created_node_ids=result["created_node_ids"],
+            ruleset=result["ruleset"],
         )
 
     except ValueError as e:

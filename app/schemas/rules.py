@@ -110,3 +110,55 @@ class RuleElementDeleteResponse(BaseModel):
 class RuleElementListResponse(BaseModel):
     count: int
     graph_uris: list[str]
+
+class RuleSetDraft(BaseModel):
+    id: str
+    entry: str
+    nodes: List[RuleNodePayload]
+
+class RuleConnectRequest(BaseModel):
+    ruleset: RuleSetDraft
+    source_id: str
+    branch: str
+    target_id: str
+
+class RuleConnectResponse(BaseModel):
+    updated: bool
+    overwritten: bool
+    previous_target_id: Optional[str] = None
+    ruleset: dict
+
+class RuleDisconnectRequest(BaseModel):
+    ruleset: RuleSetDraft
+    source_id: str
+    branch: str
+
+class RuleDisconnectResponse(BaseModel):
+    updated: bool
+    previous_target_id: Optional[str] = None
+    ruleset: dict
+
+class RuleCompletenessRequest(BaseModel):
+    ruleset: RuleSetDraft
+
+class RuleCompletenessResponse(BaseModel):
+    complete: bool
+    open: bool
+    broken: bool
+    entry_ok: bool
+    missing_entry: bool
+    missing_nodes: list[str]
+    open_branches: list[dict]
+    errors: list[str]
+
+class RuleForceEndRequest(BaseModel):
+    ruleset: RuleSetDraft
+    mode: str = "per_branch"   # Accepts: shared | per_branch | per_open_path
+    node_type: str = "end"
+    label_prefix: str = "forced_end"
+
+class RuleForceEndResponse(BaseModel):
+    updated: bool
+    filled_count: int
+    created_node_ids: list[str]
+    ruleset: dict
