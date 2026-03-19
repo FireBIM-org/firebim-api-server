@@ -162,3 +162,36 @@ class RuleForceEndResponse(BaseModel):
     filled_count: int
     created_node_ids: list[str]
     ruleset: dict
+
+class RuleElementJson(BaseModel):
+    id: str
+    node_type: str = "decision"
+
+    target_class: Optional[str] = None
+    property_path: Optional[str] = None
+    operator: Optional[str] = None
+    value: Optional[Any] = None
+
+    true_path: Optional[str] = None
+    false_path: Optional[str] = None
+    unknown_path: Optional[str] = None
+
+    label: Optional[str] = None
+    config: dict = Field(default_factory=dict)
+    graph_uri: Optional[str] = None
+
+
+class RuleElementJsonResponse(BaseModel):
+    rule_element: RuleElementJson
+
+
+class RuleElementDeriveRequest(BaseModel):
+    source_id: str
+    new_id: str
+    preserve_paths: bool = False
+    overrides: dict = Field(default_factory=dict)
+    source_graph_uri: Optional[str] = None
+
+
+class RuleElementDeriveResponse(BaseModel):
+    rule_element: RuleElementJson

@@ -47,12 +47,41 @@ from app.schemas.rules import (
     RuleCompletenessResponse,
     RuleForceEndRequest,
     RuleForceEndResponse,
+    RuleElementJson,
+    RuleElementJsonResponse,
+    RuleElementDeriveRequest,
+    RuleElementDeriveResponse,
 )
 
 
 
 router = APIRouter(prefix="/rules", tags=["rules"])
 
+
+def _rule_element_to_json(element: dict, graph_uri: str | None = None) -> RuleElementJson:
+    return RuleElementJson(
+        id=element.get("id"),
+        node_type=element.get("node_type") or "decision",
+        target_class=element.get("target_class"),
+        property_path=element.get("property_path"),
+        operator=element.get("operator"),
+        value=element.get("value"),
+        true_path=element.get("true_path"),
+        false_path=element.get("false_path"),
+        unknown_path=element.get("unknown_path"),
+        label=element.get("label"),
+        config=element.get("config") or {},
+        graph_uri=graph_uri,
+    )
+
+
+def _fetch_rule_element_json_by_graph_uri(graph_uri: str) -> RuleElementJson:
+    ttl = fetch_ttl_from_fuseki(
+        dataset="rulebook",
+        graph_uri=graph_uri,
+    )
+    element = decompile_rule_element_ttl(ttl)
+    return _rule_element_to_json(element, graph_uri=graph_uri)
 
 @router.get("/health")
 def rules_health():
@@ -272,7 +301,46 @@ def delete_ruleset(payload: RuleSetDeleteRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/rule-elements/{element_id}/json", response_model=RuleElementJsonResponse)
+def get_rule_element_json(element_id: str):
+    try:
+        graph_uri = default_rule_element_graph_uri(element_id)
+        element = _fetch_rule_element_json_by_graph_uri(graph_uri)
+        return RuleElementJsonResponse(rule_element=element)
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     
+@router.post("/rule-elements/derive", response_model=RuleElementDeriveResponse)
+def derive_rule_element(payload: RuleElementDeriveRequest):
+    try:
+        source_graph_uri = payload.source_graph_uri or default_rule_element_graph_uri(payload.source_id)
+        derived = _fetch_rule_element_json_by_graph_uri(source_graph_uri).model_dump()
+
+        derived["id"] = payload.new_id
+        derived["graph_uri"] = None
+
+        if not payload.preserve_paths:
+            derived["true_path"] = None
+            derived["false_path"] = None
+            derived["unknown_path"] = None
+
+        for key, value in payload.overrides.items():
+            if key in derived:
+                derived[key] = value
+
+        return RuleElementDeriveResponse(rule_element=RuleElementJson(**derived))
+
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/rule-elements", response_model=RuleElementPublishResponse)
 def publish_rule_element(payload: RuleElementPublishRequest):
     try:
