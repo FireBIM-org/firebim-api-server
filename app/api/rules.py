@@ -4,6 +4,7 @@ from app.rules.dsl import Rule
 from app.rules.models import fbRuleElement
 from app.rules.ruleset import RuleSet
 from app.rules.shacl_builder import SHACLBuilder
+from app.rules.element_validator import validate_rule_element_payload
 from app.rules.decompiler import decompile_ruleset_ttl, decompile_rule_element_ttl
 from app.rules.composer import (
     connect_ruleset_nodes,
@@ -343,6 +344,8 @@ def derive_rule_element(payload: RuleElementDeriveRequest):
 
 @router.post("/rule-elements", response_model=RuleElementPublishResponse)
 def publish_rule_element(payload: RuleElementPublishRequest):
+    node_data = payload.model_dump()
+    validate_rule_element_payload(node_data)
     try:
         element = fbRuleElement(
             id=payload.id,
@@ -528,6 +531,23 @@ def force_end(payload: RuleForceEndRequest):
             created_node_ids=result["created_node_ids"],
             ruleset=result["ruleset"],
         )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/rule-elements/{element_id}/json")
+def get_rule_element_json(element_id: str):
+    try:
+        graph_uri = default_rule_element_graph_uri(element_id)
+        ttl = fetch_ttl_from_fuseki(
+            dataset="rulebook",
+            graph_uri=graph_uri,
+        )
+        rule_element = decompile_rule_element_ttl(ttl)
+        return rule_element
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

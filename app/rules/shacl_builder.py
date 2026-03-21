@@ -5,14 +5,14 @@ from .models import fbRuleElement
 
 
 class SHACLBuilder:
-
     """
-    Converts fbRuleElement objects into SHACL NodeShapes
-    using SPARQL rules that produce True / False / Unknown.
+    Converts fbRuleElement objects into RDF.
+
+    decision -> SHACL NodeShape + SPARQL rule
+    start/end -> lightweight RDF metadata
     """
 
     def __init__(self, base_uri="http://example.org/firebim/"):
-
         self.graph = Graph()
 
         self.EX = Namespace(base_uri)
@@ -22,12 +22,7 @@ class SHACLBuilder:
         self.graph.bind("ex", self.EX)
         self.graph.bind("fb", self.FB)
 
-    # --------------------------------------------------
-    # simple comparison
-    # --------------------------------------------------
-
     def _build_comparison(self, element):
-
         op = element.operator
         value = element.value
 
@@ -35,200 +30,119 @@ class SHACLBuilder:
             return f"?h {op} {value}"
 
         if op == "==":
-
             if isinstance(value, (list, tuple)):
-
                 formatted = []
-
                 for v in value:
-
                     if isinstance(v, URIRef):
                         formatted.append(f"<{v}>")
-
                     elif isinstance(v, str):
                         formatted.append(f'"{v}"')
-
                     else:
                         formatted.append(str(v))
-
                 values = ", ".join(formatted)
-
                 return f"?h IN ({values})"
-
             else:
-
                 if isinstance(value, URIRef):
                     return f"?h = <{value}>"
-
                 if isinstance(value, str):
                     return f'?h = "{value}"'
-
                 return f"?h = {value}"
 
         if op == "between":
-
             lower, upper = value
             return f"(?h >= {lower} && ?h < {upper})"
 
         raise ValueError(f"Unsupported operator {op}")
 
-    # --------------------------------------------------
-    # grouped rules (OR / AND)
-    # --------------------------------------------------
+    def _add_metadata_node(self, element: fbRuleElement):
+        node_uri = self.EX[element.id]
+        self.graph.add((node_uri, RDF.type, self.EX.RuleElement))
+        self.graph.add((node_uri, self.EX.nodeType, Literal(element.node_type)))
 
-    def _build_group(self, element):
+        if element.label is not None:
+            self.graph.add((node_uri, self.EX.label, Literal(element.label)))
 
-        logic = element.value["logic"]
-        conditions = element.value["conditions"]
+        if element.value is not None:
+            self.graph.add((node_uri, self.EX.value, Literal(str(element.value))))
 
-        optionals = []
-        expressions = []
-        vars = []
+        if element.true_path:
+            self.graph.add((node_uri, self.FB.truePath, self.EX[element.true_path]))
+        if element.false_path:
+            self.graph.add((node_uri, self.FB.falsePath, self.EX[element.false_path]))
+        if element.unknown_path:
+            self.graph.add((node_uri, self.FB.unknownPath, self.EX[element.unknown_path]))
 
-        for i, cond in enumerate(conditions):
+        if isinstance(element.config, dict):
+            end_kind = element.config.get("end_kind")
+            output_text = element.config.get("output_text")
 
-            var = f"?h{i}"
-            vars.append(var)
-
-            optionals.append(
-                f"OPTIONAL {{ ?this <{cond.property_uri}> {var} }}"
-            )
-
-            if cond.operator in ["<=", ">=", "<", ">"]:
-                expressions.append(f"{var} {cond.operator} {cond.value}")
-
-            elif cond.operator == "==":
-
-                if isinstance(cond.value, list):
-
-                    values = ", ".join(f'"{v}"' for v in cond.value)
-                    expressions.append(f"{var} IN ({values})")
-
-                else:
-
-                    expressions.append(f'{var} = "{cond.value}"')
-
-        if logic == "OR":
-            expr = " || ".join(expressions)
-        else:
-            expr = " && ".join(expressions)
-
-        # detect if ALL inputs are missing
-        bound_check = " && ".join([f"!BOUND({v})" for v in vars])
-
-        optional_block = "\n".join(optionals)
-
-        return optional_block, expr, bound_check
-
-
-    # --------------------------------------------------
+            if end_kind is not None:
+                self.graph.add((node_uri, self.EX.endKind, Literal(str(end_kind))))
+            if output_text is not None:
+                self.graph.add((node_uri, self.EX.outputText, Literal(str(output_text))))
 
     def add_rule_element(self, element: fbRuleElement):
-        
+        if element.node_type in {"start", "end"}:
+            self._add_metadata_node(element)
+            return
+
         if element.node_type != "decision":
-            return  # skip SHACL generation
+            raise ValueError(f"Unsupported node_type: {element.node_type}")
 
         shape_uri = self.EX[element.id]
-
         self.graph.add((shape_uri, RDF.type, SH.NodeShape))
-        self.graph.add((shape_uri, SH.targetClass, self.EX[element.target_class]))
+        self.graph.add((shape_uri, self.EX.nodeType, Literal(element.node_type)))
+
+        # target_class may be compact local name or full URI
+        if element.target_class and str(element.target_class).startswith("http"):
+            self.graph.add((shape_uri, SH.targetClass, URIRef(element.target_class)))
+        else:
+            self.graph.add((shape_uri, SH.targetClass, self.EX[element.target_class]))
 
         if element.label:
             self.graph.add((shape_uri, self.EX.label, Literal(element.label)))
 
-        # ----------------------------------------------
-        # grouped rule
-        # ----------------------------------------------
+        property_uri = element.property_path
+        comparison = self._build_comparison(element)
 
-        if element.operator == "group":
+        sparql = f"""
+        CONSTRUCT {{
+            ?this fb:ruleResult ?result .
+        }}
+        WHERE {{
 
-            optionals, expr, bound_check = self._build_group(element)
+            OPTIONAL {{ ?this <{property_uri}> ?h }}
 
-            sparql = f"""
-            CONSTRUCT {{
-                ?this fb:ruleResult ?result .
-            }}
-            WHERE {{
+            BIND(
+                IF(!BOUND(?h), fb:Unknown,
+                    IF({comparison}, fb:True, fb:False)
+                ) AS ?result
+            )
 
-                {optionals}
-
-                BIND(
-                    IF(
-                        ({bound_check}),
-                        fb:Unknown,
-
-                        IF(
-                            ({expr}),
-                            fb:True,
-                            fb:False
-                        )
-                    ) AS ?result
-                )
-
-            }}
-            """
-
-        # ----------------------------------------------
-        # simple rule
-        # ----------------------------------------------
-
-        else:
-
-            property_uri = element.property_path
-
-            comparison = self._build_comparison(element)
-
-            sparql = f"""
-            CONSTRUCT {{
-                ?this fb:ruleResult ?result .
-            }}
-            WHERE {{
-
-                OPTIONAL {{ ?this <{property_uri}> ?h }}
-
-                BIND(
-                    IF(!BOUND(?h), fb:Unknown,
-                        IF({comparison}, fb:True, fb:False)
-                    ) AS ?result
-                )
-
-            }}
-            """
+        }}
+        """
 
         rule_node = BNode()
-
         self.graph.add((shape_uri, SH.rule, rule_node))
         self.graph.add((rule_node, RDF.type, SH.SPARQLRule))
         self.graph.add((rule_node, SH.construct, Literal(sparql)))
 
-        # ----------------------------------------------
-
         if element.true_path:
             self.graph.add((shape_uri, self.FB.truePath, self.EX[element.true_path]))
-
         if element.false_path:
             self.graph.add((shape_uri, self.FB.falsePath, self.EX[element.false_path]))
-
         if element.unknown_path:
             self.graph.add((shape_uri, self.FB.unknownPath, self.EX[element.unknown_path]))
 
-    # --------------------------------------------------
-
     def add_rule_set(self, rule_set):
-        
         ruleset_uri = self.EX[rule_set.id]
         entry_uri = self.EX[rule_set.entry]
 
-        # define RuleSet as a resource
         self.graph.add((ruleset_uri, RDF.type, self.EX.RuleSet))
-
-        # link entry point
         self.graph.add((ruleset_uri, self.EX.entryPoint, entry_uri))
 
-        # add all rule elements
         for element in rule_set.elements.values():
             self.add_rule_element(element)
-
 
     def serialize(self, path):
         self.graph.serialize(path, format="turtle")

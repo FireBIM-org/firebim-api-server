@@ -4,10 +4,17 @@ from typing import Dict, Optional, Any
 
 @dataclass
 class fbRuleElement:
+    """
+    Atomic rule element.
+
+    node_type:
+      - decision: SHACL-backed decision node
+      - start: entry/orchestration node
+      - end: terminal/output node
+    """
 
     id: str
 
-    # decision rule fields
     target_class: Optional[str] = None
     property_path: Optional[str] = None
     operator: Optional[str] = None
@@ -18,18 +25,15 @@ class fbRuleElement:
     unknown_path: Optional[str] = None
 
     label: Optional[str] = None
+
     node_type: str = "decision"
-    config: Optional[Dict] = field(default_factory=dict)
+    config: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class fbRule:
-    """
-    Composite fire safety rule consisting of multiple rule elements.
-    """
-
     id: str
     entry_element: str
-
     elements: Dict[str, fbRuleElement] = field(default_factory=dict)
 
     def add_element(self, element: fbRuleElement):

@@ -1,0 +1,460 @@
+# app/api/rules.py
+from fastapi import APIRouter, HTTPException
+
+from app.rules.dsl import Rule
+from app.rules.models import fbRuleElement
+from app.rules.ruleset import RuleSet
+from app.rules.shacl_builder import SHACLBuilder
+from app.rules.decompiler import decompile_ruleset_ttl, decompile_rule_element_ttl
+from app.rules.composer import (
+    connect_ruleset_nodes,
+    disconnect_ruleset_node_branch,
+    check_ruleset_completeness,
+    force_end_ruleset,
+)
+from app.rules.publisher import (
+    publish_ttl_to_fuseki,
+    fetch_ttl_from_fuseki,
+    delete_graph_from_fuseki,
+    default_ruleset_graph_uri,
+    default_rule_element_graph_uri,
+    list_rule_element_graphs,
+)
+from app.schemas.rules import (
+    RuleSetValidateRequest,
+    RuleSetValidateResponse,
+    RuleSetCompileResponse,
+    RuleSetDecompileRequest,
+    RuleSetDecompileResponse,
+    RuleSetPublishRequest,
+    RuleSetPublishResponse,
+    RuleSetFetchRequest,
+    RuleSetFetchResponse,
+    RuleSetDeleteRequest,
+    RuleSetDeleteResponse,
+    RuleElementPublishRequest,
+    RuleElementPublishResponse,
+    RuleElementFetchRequest,
+    RuleElementFetchResponse,
+    RuleElementDeleteRequest,
+    RuleElementDeleteResponse,
+    RuleElementListResponse,
+    RuleSetDraft,
+    RuleConnectRequest,
+    RuleConnectResponse,
+    RuleDisconnectRequest,
+    RuleDisconnectResponse,
+    RuleCompletenessRequest,
+    RuleCompletenessResponse,
+    RuleForceEndRequest,
+    RuleForceEndResponse,
+    RuleElementJson,
+    RuleElementJsonResponse,
+    RuleElementDeriveRequest,
+    RuleElementDeriveResponse,
+)
+
+
+
+router = APIRouter(prefix="/rules", tags=["rules"])
+
+
+def _rule_element_to_json(element: dict, graph_uri: str | None = None) -> RuleElementJson:
+    return RuleElementJson(
+        id=element.get("id"),
+        node_type=element.get("node_type") or "decision",
+        target_class=element.get("target_class"),
+        property_path=element.get("property_path"),
+        operator=element.get("operator"),
+        value=element.get("value"),
+        true_path=element.get("true_path"),
+        false_path=element.get("false_path"),
+        unknown_path=element.get("unknown_path"),
+        label=element.get("label"),
+        config=element.get("config") or {},
+        graph_uri=graph_uri,
+    )
+
+
+def _fetch_rule_element_json_by_graph_uri(graph_uri: str) -> RuleElementJson:
+    ttl = fetch_ttl_from_fuseki(
+        dataset="rulebook",
+        graph_uri=graph_uri,
+    )
+    element = decompile_rule_element_ttl(ttl)
+    return _rule_element_to_json(element, graph_uri=graph_uri)
+
+@router.get("/health")
+def rules_health():
+    """
+    Simple health check that proves:
+    - app.rules is importable
+    - Rule DSL works
+    """
+
+    # Create a tiny rule (no external dependencies)
+    test_rule = (
+        Rule("health_check_rule") #Name and ID of the rule
+        .target("Test") #Target class for the rule, this is ontology-specific and can be any URI  
+        .when("FBO.roomArea") #Property to evaluate, this is also ontology-specific and can be any URI - ps dont use quotes! - this is just an examplei
+        .gt(1) #Operator and value to evaluate against, in this case "greater than 1"
+        .true("ok") #Path to set if the rule evaluates to true, this is application-specific and can be any string
+        .false("fail") #Path to set if the rule evaluates to false, this is application-specific and can be any string
+        .unknown("missing") #Path to set if the rule evaluates to unknown, this is application-specific and can be any string
+        .build()
+    )
+
+    return {
+        "status": "ok",
+        "rule_id": test_rule.id,
+        "target": test_rule.target_class,
+        "operator": test_rule.operator,
+    }
+
+@router.post("/validate", response_model=RuleSetValidateResponse)
+def validate_ruleset(payload: RuleSetValidateRequest):
+    try:
+        ruleset = RuleSet(payload.id)
+
+        for node in payload.nodes:
+            element = fbRuleElement(
+                id=node.id,
+                target_class=node.target_class,
+                property_path=node.property_path,
+                operator=node.operator,
+                value=node.value,
+                true_path=node.true_path,
+                false_path=node.false_path,
+                unknown_path=node.unknown_path,
+                label=node.label,
+                node_type=node.node_type,
+                config=node.config,
+            )
+            ruleset.add(element)
+
+        ruleset.start(payload.entry)
+        ruleset.validate()
+
+        return RuleSetValidateResponse(
+            valid=True,
+            ruleset_id=ruleset.id,
+            entry=ruleset.entry,
+            node_count=len(ruleset.elements),
+            errors=[],
+        )
+
+    except ValueError as e:
+        return RuleSetValidateResponse(
+            valid=False,
+            ruleset_id=payload.id,
+            entry=payload.entry,
+            node_count=len(payload.nodes),
+            errors=[str(e)],
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/compile", response_model=RuleSetCompileResponse)
+def compile_ruleset(payload: RuleSetValidateRequest):
+    try:
+        ruleset = RuleSet(payload.id)
+
+        for node in payload.nodes:
+            element = fbRuleElement(
+                id=node.id,
+                target_class=node.target_class,
+                property_path=node.property_path,
+                operator=node.operator,
+                value=node.value,
+                true_path=node.true_path,
+                false_path=node.false_path,
+                unknown_path=node.unknown_path,
+                label=node.label,
+                node_type=node.node_type,
+                config=node.config,
+            )
+            ruleset.add(element)
+
+        ruleset.start(payload.entry)
+        ruleset.validate()
+
+        builder = SHACLBuilder()
+        builder.add_rule_set(ruleset)
+
+        ttl = builder.get_graph().serialize(format="turtle")
+
+        return RuleSetCompileResponse(
+            ruleset_id=ruleset.id,
+            node_count=len(ruleset.elements),
+            ttl=str(ttl),
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/decompile", response_model=RuleSetDecompileResponse)
+def decompile_ruleset(payload: RuleSetDecompileRequest):
+    try:
+        ruleset = decompile_ruleset_ttl(payload.ttl)
+        return RuleSetDecompileResponse(ruleset=ruleset)
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/publish", response_model=RuleSetPublishResponse)
+def publish_ruleset(payload: RuleSetPublishRequest):
+    try:
+        ruleset = RuleSet(payload.id)
+
+        for node in payload.nodes:
+            element = fbRuleElement(
+                id=node.id,
+                target_class=node.target_class,
+                property_path=node.property_path,
+                operator=node.operator,
+                value=node.value,
+                true_path=node.true_path,
+                false_path=node.false_path,
+                unknown_path=node.unknown_path,
+                label=node.label,
+                node_type=node.node_type,
+                config=node.config,
+            )
+            ruleset.add(element)
+
+        ruleset.start(payload.entry)
+        ruleset.validate()
+
+        builder = SHACLBuilder()
+        builder.add_rule_set(ruleset)
+
+        ttl = builder.get_graph().serialize(format="turtle")
+        graph_uri = payload.graph_uri or default_ruleset_graph_uri(ruleset.id)
+
+        publish_ttl_to_fuseki(
+            ttl_text=str(ttl),
+            dataset="rulebook",
+            graph_uri=graph_uri,
+        )
+
+        return RuleSetPublishResponse(
+            published=True,
+            ruleset_id=ruleset.id,
+            graph_uri=graph_uri,
+            node_count=len(ruleset.elements),
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/fetch", response_model=RuleSetFetchResponse)
+def fetch_ruleset(payload: RuleSetFetchRequest):
+
+# app/schemas/rules.py
+from typing import Any, List, Optional
+from pydantic import BaseModel, Field
+
+
+class RuleNodePayload(BaseModel):
+    id: str
+    node_type: str = "decision"
+
+    target_class: Optional[str] = None
+    property_path: Optional[str] = None
+    operator: Optional[str] = None
+    value: Optional[Any] = None
+
+    true_path: Optional[str] = None
+    false_path: Optional[str] = None
+    unknown_path: Optional[str] = None
+
+    label: Optional[str] = None
+    config: dict = Field(default_factory=dict)
+
+class RuleSetValidateRequest(BaseModel):
+    id: str
+    entry: str
+    nodes: List[RuleNodePayload]
+
+class RuleSetValidateResponse(BaseModel):
+    valid: bool
+    ruleset_id: str
+    entry: Optional[str] = None
+    node_count: int
+    errors: List[str] = Field(default_factory=list)
+
+class RuleSetCompileResponse(BaseModel):
+    ruleset_id: str
+    node_count: int
+    ttl: str
+
+class RuleSetDecompileRequest(BaseModel):
+    ttl: str
+
+class RuleSetDecompileResponse(BaseModel):
+    ruleset: dict
+
+class RuleSetPublishRequest(BaseModel):
+    id: str
+    entry: str
+    nodes: List[RuleNodePayload]
+    graph_uri: Optional[str] = None
+
+class RuleSetPublishResponse(BaseModel):
+    published: bool
+    ruleset_id: str
+    graph_uri: str
+    node_count: int
+
+class RuleSetFetchRequest(BaseModel):
+    graph_uri: str
+
+class RuleSetFetchResponse(BaseModel):
+    graph_uri: str
+    ttl: str
+    ruleset: dict | None = None
+
+class RuleSetDeleteRequest(BaseModel):
+    graph_uri: str
+
+class RuleSetDeleteResponse(BaseModel):
+    deleted: bool
+    graph_uri: str
+
+class RuleElementPublishRequest(BaseModel):
+    id: str
+    node_type: str = "decision"
+
+    target_class: Optional[str] = None
+    property_path: Optional[str] = None
+    operator: Optional[str] = None
+    value: Optional[Any] = None
+
+    true_path: Optional[str] = None
+    false_path: Optional[str] = None
+    unknown_path: Optional[str] = None
+
+    label: Optional[str] = None
+    config: dict = Field(default_factory=dict)
+
+    graph_uri: Optional[str] = None
+
+class RuleElementPublishResponse(BaseModel):
+    published: bool
+    element_id: str
+    graph_uri: str
+    node_type: str
+
+class RuleElementFetchRequest(BaseModel):
+    graph_uri: str
+
+class RuleElementFetchResponse(BaseModel):
+    graph_uri: str
+    ttl: str
+    rule_element: dict | None = None
+
+class RuleElementDeleteRequest(BaseModel):
+    graph_uri: str
+
+class RuleElementDeleteResponse(BaseModel):
+    deleted: bool
+    graph_uri: str
+
+class RuleElementListResponse(BaseModel):
+    count: int
+    graph_uris: list[str]
+
+class RuleSetDraft(BaseModel):
+    id: str
+    entry: str
+    nodes: List[RuleNodePayload]
+
+class RuleConnectRequest(BaseModel):
+    ruleset: RuleSetDraft
+    source_id: str
+    branch: str
+    target_id: str
+
+class RuleConnectResponse(BaseModel):
+    updated: bool
+    overwritten: bool
+    previous_target_id: Optional[str] = None
+    ruleset: dict
+
+class RuleDisconnectRequest(BaseModel):
+    ruleset: RuleSetDraft
+    source_id: str
+    branch: str
+
+class RuleDisconnectResponse(BaseModel):
+    updated: bool
+    previous_target_id: Optional[str] = None
+    ruleset: dict
+
+class RuleCompletenessRequest(BaseModel):
+    ruleset: RuleSetDraft
+
+class RuleCompletenessResponse(BaseModel):
+    complete: bool
+    open: bool
+    broken: bool
+    entry_ok: bool
+    missing_entry: bool
+    missing_nodes: list[str]
+    open_branches: list[dict]
+    errors: list[str]
+
+class RuleForceEndRequest(BaseModel):
+    ruleset: RuleSetDraft
+    mode: str = "per_branch"   # Accepts: shared | per_branch | per_open_path
+    node_type: str = "end"
+    label_prefix: str = "forced_end"
+
+class RuleForceEndResponse(BaseModel):
+    updated: bool
+    filled_count: int
+    created_node_ids: list[str]
+    ruleset: dict
+
+class RuleElementJson(BaseModel):
+    id: str
+    node_type: str = "decision"
+
+    target_class: Optional[str] = None
+    property_path: Optional[str] = None
+    operator: Optional[str] = None
+    value: Optional[Any] = None
+
+    true_path: Optional[str] = None
+    false_path: Optional[str] = None
+    unknown_path: Optional[str] = None
+
+    label: Optional[str] = None
+    config: dict = Field(default_factory=dict)
+    graph_uri: Optional[str] = None
+
+
+class RuleElementJsonResponse(BaseModel):
+    rule_element: RuleElementJson
+
+
+class RuleElementDeriveRequest(BaseModel):
+    source_id: str
+    new_id: str
+    preserve_paths: bool = False
+    overrides: dict = Field(default_factory=dict)
+    source_graph_uri: Optional[str] = None
+
+
+class RuleElementDeriveResponse(BaseModel):
+    rule_element: RuleElementJson
