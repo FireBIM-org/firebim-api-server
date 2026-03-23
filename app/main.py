@@ -54,12 +54,6 @@ async def startup_event():
     init_db()
     print("Database tables created successfully")
 
-    # Ensure S3 bucket exists
-    try:
-        s3_client.head_bucket(Bucket=settings.S3_BUCKET_NAME)
-    except Exception:
-        s3_client.create_bucket(Bucket=settings.S3_BUCKET_NAME)
-
 # S3 Configuration
 s3_client = boto3.client(
     's3',
@@ -70,6 +64,12 @@ s3_client = boto3.client(
 )
 
 BUCKET_NAME = settings.S3_BUCKET_NAME
+
+# Create bucket if it doesn't exist
+try:
+    s3_client.head_bucket(Bucket=BUCKET_NAME)
+except:
+    s3_client.create_bucket(Bucket=BUCKET_NAME)
 
 @app.post("/ifc-models", status_code=201)
 async def upload_model(
