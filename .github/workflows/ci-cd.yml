@@ -11,6 +11,10 @@ on:
     paths-ignore:
       - "**.md"
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   API_IMAGE: ghcr.io/${{ github.repository }}/api
@@ -51,6 +55,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
 
@@ -68,7 +73,13 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: "v2.2.4"
+
       - name: Build & push API image
+        id: build-api
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -80,7 +91,14 @@ jobs:
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
 
+      - name: Sign API image
+        env:
+          TAGS: ${{ env.API_IMAGE }}:${{ steps.tag.outputs.version }}
+          DIGEST: ${{ steps.build-api.outputs.digest }}
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+
       - name: Build & push Worker image
+        id: build-worker
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -91,3 +109,9 @@ jobs:
             ${{ env.WORKER_IMAGE }}:${{ github.ref_name }}
           cache-from: type=gha,scope=worker
           cache-to: type=gha,mode=max,scope=worker
+
+      - name: Sign Worker image
+        env:
+          TAGS: ${{ env.WORKER_IMAGE }}:${{ steps.tag.outputs.version }}
+          DIGEST: ${{ steps.build-worker.outputs.digest }}
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
