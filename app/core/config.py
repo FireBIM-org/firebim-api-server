@@ -74,6 +74,9 @@ class Settings(BaseSettings):
         )
 
 
+    # Authentik OIDC
+    AUTHENTIK_ISSUER_URL: str = "https://auth.firebim.org/application/o/firebim/"
+
     # S3
     S3_ENDPOINT_URL: str
     S3_BUCKET_NAME: str
