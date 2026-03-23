@@ -35,7 +35,6 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --cov=app --cov-report=xml
-        continue-on-error: true
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -52,8 +51,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    outputs:
-      image-tag: ${{ steps.tag.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -94,123 +91,3 @@ jobs:
             ${{ env.WORKER_IMAGE }}:${{ github.ref_name }}
           cache-from: type=gha,scope=worker
           cache-to: type=gha,mode=max,scope=worker
-
-  # ── Deploy to dev (on merge to develop) ──────────────────────────
-  deploy-dev:
-    name: Deploy → Dev
-    needs: build-and-push
-    if: github.ref == 'refs/heads/develop'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Update dev image tags in GitOps repo
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITOPS_PAT }}
-          script: |
-            const tag = '${{ needs.build-and-push.outputs.image-tag }}';
-            const owner = 'FireBIM-org';
-            const repo = 'firebim-deploy';
-
-            const files = [
-              {path: 'apps/firebim-api/overlays/dev/kustomization.yaml',    imageName: 'ghcr.io/firebim-org/firebim-api-server/api'},
-              {path: 'apps/firebim-worker/overlays/dev/kustomization.yaml', imageName: 'ghcr.io/firebim-org/firebim-api-server/worker'},
-            ];
-
-            for (const file of files) {
-              const {data} = await github.rest.repos.getContent({owner, repo, path: file.path});
-              const content = Buffer.from(data.content, 'base64').toString();
-              const updated = content.replace(
-                new RegExp(`(name: ${file.imageName.replace(/[/]/g, '\\/')}\\n\\s+newTag: ).*`),
-                `$1${tag}  # Updated by CI pipeline`
-              );
-              await github.rest.repos.createOrUpdateFileContents({
-                owner, repo, path: file.path,
-                message: `chore(dev): update ${file.path.includes('worker') ? 'worker' : 'api'} to ${tag}`,
-                content: Buffer.from(updated).toString('base64'),
-                sha: data.sha,
-              });
-            }
-
-  # ── Deploy to staging (on merge to main) ─────────────────────────
-  deploy-staging:
-    name: Deploy → Staging
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Update staging image tags in GitOps repo
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITOPS_PAT }}
-          script: |
-            const tag = '${{ needs.build-and-push.outputs.image-tag }}';
-            const owner = 'FireBIM-org';
-            const repo = 'firebim-deploy';
-
-            const files = [
-              {path: 'apps/firebim-api/overlays/staging/kustomization.yaml',    imageName: 'ghcr.io/firebim-org/firebim-api-server/api'},
-              {path: 'apps/firebim-worker/overlays/staging/kustomization.yaml', imageName: 'ghcr.io/firebim-org/firebim-api-server/worker'},
-            ];
-
-            for (const file of files) {
-              const {data} = await github.rest.repos.getContent({owner, repo, path: file.path});
-              const content = Buffer.from(data.content, 'base64').toString();
-              const updated = content.replace(
-                new RegExp(`(name: ${file.imageName.replace(/[/]/g, '\\/')}\\n\\s+newTag: ).*`),
-                `$1${tag}  # Updated by CI pipeline`
-              );
-              await github.rest.repos.createOrUpdateFileContents({
-                owner, repo, path: file.path,
-                message: `chore(staging): update ${file.path.includes('worker') ? 'worker' : 'api'} to ${tag}`,
-                content: Buffer.from(updated).toString('base64'),
-                sha: data.sha,
-              });
-            }
-
-  # ── Deploy to production (on version tag → creates PR) ───────────
-  deploy-production:
-    name: Deploy → Production (PR)
-    needs: build-and-push
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Create production deployment PR
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITOPS_PAT }}
-          script: |
-            const tag = '${{ needs.build-and-push.outputs.image-tag }}';
-            const owner = 'FireBIM-org';
-            const repo = 'firebim-deploy';
-            const branch = `deploy/production-api-${tag}`;
-
-            // Create branch from main
-            const {data: ref} = await github.rest.git.getRef({owner, repo, ref: 'heads/main'});
-            await github.rest.git.createRef({owner, repo, ref: `refs/heads/${branch}`, sha: ref.object.sha});
-
-            const files = [
-              {path: 'apps/firebim-api/overlays/production/kustomization.yaml',    imageName: 'ghcr.io/firebim-org/firebim-api-server/api'},
-              {path: 'apps/firebim-worker/overlays/production/kustomization.yaml', imageName: 'ghcr.io/firebim-org/firebim-api-server/worker'},
-            ];
-
-            for (const file of files) {
-              const {data} = await github.rest.repos.getContent({owner, repo, path: file.path, ref: branch});
-              const content = Buffer.from(data.content, 'base64').toString();
-              const updated = content.replace(
-                new RegExp(`(name: ${file.imageName.replace(/[/]/g, '\\/')}\\n\\s+newTag: ).*`),
-                `$1${tag}  # Updated by CI pipeline`
-              );
-              await github.rest.repos.createOrUpdateFileContents({
-                owner, repo, path: file.path, branch,
-                message: `chore(production): update ${file.path.includes('worker') ? 'worker' : 'api'} to ${tag}`,
-                content: Buffer.from(updated).toString('base64'),
-                sha: data.sha,
-              });
-            }
-
-            await github.rest.pulls.create({
-              owner, repo,
-              title: `🚀 Production: API ${process.env.GITHUB_REF_NAME} (${tag})`,
-              body: `## Production Deployment\n\n**Tag:** \`${process.env.GITHUB_REF_NAME}\`  **Image:** \`${tag}\`\n\n### Images\n- \`${files[0].imageName}:${tag}\`\n- \`${files[1].imageName}:${tag}\`\n\n### Checklist\n- [ ] Staging verified\n- [ ] Approved by platform team`,
-              head: branch, base: 'main',
-            });
