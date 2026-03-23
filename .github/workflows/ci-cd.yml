@@ -10,6 +10,7 @@ on:
     branches: [main, develop]
     paths-ignore:
       - "**.md"
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -48,7 +49,7 @@ jobs:
   build-and-push:
     name: Build & Push
     needs: test
-    if: github.event_name == 'push'
+    # if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
