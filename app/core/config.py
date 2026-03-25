@@ -32,7 +32,7 @@ class Settings(BaseSettings):
         env_file="../.env",
         env_ignore_empty=True,
         extra="ignore",
-        secrets_dir='/run/secrets',
+        secrets_dir='/tmp/secrets',
     )
     # API_V1_STR: str = "/api/v1"
     SECRET_KEY: SecretStr = secrets.token_urlsafe(32)
