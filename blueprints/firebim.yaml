@@ -24,7 +24,7 @@ entries:
       invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
       client_type: confidential
       client_id: !Context firebim_client_id
-      client_secret: !Env [FIREBIM_CLIENT_SECRET]
+      client_secret: !Env [FIREBIM_CLIENT_SECRET, ""]
       redirect_uris: !Context firebim_redirect_uris
       signing_key: !Find [authentik_crypto.certificatekeypair, [name, "authentik Self-signed Certificate"]]
       property_mappings:
