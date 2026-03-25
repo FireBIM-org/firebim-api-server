@@ -101,7 +101,7 @@ services:
 
   # ── Authentik (local identity provider) ─────────────────────────
   authentik-server:
-    image: ghcr.io/goauthentik/server:2025.2.1
+    image: ghcr.io/goauthentik/server:2025.12
     command: server
     ports:
       - "9090:9000"    # HTTP
@@ -129,7 +129,7 @@ services:
         condition: service_started
 
   authentik-worker:
-    image: ghcr.io/goauthentik/server:2025.2.1
+    image: ghcr.io/goauthentik/server:2025.12
     command: worker
     environment:
       AUTHENTIK_SECRET_KEY: local-dev-secret-key-change-in-production
