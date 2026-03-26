@@ -99,6 +99,13 @@ services:
     volumes:
       - minio_data:/data
 
+  # ── Mailpit (local email catcher) ────────────────────────────────
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"    # Web UI
+      - "1025:1025"    # SMTP
+
   # ── Authentik (local identity provider) ─────────────────────────
   authentik-server:
     image: ghcr.io/goauthentik/server:2025.12
@@ -115,6 +122,13 @@ services:
       AUTHENTIK_POSTGRESQL__PASSWORD: authentik-local-dev
       AUTHENTIK_BOOTSTRAP_PASSWORD: akadmin
       AUTHENTIK_BOOTSTRAP_EMAIL: admin@firebim.org
+      # SMTP — local Mailpit
+      AUTHENTIK_EMAIL__HOST: mailpit
+      AUTHENTIK_EMAIL__PORT: 1025
+      AUTHENTIK_EMAIL__USE_TLS: "false"
+      AUTHENTIK_EMAIL__USE_SSL: "false"
+      AUTHENTIK_EMAIL__FROM: noreply@firebim.org
+      AUTHENTIK_EMAIL__TIMEOUT: 10
       # Blueprint env vars
       FIREBIM_CLIENT_ID: firebim
       FIREBIM_CLIENT_SECRET: local-dev-client-secret
@@ -127,6 +141,8 @@ services:
     depends_on:
       postgres:
         condition: service_started
+      mailpit:
+        condition: service_started
 
   authentik-worker:
     image: ghcr.io/goauthentik/server:2025.12
@@ -138,6 +154,13 @@ services:
       AUTHENTIK_POSTGRESQL__NAME: authentik
       AUTHENTIK_POSTGRESQL__USER: authentik
       AUTHENTIK_POSTGRESQL__PASSWORD: authentik-local-dev
+      # SMTP — local Mailpit
+      AUTHENTIK_EMAIL__HOST: mailpit
+      AUTHENTIK_EMAIL__PORT: 1025
+      AUTHENTIK_EMAIL__USE_TLS: "false"
+      AUTHENTIK_EMAIL__USE_SSL: "false"
+      AUTHENTIK_EMAIL__FROM: noreply@firebim.org
+      AUTHENTIK_EMAIL__TIMEOUT: 10
       FIREBIM_CLIENT_ID: firebim
       FIREBIM_CLIENT_SECRET: local-dev-client-secret
       FIREBIM_REDIRECT_URIS: "http://localhost:3000/api/auth/callback/authentik"
@@ -148,6 +171,8 @@ services:
       - ./blueprints:/blueprints/custom
     depends_on:
       postgres:
+        condition: service_started
+      mailpit:
         condition: service_started
 
   pgadmin:
