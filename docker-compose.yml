@@ -132,7 +132,7 @@ services:
       # Blueprint env vars
       FIREBIM_CLIENT_ID: firebim
       FIREBIM_CLIENT_SECRET: local-dev-client-secret
-      FIREBIM_REDIRECT_URIS: "http://localhost:3000/api/auth/callback/authentik"
+      FIREBIM_REDIRECT_URI: "http://localhost:3000/api/auth/callback/authentik"
       FIREBIM_LAUNCH_URL: "http://localhost:3000"
     volumes:
       - authentik_media:/media
@@ -163,7 +163,7 @@ services:
       AUTHENTIK_EMAIL__TIMEOUT: 10
       FIREBIM_CLIENT_ID: firebim
       FIREBIM_CLIENT_SECRET: local-dev-client-secret
-      FIREBIM_REDIRECT_URIS: "http://localhost:3000/api/auth/callback/authentik"
+      FIREBIM_REDIRECT_URI: "http://localhost:3000/api/auth/callback/authentik"
       FIREBIM_LAUNCH_URL: "http://localhost:3000"
     volumes:
       - authentik_media:/media
