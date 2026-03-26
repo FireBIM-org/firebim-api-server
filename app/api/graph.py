@@ -1,8 +1,8 @@
-from fastapi import APIRouter, HTTPException
-from typing import Dict, List, Any
 import json
 import re
+from typing import Any
 
+from fastapi import APIRouter, HTTPException
 from rdflib import Graph
 from rdflib.plugins.stores.sparqlstore import SPARQLStore
 
@@ -15,7 +15,7 @@ FUSEKI_HOST = settings.FUSEKI_HOST
 # TODO: Warning! Currently using unsecured Fuseki without authentication and no SSL!
 
 # Map country code to Fuseki dataset name
-DATASET_BY_COUNTRY: Dict[str, str] = {
+DATASET_BY_COUNTRY: dict[str, str] = {
     "DK": "Danish_dataset",
     "NL": "Dutch_dataset",
     "PT": "Portugal_dataset",
@@ -26,7 +26,7 @@ DATASET_BY_COUNTRY: Dict[str, str] = {
 PARAGRAPH_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
-def _candidate_query_endpoints(dataset: str) -> List[str]:
+def _candidate_query_endpoints(dataset: str) -> list[str]:
     """Return possible SPARQL query endpoints for a dataset.
     We try /sparql then /query for broader compatibility.
     """
@@ -39,7 +39,9 @@ def _candidate_query_endpoints(dataset: str) -> List[str]:
 def _run_sparql(query: str, country_code: str) -> Any:
     ds = DATASET_BY_COUNTRY.get(country_code.upper())
     if not ds:
-        raise HTTPException(status_code=400, detail=f"Unsupported country_code. Use one of: {', '.join(DATASET_BY_COUNTRY.keys())}")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported country_code. Use one of: {', '.join(DATASET_BY_COUNTRY.keys())}"
+        )
 
     last_error: Exception | None = None
     for endpoint in _candidate_query_endpoints(ds):
@@ -72,14 +74,14 @@ def _run_sparql(query: str, country_code: str) -> Any:
 def _term_to_json(term):
     """Best-effort conversion of an rdflib term to JSON-serializable value."""
     try:
-        from rdflib.term import URIRef, Literal, BNode
+        from rdflib.term import BNode, Literal, URIRef
     except Exception:
         return str(term)
 
     if term is None:
         return None
     if isinstance(term, Literal):
-        d: Dict[str, Any] = {"type": "literal", "value": str(term)}
+        d: dict[str, Any] = {"type": "literal", "value": str(term)}
         if term.datatype:
             d["datatype"] = str(term.datatype)
         if term.language:
@@ -93,9 +95,7 @@ def _term_to_json(term):
 
 
 @router.get("/count_fro/{country_code}")
-def count_fro(
-    country_code: str
-    ):
+def count_fro(country_code: str):
     """
     Count number of entities per FRO class.
     """
@@ -129,9 +129,7 @@ ORDER BY ?class
 
 
 @router.get("/get_english/{country_code}")
-def get_english(
-    country_code: str
-    ):
+def get_english(country_code: str):
     """
     Get all entities with English original text.
     """
@@ -156,12 +154,8 @@ ORDER BY ?type ?id
 
 
 @router.get("/select_paragraph/{country_code}/{paragraph_id}")
-def select_paragraph(
-    country_code: str,
-    paragraph_id: str
-    ):
-    """
-    """
+def select_paragraph(country_code: str, paragraph_id: str):
+    """ """
 
     # Sanitize paragraph id to avoid injection, allow e.g. para-82
     if not PARAGRAPH_ID_PATTERN.match(paragraph_id):

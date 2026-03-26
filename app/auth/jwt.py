@@ -1,7 +1,7 @@
 import jwt
-from jwt import PyJWKClient
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt import PyJWKClient
 from sqlmodel import Session
 
 from app.core.config import settings
@@ -54,7 +54,7 @@ async def get_current_user(
         if sub is None:
             raise credentials_exception
     except jwt.PyJWTError:
-        raise credentials_exception
+        raise credentials_exception from None
 
     # Find or auto-provision user based on Authentik subject
     user = db.query(User).filter(User.authentik_sub == sub).first()
