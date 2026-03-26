@@ -7,7 +7,7 @@ metadata:
 
 context:
   firebim_client_id: !Env [FIREBIM_CLIENT_ID, firebim]
-  firebim_redirect_uris: !Env [FIREBIM_REDIRECT_URIS, "http://localhost:3000/api/auth/callback/authentik"]
+  firebim_redirect_uri: !Env [FIREBIM_REDIRECT_URI, "http://localhost:3000/api/auth/callback/authentik"]
   firebim_launch_url: !Env [FIREBIM_LAUNCH_URL, "http://localhost:3000"]
 
 entries:
@@ -73,6 +73,17 @@ entries:
       placeholder: Confirm your password
       order: 3
 
+  - model: authentik_policies_password.passwordpolicy
+    id: firebim-password-policy
+    state: present
+    identifiers:
+      name: firebim-password-policy
+    attrs:
+      password_field: password
+      check_zxcvbn: true
+      zxcvbn_score_threshold: 2
+      error_message: "Password is too weak. Please choose a stronger password."
+
   - model: authentik_stages_prompt.promptstage
     id: firebim-enrollment-prompt-stage
     state: present
@@ -84,7 +95,8 @@ entries:
         - !KeyOf prompt-field-email
         - !KeyOf prompt-field-password
         - !KeyOf prompt-field-password-repeat
-      validation_policies: []
+      validation_policies:
+        - !KeyOf firebim-password-policy
 
   - model: authentik_stages_user_write.userwritestage
     id: firebim-enrollment-user-write
@@ -94,6 +106,7 @@ entries:
     attrs:
       create_users_as_inactive: false
       user_creation_mode: always_create
+      user_type: internal
 
   - model: authentik_stages_user_login.userloginstage
     id: firebim-enrollment-user-login
@@ -139,7 +152,9 @@ entries:
       client_type: confidential
       client_id: !Context firebim_client_id
       client_secret: !Env [FIREBIM_CLIENT_SECRET, ""]
-      redirect_uris: !Context firebim_redirect_uris
+      redirect_uris:
+        - matching_mode: strict
+          url: !Context firebim_redirect_uri
       signing_key: !Find [authentik_crypto.certificatekeypair, [name, "authentik Self-signed Certificate"]]
       property_mappings:
         - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
@@ -148,9 +163,137 @@ entries:
       sub_mode: hashed_user_id
       include_claims_in_id_token: true
       issuer_mode: per_provider
-      access_code_validity: "minutes=1"
+      access_code_validity: "minutes=10"
       access_token_validity: "minutes=5"
       refresh_token_validity: "days=30"
+
+  # ──────────────────────────────────────────────
+  # Password recovery flow
+  # ──────────────────────────────────────────────
+  - model: authentik_flows.flow
+    id: firebim-recovery-flow
+    state: present
+    identifiers:
+      slug: firebim-recovery
+    attrs:
+      name: FireBIM Password Recovery
+      title: Reset your password
+      designation: recovery
+      authentication: require_unauthenticated
+
+  - model: authentik_stages_identification.identificationstage
+    id: firebim-recovery-identification
+    state: present
+    identifiers:
+      name: firebim-recovery-identification
+    attrs:
+      user_fields:
+        - email
+        - username
+
+  - model: authentik_stages_email.emailstage
+    id: firebim-recovery-email
+    state: present
+    identifiers:
+      name: firebim-recovery-email
+    attrs:
+      use_global_settings: true
+      subject: Reset your FireBIM password
+      template: email/password_reset.html
+      activate_user_on_success: true
+      token_expiry: "minutes=30"
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-field-password-recovery
+    state: present
+    identifiers:
+      field_key: password
+      name: firebim-recovery-password
+    attrs:
+      label: New Password
+      type: password
+      required: true
+      placeholder: Enter new password
+      order: 0
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-field-password-recovery-repeat
+    state: present
+    identifiers:
+      field_key: password_repeat
+      name: firebim-recovery-password-repeat
+    attrs:
+      label: Repeat New Password
+      type: password
+      required: true
+      placeholder: Confirm new password
+      order: 1
+
+  - model: authentik_stages_prompt.promptstage
+    id: firebim-recovery-prompt-stage
+    state: present
+    identifiers:
+      name: firebim-recovery-prompt
+    attrs:
+      fields:
+        - !KeyOf prompt-field-password-recovery
+        - !KeyOf prompt-field-password-recovery-repeat
+      validation_policies:
+        - !KeyOf firebim-password-policy
+
+  - model: authentik_stages_user_write.userwritestage
+    id: firebim-recovery-user-write
+    state: present
+    identifiers:
+      name: firebim-recovery-user-write
+    attrs:
+      user_creation_mode: never_create
+
+  - model: authentik_stages_user_login.userloginstage
+    id: firebim-recovery-user-login
+    state: present
+    identifiers:
+      name: firebim-recovery-user-login
+
+  - model: authentik_flows.flowstagebinding
+    id: firebim-recovery-binding-0
+    state: present
+    identifiers:
+      target: !KeyOf firebim-recovery-flow
+      stage: !KeyOf firebim-recovery-identification
+      order: 10
+
+  - model: authentik_flows.flowstagebinding
+    id: firebim-recovery-binding-1
+    state: present
+    identifiers:
+      target: !KeyOf firebim-recovery-flow
+      stage: !KeyOf firebim-recovery-email
+      order: 20
+
+  - model: authentik_flows.flowstagebinding
+    id: firebim-recovery-binding-2
+    state: present
+    identifiers:
+      target: !KeyOf firebim-recovery-flow
+      stage: !KeyOf firebim-recovery-prompt-stage
+      order: 30
+
+  - model: authentik_flows.flowstagebinding
+    id: firebim-recovery-binding-3
+    state: present
+    identifiers:
+      target: !KeyOf firebim-recovery-flow
+      stage: !KeyOf firebim-recovery-user-write
+      order: 40
+
+  - model: authentik_flows.flowstagebinding
+    id: firebim-recovery-binding-4
+    state: present
+    identifiers:
+      target: !KeyOf firebim-recovery-flow
+      stage: !KeyOf firebim-recovery-user-login
+      order: 50
 
   # ──────────────────────────────────────────────
   # Application (visible on the Authentik dashboard)
@@ -166,3 +309,17 @@ entries:
       meta_launch_url: !Context firebim_launch_url
       meta_description: "FireBIM - IFC/IDS Compliance Checking Platform"
       policy_engine_mode: any
+
+  # ──────────────────────────────────────────────
+  # Connect enrollment flow to the default login page
+  # ──────────────────────────────────────────────
+  - model: authentik_stages_identification.identificationstage
+    state: present
+    identifiers:
+      name: default-authentication-identification
+    attrs:
+      user_fields:
+        - email
+        - username
+      enrollment_flow: !KeyOf firebim-enrollment-flow
+      recovery_flow: !KeyOf firebim-recovery-flow
