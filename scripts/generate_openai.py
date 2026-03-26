@@ -1,6 +1,6 @@
 import json
-import sys
 import os
+import sys
 
 # Add app to path
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -11,8 +11,7 @@ app_dir = os.path.join(root_dir, "app")
 # Change working directory to app directory
 os.chdir(app_dir)
 
-# Import the FastAPI app instance
-from app.main import app
+from app.main import app  # noqa: E402  # Import the FastAPI app instance (path setup required first)
 
 print("Generating OpenAPI schema...")
 openapi_schema = app.openapi()

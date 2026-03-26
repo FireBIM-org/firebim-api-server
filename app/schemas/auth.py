@@ -1,5 +1,4 @@
 from pydantic import EmailStr
-from typing import Optional
 from sqlmodel import SQLModel
 
 

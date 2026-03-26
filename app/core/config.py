@@ -1,21 +1,19 @@
 import secrets
 import warnings
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
     AnyUrl,
     BeforeValidator,
-    EmailStr,
+    Field,
     HttpUrl,
     PostgresDsn,
     SecretStr,
-    Field,
     computed_field,
     model_validator,
 )
 from pydantic_core import MultiHostUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing_extensions import Self
 
 
 def parse_cors(v: Any) -> list[str] | str:
@@ -32,7 +30,7 @@ class Settings(BaseSettings):
         env_file="../.env",
         env_ignore_empty=True,
         extra="ignore",
-        secrets_dir='/run/secrets',
+        secrets_dir="/var/run/secrets",
     )
     # API_V1_STR: str = "/api/v1"
     SECRET_KEY: SecretStr = secrets.token_urlsafe(32)
@@ -41,23 +39,24 @@ class Settings(BaseSettings):
     # FRONTEND_HOST: str = "http://localhost:5173"
     ENVIRONMENT: Literal["local", "staging", "production"] = "local"
 
-    BACKEND_CORS_ORIGINS: Annotated[
-        list[AnyUrl] | str, BeforeValidator(parse_cors)
-    ] = []
+    BACKEND_CORS_ORIGINS: Annotated[list[AnyUrl] | str, BeforeValidator(parse_cors)] = []
 
     @computed_field  # type: ignore[prop-decorator]
     @property
     def all_cors_origins(self) -> list[str]:
-        return [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS] + [
-            # self.FRONTEND_HOST
-        ]
+        return (
+            [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS]
+            + [
+                # self.FRONTEND_HOST
+            ]
+        )
 
     # PROJECT_NAME: str
     SENTRY_DSN: HttpUrl | None = None
     POSTGRES_HOST: str
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str
-    POSTGRES_PASSWORD: SecretStr = Field(alias='db-password')
+    POSTGRES_PASSWORD: SecretStr = Field(alias="db-password")
     # POSTGRES_PASSWORD_FILE: str = ""
     POSTGRES_DB: str = ""
 
@@ -73,15 +72,17 @@ class Settings(BaseSettings):
             path=self.POSTGRES_DB,
         )
 
-
     # Authentik OIDC
     AUTHENTIK_ISSUER_URL: str = "https://auth.firebim.org/application/o/firebim/"
+    # Optional: internal URL for JWKS fetching when running inside Docker.
+    # If not set, falls back to AUTHENTIK_ISSUER_URL.
+    AUTHENTIK_INTERNAL_URL: str = ""
 
     # S3
     S3_ENDPOINT_URL: str
     S3_BUCKET_NAME: str
     S3_ACCESS_KEY_ID: str
-    S3_SECRET_ACCESS_KEY: SecretStr = Field(alias='s3-secret-key')
+    S3_SECRET_ACCESS_KEY: SecretStr = Field(alias="s3-secret-key")
     # S3_SECRET_ACCESS_KEY_FILE: str
     S3_REGION: str
 
@@ -112,8 +113,7 @@ class Settings(BaseSettings):
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":
             message = (
-                f'The value of {var_name} is "changethis", '
-                "for security, please change it, at least for deployments."
+                f'The value of {var_name} is "changethis", for security, please change it, at least for deployments.'
             )
             if self.ENVIRONMENT == "local":
                 warnings.warn(message, stacklevel=1)
