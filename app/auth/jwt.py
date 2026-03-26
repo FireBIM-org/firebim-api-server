@@ -52,7 +52,7 @@ async def get_current_user(
         if sub is None:
             raise credentials_exception
     except jwt.PyJWTError:
-        raise credentials_exception
+        raise credentials_exception from None
 
     # Find or auto-provision user based on Authentik subject
     user = db.query(User).filter(User.authentik_sub == sub).first()
