@@ -26,17 +26,13 @@ def parse_cors(v: Any) -> list[str] | str:
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        # Use top level .env file (one level above ./backend/)
         env_file="../.env",
         env_ignore_empty=True,
         extra="ignore",
         secrets_dir="/var/run/secrets",
     )
-    # API_V1_STR: str = "/api/v1"
     SECRET_KEY: SecretStr = secrets.token_urlsafe(32)
-    # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
-    # FRONTEND_HOST: str = "http://localhost:5173"
     ENVIRONMENT: Literal["local", "staging", "production"] = "local"
 
     BACKEND_CORS_ORIGINS: Annotated[list[AnyUrl] | str, BeforeValidator(parse_cors)] = []
@@ -44,20 +40,13 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def all_cors_origins(self) -> list[str]:
-        return (
-            [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS]
-            + [
-                # self.FRONTEND_HOST
-            ]
-        )
+        return [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS]
 
-    # PROJECT_NAME: str
     SENTRY_DSN: HttpUrl | None = None
     POSTGRES_HOST: str
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str
     POSTGRES_PASSWORD: SecretStr = Field(alias="db-password")
-    # POSTGRES_PASSWORD_FILE: str = ""
     POSTGRES_DB: str = ""
 
     @computed_field  # type: ignore[prop-decorator]
@@ -74,8 +63,6 @@ class Settings(BaseSettings):
 
     # Authentik OIDC
     AUTHENTIK_ISSUER_URL: str = "https://auth.firebim.org/application/o/firebim/"
-    # Optional: internal URL for JWKS fetching when running inside Docker.
-    # If not set, falls back to AUTHENTIK_ISSUER_URL.
     AUTHENTIK_INTERNAL_URL: str = ""
 
     # S3
@@ -83,32 +70,13 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str
     S3_ACCESS_KEY_ID: str
     S3_SECRET_ACCESS_KEY: SecretStr = Field(alias="s3-secret-key")
-    # S3_SECRET_ACCESS_KEY_FILE: str
     S3_REGION: str
 
     # Worker
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str
 
-    # SMTP_TLS: bool = True
-    # SMTP_SSL: bool = False
-    # SMTP_PORT: int = 587
-    # SMTP_HOST: str | None = None
-    # SMTP_USER: str | None = None
-    # SMTP_PASSWORD: str | None = None
-    # EMAILS_FROM_EMAIL: EmailStr | None = None
-    # EMAILS_FROM_NAME: EmailStr | None = None
-
-    # EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = 48
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def emails_enabled(self) -> bool:
-        return bool(self.SMTP_HOST and self.EMAILS_FROM_EMAIL)
-
-    # EMAIL_TEST_USER: EmailStr = "test@example.com"
-    # FIRST_SUPERUSER: EmailStr
-    # FIRST_SUPERUSER_PASSWORD: str
+    FUSEKI_HOST: str
 
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":
@@ -124,13 +92,7 @@ class Settings(BaseSettings):
     def _enforce_non_default_secrets(self) -> Self:
         self._check_default_secret("SECRET_KEY", self.SECRET_KEY)
         self._check_default_secret("POSTGRES_PASSWORD", self.POSTGRES_PASSWORD)
-        # self._check_default_secret(
-        #     "FIRST_SUPERUSER_PASSWORD", self.FIRST_SUPERUSER_PASSWORD
-        # )
-
         return self
-
-    FUSEKI_HOST: str
 
 
 settings = Settings()
