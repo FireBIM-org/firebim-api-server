@@ -148,7 +148,7 @@ entries:
       sub_mode: hashed_user_id
       include_claims_in_id_token: true
       issuer_mode: per_provider
-      access_code_validity: "minutes=1"
+      access_code_validity: "minutes=10"
       access_token_validity: "minutes=5"
       refresh_token_validity: "days=30"
 
@@ -166,3 +166,13 @@ entries:
       meta_launch_url: !Context firebim_launch_url
       meta_description: "FireBIM - IFC/IDS Compliance Checking Platform"
       policy_engine_mode: any
+
+  # ──────────────────────────────────────────────
+  # Connect enrollment flow to the default login page
+  # ──────────────────────────────────────────────
+  - model: authentik_stages_identification.identificationstage
+    state: present
+    identifiers:
+      name: default-authentication-identification
+    attrs:
+      enrollment_flow: !KeyOf firebim-enrollment-flow
