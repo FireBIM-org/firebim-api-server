@@ -175,4 +175,7 @@ entries:
     identifiers:
       name: default-authentication-identification
     attrs:
+      user_fields:
+        - email
+        - username
       enrollment_flow: !KeyOf firebim-enrollment-flow
