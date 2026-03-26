@@ -1,6 +1,6 @@
 import json
-import sys
 import os
+import sys
 
 # Add app to path
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

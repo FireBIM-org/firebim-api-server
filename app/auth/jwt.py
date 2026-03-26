@@ -1,7 +1,7 @@
 import jwt
-from jwt import PyJWKClient
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt import PyJWKClient
 from sqlmodel import Session
 
 from app.core.config import settings
