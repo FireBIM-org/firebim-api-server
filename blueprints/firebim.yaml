@@ -7,7 +7,7 @@ metadata:
 
 context:
   firebim_client_id: !Env [FIREBIM_CLIENT_ID, firebim]
-  firebim_redirect_uris: !Env [FIREBIM_REDIRECT_URIS, "http://localhost:3000/api/auth/callback/authentik"]
+  firebim_redirect_uri: !Env [FIREBIM_REDIRECT_URI, "http://localhost:3000/api/auth/callback/authentik"]
   firebim_launch_url: !Env [FIREBIM_LAUNCH_URL, "http://localhost:3000"]
 
 entries:
@@ -25,7 +25,9 @@ entries:
       client_type: confidential
       client_id: !Context firebim_client_id
       client_secret: !Env [FIREBIM_CLIENT_SECRET, ""]
-      redirect_uris: !Context firebim_redirect_uris
+      redirect_uris:
+        - matching_mode: strict
+          url: !Context firebim_redirect_uri
       signing_key: !Find [authentik_crypto.certificatekeypair, [name, "authentik Self-signed Certificate"]]
       property_mappings:
         - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
