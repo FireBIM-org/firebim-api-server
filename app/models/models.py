@@ -11,7 +11,6 @@ class User(SQLModel, table=True):
     authentik_sub: str = Field(unique=True, nullable=False, index=True)
     username: str = Field(unique=True, nullable=False)
     email: str = Field(nullable=False)
-    hashed_password: str | None = Field(default=None, nullable=True)
     is_active: bool = Field(default=True)
     created_at: datetime = Field(
         sa_column=Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)

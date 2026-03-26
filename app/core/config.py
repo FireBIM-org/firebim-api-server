@@ -30,7 +30,7 @@ class Settings(BaseSettings):
         env_file="../.env",
         env_ignore_empty=True,
         extra="ignore",
-        secrets_dir="/run/secrets",
+        secrets_dir="/var/run/secrets",
     )
     # API_V1_STR: str = "/api/v1"
     SECRET_KEY: SecretStr = secrets.token_urlsafe(32)
@@ -74,6 +74,9 @@ class Settings(BaseSettings):
 
     # Authentik OIDC
     AUTHENTIK_ISSUER_URL: str = "https://auth.firebim.org/application/o/firebim/"
+    # Optional: internal URL for JWKS fetching when running inside Docker.
+    # If not set, falls back to AUTHENTIK_ISSUER_URL.
+    AUTHENTIK_INTERNAL_URL: str = ""
 
     # S3
     S3_ENDPOINT_URL: str

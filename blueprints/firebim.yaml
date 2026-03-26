@@ -12,6 +12,120 @@ context:
 
 entries:
   # ──────────────────────────────────────────────
+  # Enrollment flow — allows users to self-register
+  # ──────────────────────────────────────────────
+  - model: authentik_flows.flow
+    id: firebim-enrollment-flow
+    state: present
+    identifiers:
+      slug: firebim-enrollment
+    attrs:
+      name: FireBIM Self-Enrollment
+      title: Create a FireBIM Account
+      designation: enrollment
+      authentication: require_unauthenticated
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-field-username
+    state: present
+    identifiers:
+      field_key: username
+    attrs:
+      label: Username
+      type: username
+      required: true
+      placeholder: Choose a username
+      order: 0
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-field-email
+    state: present
+    identifiers:
+      field_key: email
+    attrs:
+      label: Email
+      type: email
+      required: true
+      placeholder: your@email.com
+      order: 1
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-field-password
+    state: present
+    identifiers:
+      field_key: password
+    attrs:
+      label: Password
+      type: password
+      required: true
+      placeholder: Choose a password
+      order: 2
+
+  - model: authentik_stages_prompt.prompt
+    id: prompt-field-password-repeat
+    state: present
+    identifiers:
+      field_key: password_repeat
+    attrs:
+      label: Repeat Password
+      type: password
+      required: true
+      placeholder: Confirm your password
+      order: 3
+
+  - model: authentik_stages_prompt.promptstage
+    id: firebim-enrollment-prompt-stage
+    state: present
+    identifiers:
+      name: firebim-enrollment-prompt
+    attrs:
+      fields:
+        - !KeyOf prompt-field-username
+        - !KeyOf prompt-field-email
+        - !KeyOf prompt-field-password
+        - !KeyOf prompt-field-password-repeat
+      validation_policies: []
+
+  - model: authentik_stages_user_write.userwritestage
+    id: firebim-enrollment-user-write
+    state: present
+    identifiers:
+      name: firebim-enrollment-user-write
+    attrs:
+      create_users_as_inactive: false
+      user_creation_mode: always_create
+
+  - model: authentik_stages_user_login.userloginstage
+    id: firebim-enrollment-user-login
+    state: present
+    identifiers:
+      name: firebim-enrollment-user-login
+
+  - model: authentik_flows.flowstagebinding
+    id: firebim-enrollment-binding-0
+    state: present
+    identifiers:
+      target: !KeyOf firebim-enrollment-flow
+      stage: !KeyOf firebim-enrollment-prompt-stage
+      order: 10
+
+  - model: authentik_flows.flowstagebinding
+    id: firebim-enrollment-binding-1
+    state: present
+    identifiers:
+      target: !KeyOf firebim-enrollment-flow
+      stage: !KeyOf firebim-enrollment-user-write
+      order: 20
+
+  - model: authentik_flows.flowstagebinding
+    id: firebim-enrollment-binding-2
+    state: present
+    identifiers:
+      target: !KeyOf firebim-enrollment-flow
+      stage: !KeyOf firebim-enrollment-user-login
+      order: 30
+
+  # ──────────────────────────────────────────────
   # OAuth2 / OpenID Connect Provider
   # ──────────────────────────────────────────────
   - model: authentik_providers_oauth2.oauth2provider
@@ -24,7 +138,7 @@ entries:
       invalidation_flow: !Find [authentik_flows.flow, [slug, default-provider-invalidation-flow]]
       client_type: confidential
       client_id: !Context firebim_client_id
-      client_secret: !Env [FIREBIM_CLIENT_SECRET]
+      client_secret: !Env [FIREBIM_CLIENT_SECRET, ""]
       redirect_uris: !Context firebim_redirect_uris
       signing_key: !Find [authentik_crypto.certificatekeypair, [name, "authentik Self-signed Certificate"]]
       property_mappings:
