@@ -1,0 +1,52 @@
+name: Create Release Branch
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0, 2.3)'
+        required: true
+        type: string
+      sha:
+        description: 'Commit SHA to branch from (defaults to main HEAD)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: Create release/${{ inputs.version }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve base commit
+        id: base
+        run: |
+          if [[ -n "${{ inputs.sha }}" ]]; then
+            SHA="${{ inputs.sha }}"
+          else
+            SHA="$(git rev-parse origin/main)"
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Base commit: $SHA"
+
+      - name: Validate commit exists
+        run: git cat-file -e "${{ steps.base.outputs.sha }}"
+
+      - name: Create release branch
+        run: |
+          BRANCH="release/${{ inputs.version }}"
+
+          if git ls-remote --heads origin "$BRANCH" | grep -q "$BRANCH"; then
+            echo "::error::Branch $BRANCH already exists"
+            exit 1
+          fi
+
+          git checkout -b "$BRANCH" "${{ steps.base.outputs.sha }}"
+          git push origin "$BRANCH"
+          echo "Created $BRANCH from ${{ steps.base.outputs.sha }}"

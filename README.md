@@ -1,7 +1,6 @@
 # FireBIM API server
-`main`: [![FireBIM API CI/CD](https://github.com/FireBIM-org/firebim-api-server/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/FireBIM-org/firebim-api-server/actions/workflows/ci-cd.yml)
-
-`develop`: [![FireBIM API CI/CD](https://github.com/FireBIM-org/firebim-api-server/actions/workflows/ci-cd.yml/badge.svg?branch=develop)](https://github.com/FireBIM-org/firebim-api-server/actions/workflows/ci-cd.yml)
+[![Build & Push Image](https://github.com/FireBIM-org/firebim-api-server/actions/workflows/build-image.yml/badge.svg)](https://github.com/FireBIM-org/firebim-api-server/actions/workflows/build-image.yml)
+[![CI](https://github.com/FireBIM-org/firebim-api-server/actions/workflows/ci.yml/badge.svg)](https://github.com/FireBIM-org/firebim-api-server/actions/workflows/ci.yml)
 
 
 This repository is solely for API-specific code for deployment to a server.
