@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
+from firebim_common.models import User
+from firebim_common.schemas.auth import User as UserSchema
 
-from app.auth.jwt import get_current_active_user
-from app.models.models import User
-from app.schemas.auth import User as UserSchema
+from firebim_api.auth.jwt import get_current_active_user
 
 router = APIRouter(tags=["authentication"])
 

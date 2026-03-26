@@ -3,33 +3,25 @@ import re
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from firebim_common.config import settings
 from rdflib import Graph
 from rdflib.plugins.stores.sparqlstore import SPARQLStore
 
-from app.core.config import settings
-
 router = APIRouter(prefix="/graph", tags=["graph"])
 
-# Settings
 FUSEKI_HOST = settings.FUSEKI_HOST
-# TODO: Warning! Currently using unsecured Fuseki without authentication and no SSL!
 
-# Map country code to Fuseki dataset name
 DATASET_BY_COUNTRY: dict[str, str] = {
     "DK": "Danish_dataset",
     "NL": "Dutch_dataset",
     "PT": "Portugal_dataset",
 }
 
-
-# Allow safe paragraph id pattern (avoid SPARQL injection)
 PARAGRAPH_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def _candidate_query_endpoints(dataset: str) -> list[str]:
-    """Return possible SPARQL query endpoints for a dataset.
-    We try /sparql then /query for broader compatibility.
-    """
+    """Return possible SPARQL query endpoints for a dataset."""
     return [
         f"{FUSEKI_HOST}/{dataset}/sparql",
         f"{FUSEKI_HOST}/{dataset}/query",
@@ -49,15 +41,12 @@ def _run_sparql(query: str, country_code: str) -> Any:
             store = SPARQLStore(endpoint)
             g = Graph(store=store)
             result = g.query(query)
-            # Try returning standard SPARQL JSON format
             try:
                 serialized = result.serialize(format="json")
-                # result.serialize may return bytes
                 if isinstance(serialized, (bytes, bytearray)):
                     return json.loads(serialized.decode("utf-8"))
                 return json.loads(serialized)
             except Exception:
-                # Fallback: turn into a simple list of dicts
                 rows = []
                 for b in result.bindings:
                     row = {str(k): _term_to_json(v) for k, v in b.items()}
@@ -67,7 +56,6 @@ def _run_sparql(query: str, country_code: str) -> Any:
             last_error = e
             continue
 
-    # If all endpoints failed
     raise HTTPException(status_code=502, detail=f"SPARQL query failed for dataset '{ds}'. Last error: {last_error}")
 
 
@@ -96,11 +84,7 @@ def _term_to_json(term):
 
 @router.get("/count_fro/{country_code}")
 def count_fro(country_code: str):
-    """
-    Count number of entities per FRO class.
-    """
-
-    # Query string
+    """Count number of entities per FRO class."""
     query = """
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX fbr: <http://www.FireBIM.org/regulations#>
@@ -130,11 +114,7 @@ ORDER BY ?class
 
 @router.get("/get_english/{country_code}")
 def get_english(country_code: str):
-    """
-    Get all entities with English original text.
-    """
-
-    # Query string
+    """Get all entities with English original text."""
     query = """
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX fbr: <http://www.FireBIM.org/regulations#>
@@ -155,13 +135,10 @@ ORDER BY ?type ?id
 
 @router.get("/select_paragraph/{country_code}/{paragraph_id}")
 def select_paragraph(country_code: str, paragraph_id: str):
-    """ """
-
-    # Sanitize paragraph id to avoid injection, allow e.g. para-82
+    """Select a paragraph by ID with its sections and clauses."""
     if not PARAGRAPH_ID_PATTERN.match(paragraph_id):
         raise HTTPException(status_code=400, detail="Invalid paragraph_id format")
 
-    # Query string
     query = f"""
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX fbr: <http://www.FireBIM.org/regulations#>

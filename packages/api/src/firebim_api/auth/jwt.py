@@ -1,12 +1,11 @@
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from firebim_common.config import settings
+from firebim_common.database import get_db
+from firebim_common.models import User
 from jwt import PyJWKClient
 from sqlmodel import Session
-
-from app.core.config import settings
-from app.models.database import get_db
-from app.models.models import User
 
 # Bearer token extraction
 security = HTTPBearer()
@@ -18,7 +17,6 @@ _jwks_client = None
 def get_jwks_client() -> PyJWKClient:
     global _jwks_client
     if _jwks_client is None:
-        # Use the internal URL (reachable inside Docker) if set, otherwise the public issuer URL
         base_url = settings.AUTHENTIK_INTERNAL_URL or settings.AUTHENTIK_ISSUER_URL
         jwks_url = f"{base_url.rstrip('/')}/jwks/"
         _jwks_client = PyJWKClient(jwks_url)

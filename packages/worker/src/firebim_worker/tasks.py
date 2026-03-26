@@ -7,11 +7,10 @@ import boto3
 import ifcopenshell
 import ifctester
 import ifctester.reporter
-
-from app.core.config import settings
-from app.models.database import get_db
-from app.models.models import IfcModel
-from app.workers.celery_app import celery_app
+from firebim_common.celery import celery_app
+from firebim_common.config import settings
+from firebim_common.database import get_db
+from firebim_common.models import IfcModel
 
 # S3 Configuration
 s3_client = boto3.client(
@@ -27,19 +26,14 @@ BUCKET_NAME = settings.S3_BUCKET_NAME
 
 @celery_app.task(name="process_model")
 def process_model(model_id, s3_key):
-    """
-    Process an IFC model file asynchronously.
-    """
+    """Process an IFC model file asynchronously."""
     try:
-        # Download file from S3
         with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False) as temp_file:
             s3_client.download_file(Bucket=BUCKET_NAME, Key=s3_key, Filename=temp_file.name)
             temp_path = temp_file.name
 
-        # Process with IfcOpenShell
         model = ifcopenshell.open(temp_path)
 
-        # Simple processing example - count objects by type
         stats = {}
         for element in model.by_type("IfcElement"):
             element_type = element.is_a()
@@ -48,14 +42,11 @@ def process_model(model_id, s3_key):
             else:
                 stats[element_type] = 1
 
-        # Save processing results to S3
         result_key = f"results/{model_id}/stats.json"
         s3_client.put_object(Bucket=BUCKET_NAME, Key=result_key, Body=json.dumps(stats))
 
-        # Clean up
         os.unlink(temp_path)
 
-        # Update database with result information
         db = next(get_db())
         ifc_model = db.query(IfcModel).filter(IfcModel.id == model_id).first()
         if ifc_model:
@@ -71,11 +62,8 @@ def process_model(model_id, s3_key):
 
 @celery_app.task(name="check_model_with_ids")
 def check_model_with_ids(ids_id, model_id, ids_s3_key, model_s3_key):
-    """
-    Check an IFC model against an IDS file asynchronously.
-    """
+    """Check an IFC model against an IDS file asynchronously."""
     try:
-        # Download files from S3
         with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False) as model_file:
             s3_client.download_file(Bucket=BUCKET_NAME, Key=model_s3_key, Filename=model_file.name)
             model_path = model_file.name
@@ -84,10 +72,8 @@ def check_model_with_ids(ids_id, model_id, ids_s3_key, model_s3_key):
             s3_client.download_file(Bucket=BUCKET_NAME, Key=ids_s3_key, Filename=ids_file.name)
             ids_path = ids_file.name
 
-        # Process with IfcOpenShell
         ifc_model = ifcopenshell.open(model_path)
 
-        # Check model against IDS
         check_id = str(uuid.uuid4())
         ids = ifctester.open(ids_path, validate=True)
         ids.validate(ifc_model)
@@ -97,11 +83,9 @@ def check_model_with_ids(ids_id, model_id, ids_s3_key, model_s3_key):
 
         check_result = json.loads(reporter.to_string())
 
-        # Save check results to S3
         result_key = f"checks/{check_id}/result.json"
         s3_client.put_object(Bucket=BUCKET_NAME, Key=result_key, Body=json.dumps(check_result))
 
-        # Clean up
         os.unlink(model_path)
         os.unlink(ids_path)
 
