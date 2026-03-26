@@ -18,7 +18,9 @@ _jwks_client = None
 def get_jwks_client() -> PyJWKClient:
     global _jwks_client
     if _jwks_client is None:
-        jwks_url = f"{settings.AUTHENTIK_ISSUER_URL.rstrip('/')}/jwks/"
+        # Use the internal URL (reachable inside Docker) if set, otherwise the public issuer URL
+        base_url = settings.AUTHENTIK_INTERNAL_URL or settings.AUTHENTIK_ISSUER_URL
+        jwks_url = f"{base_url.rstrip('/')}/jwks/"
         _jwks_client = PyJWKClient(jwks_url)
     return _jwks_client
 

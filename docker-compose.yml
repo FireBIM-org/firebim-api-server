@@ -21,13 +21,17 @@ services:
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS-https://firebim.org,https://www.firebim.org,https://app.firebim.org,https://www.app.firebim.org,http://localhost:3000}
       - FUSEKI_HOST=${FUSEKI_HOST-http://graph-demo.firebim.org:3030}
+      # Public issuer URL (matches the iss claim in tokens issued via the browser)
       - AUTHENTIK_ISSUER_URL=http://localhost:9090/application/o/firebim/
+      # Internal URL for JWKS fetching from inside the Docker network
+      - AUTHENTIK_INTERNAL_URL=http://authentik-server:9000/application/o/firebim/
     volumes:
       - ./app:/app
     depends_on:
       - postgres
       - minio
       - rabbitmq
+      - authentik-server
 
   celery-worker:
     build:
@@ -114,7 +118,7 @@ services:
       # Blueprint env vars
       FIREBIM_CLIENT_ID: firebim
       FIREBIM_CLIENT_SECRET: local-dev-client-secret
-      FIREBIM_REDIRECT_URIS: "http://localhost:3000/api/auth/callback/authentik\nhttp://localhost:8000/api/auth/callback/authentik"
+      FIREBIM_REDIRECT_URIS: "http://localhost:3000/api/auth/callback/authentik"
       FIREBIM_LAUNCH_URL: "http://localhost:3000"
     volumes:
       - authentik_media:/media
@@ -136,7 +140,7 @@ services:
       AUTHENTIK_POSTGRESQL__PASSWORD: authentik-local-dev
       FIREBIM_CLIENT_ID: firebim
       FIREBIM_CLIENT_SECRET: local-dev-client-secret
-      FIREBIM_REDIRECT_URIS: "http://localhost:3000/api/auth/callback/authentik\nhttp://localhost:8000/api/auth/callback/authentik"
+      FIREBIM_REDIRECT_URIS: "http://localhost:3000/api/auth/callback/authentik"
       FIREBIM_LAUNCH_URL: "http://localhost:3000"
     volumes:
       - authentik_media:/media

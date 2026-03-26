@@ -76,6 +76,9 @@ class Settings(BaseSettings):
 
     # Authentik OIDC
     AUTHENTIK_ISSUER_URL: str = "https://auth.firebim.org/application/o/firebim/"
+    # Optional: internal URL for JWKS fetching when running inside Docker.
+    # If not set, falls back to AUTHENTIK_ISSUER_URL.
+    AUTHENTIK_INTERNAL_URL: str = ""
 
     # S3
     S3_ENDPOINT_URL: str
