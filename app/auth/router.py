@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 
+from app.auth.jwt import get_current_active_user
 from app.models.models import User
 from app.schemas.auth import User as UserSchema
-from app.auth.jwt import get_current_active_user
 
 router = APIRouter(tags=["authentication"])
 
