@@ -1,6 +1,9 @@
 import logging
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel
+
 
 from app.rules.composer import (
     check_ruleset_completeness,
@@ -12,6 +15,7 @@ from app.rules.decompiler import decompile_rule_element_ttl, decompile_ruleset_t
 from app.rules.dsl import RuleElementBuilder
 from app.rules.element_validator import validate_rule_element_payload
 from app.rules.models import fbRuleElement
+from app.graphs_and_checks.publisher import fetch_rule_ttl
 from app.rules.publisher import (
     default_rule_element_graph_uri,
     default_rule_graph_uri,
@@ -69,6 +73,11 @@ from app.schemas.rules import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rules", tags=["rules"])
 
+
+class RuleTtlResponse(BaseModel):
+    graph_uri: str
+    ttl: str
+    content_type: str = "text/turtle"
 
 def _publish_error_payload(error_code: str, message: str, exc: Exception):
     logger.exception(message, exc_info=exc)
@@ -738,3 +747,54 @@ def get_rule(rule_id: str):
         graph_uri = _resolve_rule_graph_uri(rule_id)
         error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while fetching rule", exc)
         return RuleFetchResponse(graph_uri=graph_uri, ttl="", rule=None, **error_bits)
+
+@router.get(
+    "/{rule_id}/ttl",
+    response_class=PlainTextResponse,
+    responses={
+        200: {
+            "content": {
+                "text/turtle": {
+                    "example": """PREFIX ex: <http://example.org/firebim/>
+PREFIX fb: <http://example.org/firebim/rule/>
+PREFIX sh: <http://www.w3.org/ns/shacl#>
+
+ex:room_area_rule a ex:RuleSet ;
+    ex:entryPoint ex:check_room_area .
+"""
+                }
+            },
+            "description": "Raw Turtle for the rule graph",
+        }
+    },
+)
+def get_rule_ttl(rule_id: str):
+    try:
+        _graph_uri, ttl = fetch_rule_ttl(rule_id)
+        return PlainTextResponse(
+            content=ttl,
+            media_type="text/turtle; charset=utf-8",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch raw TTL for rule '{rule_id}': {exc}",
+        )
+    
+@router.get("/{rule_id}/ttl.json", response_model=RuleTtlResponse)
+def get_rule_ttl_json(rule_id: str):
+    try:
+        graph_uri, ttl = fetch_rule_ttl(rule_id)
+        return RuleTtlResponse(
+            graph_uri=graph_uri,
+            ttl=ttl,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch TTL JSON for rule '{rule_id}': {exc}",
+        )

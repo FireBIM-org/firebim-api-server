@@ -1,0 +1,46 @@
+=== FIREBIM API STRUCTURE ===
+
+--- Directory tree: app/api ---
+app/api
+app/api/__init__.py
+app/api/graph.py
+app/api/rules.py
+
+--- Python files containing APIRouter ---
+app/api/graph.py
+app/api/rules.py
+app/auth/router.py
+
+--- include_router registrations ---
+app/main.py:26:app.include_router(auth_router)
+app/main.py:27:app.include_router(graph_router)
+app/main.py:28:app.include_router(rules_router)
+
+--- Declared endpoints ---
+app/api/graph.py:131:@router.get("/get_english/{country_code}")
+app/api/graph.py:158:@router.get("/select_paragraph/{country_code}/{paragraph_id}")
+app/api/graph.py:95:@router.get("/count_fro/{country_code}")
+app/api/rules.py:274:@router.get("/health")
+app/api/rules.py:294:@router.post("/validate", response_model=RuleValidateResponse)
+app/api/rules.py:332:@router.post("/compile", response_model=RuleCompileResponse)
+app/api/rules.py:358:@router.post("/decompile", response_model=RuleDecompileResponse)
+app/api/rules.py:370:@router.post("/publish", response_model=RulePublishResponse)
+app/api/rules.py:415:@router.get("/list", response_model=RuleListResponse)
+app/api/rules.py:425:@router.post("/fetch", response_model=RuleFetchResponse)
+app/api/rules.py:437:@router.post("/delete", response_model=RuleDeleteResponse)
+app/api/rules.py:452:@router.post("/assemble", response_model=RuleAssembleResponse)
+app/api/rules.py:477:@router.post("/assemble/compile", response_model=RuleAssembleCompileResponse)
+app/api/rules.py:514:@router.post("/rule-elements/derive", response_model=RuleElementDeriveResponse)
+app/api/rules.py:539:@router.post("/rule-elements", response_model=RuleElementPublishResponse)
+app/api/rules.py:591:@router.post("/rule-elements/fetch", response_model=RuleElementFetchResponse)
+app/api/rules.py:603:@router.post("/rule-elements/delete", response_model=RuleElementDeleteResponse)
+app/api/rules.py:618:@router.get("/rule-elements", response_model=RuleElementListResponse)
+app/api/rules.py:635:@router.post("/connect", response_model=RuleConnectResponse)
+app/api/rules.py:657:@router.post("/disconnect", response_model=RuleDisconnectResponse)
+app/api/rules.py:677:@router.post("/check-completeness", response_model=RuleCompletenessResponse)
+app/api/rules.py:697:@router.post("/force-end", response_model=RuleForceEndResponse)
+app/api/rules.py:719:@router.get("/rule-elements/{element_id}", response_model=RuleElementFetchResponse)
+app/api/rules.py:731:@router.get("/{rule_id}", response_model=RuleFetchResponse)
+app/auth/router.py:20:@router.post("/token", response_model=Token)
+app/auth/router.py:41:@router.post("/register", response_model=UserSchema, status_code=status.HTTP_201_CREATED)
+app/auth/router.py:75:@router.get("/users/me", response_model=UserSchema)
