@@ -279,7 +279,7 @@ def run_check(payload: CheckRunRequest):
         )
 
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         error_bits = _error_payload(
             "check_run_error",
@@ -359,7 +359,7 @@ def run_blind_check(payload: BlindCheckRunRequest):
         )
 
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         error_bits = _error_payload(
             "blind_check_run_error",
@@ -393,7 +393,7 @@ def check_compatibility(payload: CheckCompatibilityRequest):
         )
 
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         error_bits = _error_payload(
             "check_compatibility_error",
