@@ -34,6 +34,8 @@ Before committing any Python code changes, always run:
 ```bash
 uv run ruff format .
 uv run ruff check --fix .
+uv run pytest
+make openapi
 ```
 
 ## Key Patterns
