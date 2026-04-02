@@ -70,9 +70,7 @@ class SHACLBuilder:
         if element.false_path:
             self.graph.add((node_uri, self.FB.falsePath, self.EX[element.false_path]))
         if element.unknown_path:
-            self.graph.add(
-                (node_uri, self.FB.unknownPath, self.EX[element.unknown_path])
-            )
+            self.graph.add((node_uri, self.FB.unknownPath, self.EX[element.unknown_path]))
 
         if isinstance(element.config, dict):
             end_kind = element.config.get("end_kind")
@@ -81,9 +79,7 @@ class SHACLBuilder:
             if end_kind is not None:
                 self.graph.add((node_uri, self.EX.endKind, Literal(str(end_kind))))
             if output_text is not None:
-                self.graph.add(
-                    (node_uri, self.EX.outputText, Literal(str(output_text)))
-                )
+                self.graph.add((node_uri, self.EX.outputText, Literal(str(output_text))))
 
     def add_rule_element(self, element: fbRuleElement):
         if element.node_type in {"start", "end"}:
@@ -136,9 +132,7 @@ class SHACLBuilder:
         if element.false_path:
             self.graph.add((shape_uri, self.FB.falsePath, self.EX[element.false_path]))
         if element.unknown_path:
-            self.graph.add(
-                (shape_uri, self.FB.unknownPath, self.EX[element.unknown_path])
-            )
+            self.graph.add((shape_uri, self.FB.unknownPath, self.EX[element.unknown_path]))
 
     def add_rule_set(self, rule_set):
         ruleset_uri = self.EX[rule_set.id]

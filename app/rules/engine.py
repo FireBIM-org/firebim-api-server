@@ -1,7 +1,7 @@
 # firebim/rules/engine.py
 
-
 class RuleEngine:
+
     def __init__(self, rule_set, evaluator):
         self.rule_set = rule_set
         self.evaluator = evaluator  # function or class
@@ -16,6 +16,7 @@ class RuleEngine:
         previous = None
 
         while True:
+
             if current in visited:
                 raise ValueError(f"Cycle detected at '{current}'")
 
@@ -28,6 +29,7 @@ class RuleEngine:
             # ----------------------------------
 
             if element.node_type != "decision":
+
                 if element.operator == "default":
                     return element.config["value"]
 
@@ -46,8 +48,8 @@ class RuleEngine:
                         "condition": {
                             "property": previous.property_path,
                             "operator": previous.operator,
-                            "value": previous.value,
-                        },
+                            "value": previous.value
+                        }
                     }
 
             else:

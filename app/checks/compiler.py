@@ -77,15 +77,9 @@ class RuleCompiler:
             metadata={
                 "compiler": "RuleCompiler",
                 "node_count": len(compiled_nodes),
-                "decision_count": sum(
-                    1 for n in compiled_nodes.values() if n.node_type == "decision"
-                ),
-                "start_count": sum(
-                    1 for n in compiled_nodes.values() if n.node_type == "start"
-                ),
-                "end_count": sum(
-                    1 for n in compiled_nodes.values() if n.node_type == "end"
-                ),
+                "decision_count": sum(1 for n in compiled_nodes.values() if n.node_type == "decision"),
+                "start_count": sum(1 for n in compiled_nodes.values() if n.node_type == "start"),
+                "end_count": sum(1 for n in compiled_nodes.values() if n.node_type == "end"),
             },
         )
 
@@ -110,9 +104,7 @@ class RuleCompiler:
         value: Any = None
 
         if construct_text:
-            property_path, operator, value = self._parse_construct_rule(
-                str(construct_text)
-            )
+            property_path, operator, value = self._parse_construct_rule(str(construct_text))
 
         label = graph.value(shape_uri, EX.label)
 
@@ -132,9 +124,7 @@ class RuleCompiler:
             unknown_node_id=self._local_name(unknown_obj) if unknown_obj else None,
             shape_id=node_id,
             shape_uri=str(shape_uri),
-            sparql_construct=str(construct_text)
-            if construct_text is not None
-            else None,
+            sparql_construct=str(construct_text) if construct_text is not None else None,
             config=config,
         )
 
@@ -174,9 +164,7 @@ class RuleCompiler:
                 next_node_id=self._local_name(true_obj) if true_obj else None,
                 config=config,
             )
-            self._validate_start_node(
-                node, false_obj=false_obj, unknown_obj=unknown_obj
-            )
+            self._validate_start_node(node, false_obj=false_obj, unknown_obj=unknown_obj)
             return node
 
         if node_type == "end":
@@ -239,27 +227,19 @@ class RuleCompiler:
             elif node.node_type == "end":
                 pass
 
-        missing = sorted(
-            node_id for node_id in referenced_node_ids if node_id not in compiled.nodes
-        )
+        missing = sorted(node_id for node_id in referenced_node_ids if node_id not in compiled.nodes)
         if missing:
             raise ValueError(
                 f"Rule '{compiled.rule_id}' contains branch targets that do not exist: {missing}"
             )
 
-        end_nodes = [
-            node.node_id for node in compiled.nodes.values() if node.node_type == "end"
-        ]
+        end_nodes = [node.node_id for node in compiled.nodes.values() if node.node_type == "end"]
         if not end_nodes:
-            raise ValueError(
-                f"Rule '{compiled.rule_id}' must contain at least one end node"
-            )
+            raise ValueError(f"Rule '{compiled.rule_id}' must contain at least one end node")
 
         # optional: detect unreachable nodes
         reachable = self._reachable_node_ids(compiled)
-        unreachable = sorted(
-            node_id for node_id in compiled.nodes if node_id not in reachable
-        )
+        unreachable = sorted(node_id for node_id in compiled.nodes if node_id not in reachable)
         if unreachable:
             compiled.metadata["unreachable_nodes"] = unreachable
 
@@ -284,11 +264,7 @@ class RuleCompiler:
                     next_ids.append(node.next_node_id)
 
             elif node.node_type == "decision":
-                for next_id in [
-                    node.true_node_id,
-                    node.false_node_id,
-                    node.unknown_node_id,
-                ]:
+                for next_id in [node.true_node_id, node.false_node_id, node.unknown_node_id]:
                     if next_id:
                         next_ids.append(next_id)
 
@@ -328,9 +304,7 @@ class RuleCompiler:
                 f"{', '.join(missing_branches)}"
             )
 
-    def _validate_start_node(
-        self, node: StartNode, false_obj=None, unknown_obj=None
-    ) -> None:
+    def _validate_start_node(self, node: StartNode, false_obj=None, unknown_obj=None) -> None:
         if false_obj is not None or unknown_obj is not None:
             raise ValueError(
                 f"Start node '{node.node_id}' should not define false_path or unknown_path"
@@ -339,9 +313,7 @@ class RuleCompiler:
         if not node.next_node_id:
             raise ValueError(f"Start node '{node.node_id}' is missing next node")
 
-    def _validate_end_node(
-        self, node: EndNode, true_obj=None, false_obj=None, unknown_obj=None
-    ) -> None:
+    def _validate_end_node(self, node: EndNode, true_obj=None, false_obj=None, unknown_obj=None) -> None:
         if true_obj is not None or false_obj is not None or unknown_obj is not None:
             raise ValueError(
                 f"End node '{node.node_id}' should not define outgoing paths"
@@ -353,9 +325,7 @@ class RuleCompiler:
             return uri.rsplit("#", 1)[-1]
         return uri.rstrip("/").rsplit("/", 1)[-1]
 
-    def _parse_construct_rule(
-        self, sparql_text: str
-    ) -> tuple[str | None, str | None, Any]:
+    def _parse_construct_rule(self, sparql_text: str) -> tuple[str | None, str | None, Any]:
         """
         Parse the current SHACLBuilder-style construct SPARQL into a lightweight
         executable decision descriptor.

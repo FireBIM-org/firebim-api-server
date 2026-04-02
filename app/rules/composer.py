@@ -11,9 +11,8 @@ def _sync_ruleset_containers(ruleset: dict, elements: list[dict]) -> dict:
     return ruleset
 
 
-def connect_ruleset_nodes(
-    ruleset: dict, source_id: str, branch: str, target_id: str
-) -> dict:
+
+def connect_ruleset_nodes(ruleset: dict, source_id: str, branch: str, target_id: str) -> dict:
     """
     Connect one rule element branch to another rule element in a draft Rule.
     Accepts both legacy nodes[] and new elements[] payloads.
@@ -61,6 +60,7 @@ def connect_ruleset_nodes(
     }
 
 
+
 def disconnect_ruleset_node_branch(ruleset: dict, source_id: str, branch: str) -> dict:
     """
     Remove one branch connection from a rule element in a draft Rule.
@@ -102,6 +102,7 @@ def disconnect_ruleset_node_branch(ruleset: dict, source_id: str, branch: str) -
     }
 
 
+
 def check_ruleset_completeness(ruleset: dict) -> dict:
     """
     Check whether a draft Rule is complete, open, or broken.
@@ -125,9 +126,7 @@ def check_ruleset_completeness(ruleset: dict) -> dict:
 
     for element in elements:
         element_id = element.get("id")
-        element_type = element.get("element_type") or element.get(
-            "node_type", "decision"
-        )
+        element_type = element.get("element_type") or element.get("node_type", "decision")
 
         if element_type == "decision":
             for branch_name, path_field in [
@@ -169,12 +168,8 @@ def check_ruleset_completeness(ruleset: dict) -> dict:
     }
 
 
-def force_end_ruleset(
-    ruleset: dict,
-    mode: str = "per_branch",
-    node_type: str = "end",
-    label_prefix: str = "forced_end",
-) -> dict:
+
+def force_end_ruleset(ruleset: dict, mode: str = "per_branch", node_type: str = "end", label_prefix: str = "forced_end") -> dict:
     """
     Fill open branches on decision rule elements with generated or shared end rule elements.
     """
@@ -190,14 +185,12 @@ def force_end_ruleset(
     def ensure_element(element_id: str):
         nonlocal created_node_ids, existing_ids, elements
         if element_id not in existing_ids:
-            elements.append(
-                {
-                    "id": element_id,
-                    "element_type": node_type,
-                    "node_type": node_type,
-                    "label": element_id,
-                }
-            )
+            elements.append({
+                "id": element_id,
+                "element_type": node_type,
+                "node_type": node_type,
+                "label": element_id,
+            })
             existing_ids.add(element_id)
             created_node_ids.append(element_id)
 
@@ -214,9 +207,7 @@ def force_end_ruleset(
             ensure_element(element_id)
 
     for element in elements:
-        element_type = element.get("element_type") or element.get(
-            "node_type", "decision"
-        )
+        element_type = element.get("element_type") or element.get("node_type", "decision")
         if element_type != "decision":
             continue
 

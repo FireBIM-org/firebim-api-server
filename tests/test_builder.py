@@ -1,11 +1,9 @@
 from app.rules.shacl_builder import SHACLBuilder
 from app.rules.dsl import Rule
 
-
 class FakeFBO:
     Window = "http://example.org/fbo/1.0/Window"
     FireLoadDensityModified = "http://example.org/fbo/1.0/FireLoadDensityModified"
-
 
 def test_ttl_generation():
 

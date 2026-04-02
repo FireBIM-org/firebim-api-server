@@ -122,9 +122,7 @@ class BlindShaclRuleRunner:
             "debug": {
                 "elapsed_ms": elapsed_ms,
                 "decision_node_count": sum(
-                    1
-                    for node in compiled.nodes.values()
-                    if node.node_type == "decision"
+                    1 for node in compiled.nodes.values() if node.node_type == "decision"
                 ),
                 "end_node_count": sum(
                     1 for node in compiled.nodes.values() if node.node_type == "end"
@@ -153,7 +151,9 @@ class BlindShaclRuleRunner:
                 f"Compiled rule entry '{compiled.entry_node_id}' is not a start node"
             )
         if not entry.next_node_id:
-            raise ValueError(f"Start node '{entry.node_id}' has no next_node_id")
+            raise ValueError(
+                f"Start node '{entry.node_id}' has no next_node_id"
+            )
 
         next_node = compiled.get_node(entry.next_node_id)
         if next_node.node_type != "decision":

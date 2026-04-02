@@ -38,7 +38,6 @@ from app.schemas.checks import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/checks", tags=["checks"])
 
-
 def _error_payload(error_code: str, message: str, exc: Exception) -> dict:
     logger.exception(message, exc_info=exc)
     return {
@@ -55,9 +54,7 @@ def _parse_ttl_to_graph(ttl: str) -> Graph:
     return g
 
 
-def _required_classes_and_properties_from_rule_graph(
-    shacl_graph: Graph,
-) -> tuple[list[str], list[str]]:
+def _required_classes_and_properties_from_rule_graph(shacl_graph: Graph) -> tuple[list[str], list[str]]:
     required_classes = set()
     required_properties = set()
 
@@ -101,9 +98,7 @@ def _to_check_run_summary(result: RuleRunResult) -> CheckRunSummary:
     )
 
 
-def _to_check_run_engine_info(
-    result: RuleRunResult, options: RunOptions
-) -> CheckRunEngineInfo:
+def _to_check_run_engine_info(result: RuleRunResult, options: RunOptions) -> CheckRunEngineInfo:
     engine_info = result.engine or {}
     return CheckRunEngineInfo(
         engine=engine_info.get("mode", "compiled_runtime"),
@@ -156,9 +151,7 @@ def _build_compatibility_response(
     shacl_graph = _parse_ttl_to_graph(rule_ttl)
     data_graph = _parse_ttl_to_graph(graph_ttl)
 
-    required_classes, required_properties = (
-        _required_classes_and_properties_from_rule_graph(shacl_graph)
-    )
+    required_classes, required_properties = _required_classes_and_properties_from_rule_graph(shacl_graph)
     class_counter, property_counter = _graph_profile_from_graph(data_graph)
 
     target_classes_found = [
@@ -173,14 +166,10 @@ def _build_compatibility_response(
     ]
 
     missing_target_classes = [
-        class_uri
-        for class_uri in required_classes
-        if class_counter.get(class_uri, 0) == 0
+        class_uri for class_uri in required_classes if class_counter.get(class_uri, 0) == 0
     ]
     missing_properties = [
-        prop_uri
-        for prop_uri in required_properties
-        if property_counter.get(prop_uri, 0) == 0
+        prop_uri for prop_uri in required_properties if property_counter.get(prop_uri, 0) == 0
     ]
 
     graph_classes_unused_by_rule = [
@@ -196,11 +185,7 @@ def _build_compatibility_response(
 
     total_required = len(required_classes) + len(required_properties)
     total_missing = len(missing_target_classes) + len(missing_properties)
-    compatibility_score = (
-        1.0
-        if total_required == 0
-        else max((total_required - total_missing) / total_required, 0.0)
-    )
+    compatibility_score = 1.0 if total_required == 0 else max((total_required - total_missing) / total_required, 0.0)
 
     warnings: list[CompatibilityWarning] = []
     if missing_target_classes:
@@ -280,15 +265,9 @@ def run_check(payload: CheckRunRequest):
             graph_id=payload.graph_id,
             summary=_to_check_run_summary(result),
             engine=_to_check_run_engine_info(result, options),
-            targets=_to_check_target_results(result)
-            if payload.options.include_targets
-            else [],
-            report_text=result.report_text
-            if payload.options.include_report_text
-            else None,
-            report_graph_ttl=result.report_graph_ttl
-            if payload.options.include_report_graph_ttl
-            else None,
+            targets=_to_check_target_results(result) if payload.options.include_targets else [],
+            report_text=result.report_text if payload.options.include_report_text else None,
+            report_graph_ttl=result.report_graph_ttl if payload.options.include_report_graph_ttl else None,
             compiled_rule=result.compiled_rule,
             debug={
                 **result.debug,
@@ -333,6 +312,7 @@ def run_check(payload: CheckRunRequest):
 
 
 @router.post("/run-blind", response_model=BlindCheckRunResponse)
+
 def run_blind_check(payload: BlindCheckRunRequest):
     if BlindShaclRuleRunner is None:
         raise HTTPException(

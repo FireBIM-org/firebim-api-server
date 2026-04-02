@@ -206,8 +206,7 @@ class CheckRuntime:
                         steps=state.steps,
                         evidence={
                             "reason_code": "cycle_detected",
-                            "visited_node_ids": state.visited_node_ids
-                            + [state.node_id],
+                            "visited_node_ids": state.visited_node_ids + [state.node_id],
                         },
                         include_trace=options.include_trace,
                     )
@@ -219,9 +218,7 @@ class CheckRuntime:
             node = compiled.get_node(state.node_id)
 
             if node.node_type == "end":
-                terminal_status = self._infer_end_status(
-                    node, incoming_status=self._last_status(state.steps)
-                )
+                terminal_status = self._infer_end_status(node, incoming_status=self._last_status(state.steps))
                 end_step = TargetTraceStep(
                     node_id=node.node_id,
                     node_type=node.node_type,
@@ -436,9 +433,7 @@ class CheckRuntime:
             for item in resolved_targets
         ]
 
-    def _branch_next_node_id(
-        self, node: DecisionNode, status: CheckStatus
-    ) -> str | None:
+    def _branch_next_node_id(self, node: DecisionNode, status: CheckStatus) -> str | None:
         if status == "True":
             return node.true_node_id
         if status == "False":
@@ -453,18 +448,14 @@ class CheckRuntime:
             passed=sum(1 for trace in traces if trace.final_status == "True"),
             failed=sum(1 for trace in traces if trace.final_status == "False"),
             unknown=sum(1 for trace in traces if trace.final_status == "Unknown"),
-            conforms=all(trace.final_status == "True" for trace in traces)
-            if traces
-            else False,
+            conforms=all(trace.final_status == "True" for trace in traces) if traces else False,
             terminal_counts={},
             missing_data_categories={},
         )
 
         for trace in traces:
             terminal_key = trace.terminal_node_id or "__no_terminal__"
-            summary.terminal_counts[terminal_key] = (
-                summary.terminal_counts.get(terminal_key, 0) + 1
-            )
+            summary.terminal_counts[terminal_key] = summary.terminal_counts.get(terminal_key, 0) + 1
 
             reason_code = self._extract_missing_data_reason(trace)
             if reason_code:
@@ -516,9 +507,7 @@ class CheckRuntime:
             return "Unknown"
         return steps[-1].status
 
-    def _infer_end_status(
-        self, node: EndNode, incoming_status: CheckStatus
-    ) -> CheckStatus:
+    def _infer_end_status(self, node: EndNode, incoming_status: CheckStatus) -> CheckStatus:
         text = (self._end_message(node) or "").strip().lower()
 
         if node.end_kind:

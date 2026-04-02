@@ -43,9 +43,7 @@ class PyShaclAtomicEvaluator(RDFGraphBackedEvaluator):
         try:
             data_graph = self.get_graph(graph_ref)
 
-            precheck = self._precheck_unknown(
-                data_graph=data_graph, node=node, target=target
-            )
+            precheck = self._precheck_unknown(data_graph=data_graph, node=node, target=target)
             if precheck is not None:
                 return precheck
 
@@ -241,9 +239,7 @@ class PyShaclAtomicEvaluator(RDFGraphBackedEvaluator):
         - later we can swap or extend backend without changing runtime contract
         """
         if not node.shape_uri:
-            shape_uri = URIRef(
-                f"http://example.org/firebim/runtime/shape/{node.node_id}"
-            )
+            shape_uri = URIRef(f"http://example.org/firebim/runtime/shape/{node.node_id}")
         else:
             shape_uri = URIRef(node.shape_uri)
 
@@ -287,57 +283,37 @@ class PyShaclAtomicEvaluator(RDFGraphBackedEvaluator):
             raise ValueError("Decision operator is missing")
 
         if operator == "<=":
-            shacl_graph.add(
-                (property_shape, SH.maxInclusive, self._python_to_literal(value))
-            )
+            shacl_graph.add((property_shape, SH.maxInclusive, self._python_to_literal(value)))
             return
 
         if operator == "<":
-            shacl_graph.add(
-                (property_shape, SH.maxExclusive, self._python_to_literal(value))
-            )
+            shacl_graph.add((property_shape, SH.maxExclusive, self._python_to_literal(value)))
             return
 
         if operator == ">=":
-            shacl_graph.add(
-                (property_shape, SH.minInclusive, self._python_to_literal(value))
-            )
+            shacl_graph.add((property_shape, SH.minInclusive, self._python_to_literal(value)))
             return
 
         if operator == ">":
-            shacl_graph.add(
-                (property_shape, SH.minExclusive, self._python_to_literal(value))
-            )
+            shacl_graph.add((property_shape, SH.minExclusive, self._python_to_literal(value)))
             return
 
         if operator == "=" or operator == "==":
             if isinstance(value, list):
-                shacl_graph.add(
-                    (property_shape, SH["in"], self._build_rdf_list(shacl_graph, value))
-                )
+                shacl_graph.add((property_shape, SH["in"], self._build_rdf_list(shacl_graph, value)))
             else:
-                shacl_graph.add(
-                    (property_shape, SH.hasValue, self._python_to_literal(value))
-                )
+                shacl_graph.add((property_shape, SH.hasValue, self._python_to_literal(value)))
             return
 
         if operator == "between":
             if not isinstance(value, (list, tuple)) or len(value) != 2:
-                raise ValueError(
-                    "Operator 'between' requires a 2-item tuple/list value"
-                )
+                raise ValueError("Operator 'between' requires a 2-item tuple/list value")
             lower, upper = value
-            shacl_graph.add(
-                (property_shape, SH.minInclusive, self._python_to_literal(lower))
-            )
-            shacl_graph.add(
-                (property_shape, SH.maxInclusive, self._python_to_literal(upper))
-            )
+            shacl_graph.add((property_shape, SH.minInclusive, self._python_to_literal(lower)))
+            shacl_graph.add((property_shape, SH.maxInclusive, self._python_to_literal(upper)))
             return
 
-        raise ValueError(
-            f"Unsupported operator for pySHACL atomic evaluator: '{operator}'"
-        )
+        raise ValueError(f"Unsupported operator for pySHACL atomic evaluator: '{operator}'")
 
     def _extract_validation_results_for_target(
         self,
@@ -373,9 +349,7 @@ class PyShaclAtomicEvaluator(RDFGraphBackedEvaluator):
             )
         return rows
 
-    def _best_report_message(
-        self, validation_results: list[dict[str, Any]]
-    ) -> str | None:
+    def _best_report_message(self, validation_results: list[dict[str, Any]]) -> str | None:
         for item in validation_results:
             msg = item.get("message")
             if msg:

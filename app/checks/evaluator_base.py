@@ -64,7 +64,9 @@ class RDFGraphBackedEvaluator(AtomicEvaluator, ABC):
             return cached
 
         if not graph_ref.ttl or not graph_ref.ttl.strip():
-            raise ValueError(f"Graph '{graph_ref.graph_id}' has no TTL content loaded")
+            raise ValueError(
+                f"Graph '{graph_ref.graph_id}' has no TTL content loaded"
+            )
 
         graph = Graph()
         graph.parse(data=graph_ref.ttl, format="turtle")

@@ -101,9 +101,7 @@ class CompiledRuleSet(BaseModel):
         try:
             return self.nodes[node_id]
         except KeyError as exc:
-            raise KeyError(
-                f"Compiled rule '{self.rule_id}' is missing node '{node_id}'"
-            ) from exc
+            raise KeyError(f"Compiled rule '{self.rule_id}' is missing node '{node_id}'") from exc
 
 
 class TargetRef(BaseModel):

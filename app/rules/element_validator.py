@@ -10,8 +10,7 @@ def validate_rule_element_payload(node: dict) -> None:
 
     if node_type == "decision":
         missing = [
-            name
-            for name in ["target_class", "property_path", "operator"]
+            name for name in ["target_class", "property_path", "operator"]
             if not node.get(name)
         ]
         if missing:
@@ -26,7 +25,7 @@ def validate_rule_element_payload(node: dict) -> None:
             )
 
     elif node_type == "end":
-        if any(
-            node.get(k) is not None for k in ["true_path", "false_path", "unknown_path"]
-        ):
-            raise ValueError(f"End node '{node_id}' should not define outgoing paths")
+        if any(node.get(k) is not None for k in ["true_path", "false_path", "unknown_path"]):
+            raise ValueError(
+                f"End node '{node_id}' should not define outgoing paths"
+            )
