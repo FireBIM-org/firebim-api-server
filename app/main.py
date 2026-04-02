@@ -108,8 +108,8 @@ async def health() -> JSONResponse:
     async def _celery_check() -> tuple[str, str, bool]:
         try:
             result = await asyncio.wait_for(
-                asyncio.to_thread(celery_app.control.ping, timeout=2),
-                timeout=3.0,
+                asyncio.to_thread(celery_app.control.ping, timeout=5),
+                timeout=6.0,
             )
             if result:
                 return "celery", "ok", True
