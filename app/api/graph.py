@@ -32,8 +32,7 @@ def count_fro(country_code: str) -> dict:
         "country_code": country_code,
         "count": 0,
         "message": (
-            "Legacy graph API placeholder. "
-            "This endpoint is not part of the new RuleBook building-graph runtime."
+            "Legacy graph API placeholder. This endpoint is not part of the new RuleBook building-graph runtime."
         ),
     }
 
@@ -50,8 +49,7 @@ def get_english(country_code: str) -> dict:
         "country_code": country_code,
         "text": "",
         "message": (
-            "Legacy graph API placeholder. "
-            "This endpoint is not part of the new RuleBook building-graph runtime."
+            "Legacy graph API placeholder. This endpoint is not part of the new RuleBook building-graph runtime."
         ),
     }
 
@@ -69,7 +67,6 @@ def select_paragraph(country_code: str, paragraph_id: str) -> dict:
         "paragraph_id": paragraph_id,
         "paragraph": None,
         "message": (
-            "Legacy graph API placeholder. "
-            "This endpoint is not part of the new RuleBook building-graph runtime."
+            "Legacy graph API placeholder. This endpoint is not part of the new RuleBook building-graph runtime."
         ),
     }

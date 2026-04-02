@@ -1,4 +1,4 @@
-from rdflib import Graph, Namespace, RDF, Literal, BNode, URIRef
+from rdflib import RDF, BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import SH
 
 from .models import fbRuleElement

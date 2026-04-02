@@ -11,7 +11,6 @@ def _sync_ruleset_containers(ruleset: dict, elements: list[dict]) -> dict:
     return ruleset
 
 
-
 def connect_ruleset_nodes(ruleset: dict, source_id: str, branch: str, target_id: str) -> dict:
     """
     Connect one rule element branch to another rule element in a draft Rule.
@@ -60,7 +59,6 @@ def connect_ruleset_nodes(ruleset: dict, source_id: str, branch: str, target_id:
     }
 
 
-
 def disconnect_ruleset_node_branch(ruleset: dict, source_id: str, branch: str) -> dict:
     """
     Remove one branch connection from a rule element in a draft Rule.
@@ -100,7 +98,6 @@ def disconnect_ruleset_node_branch(ruleset: dict, source_id: str, branch: str) -
         "previous_target_id": previous_target_id,
         "ruleset": _sync_ruleset_containers(ruleset, elements),
     }
-
 
 
 def check_ruleset_completeness(ruleset: dict) -> dict:
@@ -168,8 +165,9 @@ def check_ruleset_completeness(ruleset: dict) -> dict:
     }
 
 
-
-def force_end_ruleset(ruleset: dict, mode: str = "per_branch", node_type: str = "end", label_prefix: str = "forced_end") -> dict:
+def force_end_ruleset(
+    ruleset: dict, mode: str = "per_branch", node_type: str = "end", label_prefix: str = "forced_end"
+) -> dict:
     """
     Fill open branches on decision rule elements with generated or shared end rule elements.
     """
@@ -185,12 +183,14 @@ def force_end_ruleset(ruleset: dict, mode: str = "per_branch", node_type: str = 
     def ensure_element(element_id: str):
         nonlocal created_node_ids, existing_ids, elements
         if element_id not in existing_ids:
-            elements.append({
-                "id": element_id,
-                "element_type": node_type,
-                "node_type": node_type,
-                "label": element_id,
-            })
+            elements.append(
+                {
+                    "id": element_id,
+                    "element_type": node_type,
+                    "node_type": node_type,
+                    "label": element_id,
+                }
+            )
             existing_ids.add(element_id)
             created_node_ids.append(element_id)
 

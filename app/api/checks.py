@@ -38,6 +38,7 @@ from app.schemas.checks import (
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/checks", tags=["checks"])
 
+
 def _error_payload(error_code: str, message: str, exc: Exception) -> dict:
     logger.exception(message, exc_info=exc)
     return {
@@ -165,12 +166,8 @@ def _build_compatibility_response(
         if property_counter.get(prop_uri, 0) > 0
     ]
 
-    missing_target_classes = [
-        class_uri for class_uri in required_classes if class_counter.get(class_uri, 0) == 0
-    ]
-    missing_properties = [
-        prop_uri for prop_uri in required_properties if property_counter.get(prop_uri, 0) == 0
-    ]
+    missing_target_classes = [class_uri for class_uri in required_classes if class_counter.get(class_uri, 0) == 0]
+    missing_properties = [prop_uri for prop_uri in required_properties if property_counter.get(prop_uri, 0) == 0]
 
     graph_classes_unused_by_rule = [
         CompatibilityMatch(value=value, count=count)
@@ -312,7 +309,6 @@ def run_check(payload: CheckRunRequest):
 
 
 @router.post("/run-blind", response_model=BlindCheckRunResponse)
-
 def run_blind_check(payload: BlindCheckRunRequest):
     if BlindShaclRuleRunner is None:
         raise HTTPException(
@@ -345,10 +341,7 @@ def run_blind_check(payload: BlindCheckRunRequest):
             rule_id=payload.rule_id,
             graph_id=payload.graph_id,
             summary=CheckRunSummary(**result.get("summary", {})),
-            end_outputs=[
-                BlindCheckTerminalOutput(**item)
-                for item in result.get("end_outputs", [])
-            ],
+            end_outputs=[BlindCheckTerminalOutput(**item) for item in result.get("end_outputs", [])],
             terminal_counts=result.get("terminal_counts", {}),
             message_counts=result.get("message_counts", {}),
             debug={

@@ -4,7 +4,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-
 CheckStatus = Literal["True", "False", "Unknown"]
 NodeType = Literal["start", "decision", "end"]
 

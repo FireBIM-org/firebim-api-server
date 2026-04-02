@@ -35,8 +35,6 @@ class Rule:
         for element in self.elements.values():
             for path in [element.true_path, element.false_path, element.unknown_path]:
                 if path and path not in self.elements:
-                    raise ValueError(
-                        f"{element.id} points to unknown rule element '{path}'"
-                    )
+                    raise ValueError(f"{element.id} points to unknown rule element '{path}'")
 
         return True

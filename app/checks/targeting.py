@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from rdflib import Graph, RDF, URIRef
+from rdflib import RDF, Graph, URIRef
 
 from app.checks.caching import TargetingCache
 from app.checks.result_models import CompiledRuleSet, DecisionNode, GraphRef, TargetRef
@@ -139,9 +139,7 @@ class TargetResolver:
         Return the distinct target classes referenced by decision nodes.
         """
         target_classes = {
-            node.target_class
-            for node in compiled.nodes.values()
-            if node.node_type == "decision" and node.target_class
+            node.target_class for node in compiled.nodes.values() if node.node_type == "decision" and node.target_class
         }
         return sorted(target_classes)
 
@@ -172,9 +170,7 @@ class TargetResolver:
             return cached
 
         target_uri = URIRef(target_class)
-        subjects = sorted(
-            {str(subject) for subject in graph.subjects(RDF.type, target_uri)}
-        )
+        subjects = sorted({str(subject) for subject in graph.subjects(RDF.type, target_uri)})
 
         self.cache.set_targets(graph_ref.graph_uri, target_class, subjects)
         return subjects

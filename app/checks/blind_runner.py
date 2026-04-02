@@ -4,7 +4,7 @@ import time
 from collections import Counter, deque
 from typing import Any
 
-from rdflib import Graph, Namespace, RDF, URIRef
+from rdflib import Graph, Namespace
 
 from app.checks.compiler import RuleCompiler
 from app.checks.result_models import CompiledRuleSet, DecisionNode, EndNode, GraphRef
@@ -121,16 +121,9 @@ class BlindShaclRuleRunner:
             "message_counts": dict(message_counts),
             "debug": {
                 "elapsed_ms": elapsed_ms,
-                "decision_node_count": sum(
-                    1 for node in compiled.nodes.values() if node.node_type == "decision"
-                ),
-                "end_node_count": sum(
-                    1 for node in compiled.nodes.values() if node.node_type == "end"
-                ),
-                "decision_result_sizes": {
-                    node_id: len(result_map)
-                    for node_id, result_map in decision_results.items()
-                },
+                "decision_node_count": sum(1 for node in compiled.nodes.values() if node.node_type == "decision"),
+                "end_node_count": sum(1 for node in compiled.nodes.values() if node.node_type == "end"),
+                "decision_result_sizes": {node_id: len(result_map) for node_id, result_map in decision_results.items()},
                 "compiled_rule_id": compiled.rule_id,
                 "compiled_entry_node_id": compiled.entry_node_id,
                 "experimental_mode": True,
@@ -147,19 +140,13 @@ class BlindShaclRuleRunner:
     def _resolve_first_decision(self, compiled: CompiledRuleSet) -> DecisionNode:
         entry = compiled.get_node(compiled.entry_node_id)
         if entry.node_type != "start":
-            raise ValueError(
-                f"Compiled rule entry '{compiled.entry_node_id}' is not a start node"
-            )
+            raise ValueError(f"Compiled rule entry '{compiled.entry_node_id}' is not a start node")
         if not entry.next_node_id:
-            raise ValueError(
-                f"Start node '{entry.node_id}' has no next_node_id"
-            )
+            raise ValueError(f"Start node '{entry.node_id}' has no next_node_id")
 
         next_node = compiled.get_node(entry.next_node_id)
         if next_node.node_type != "decision":
-            raise ValueError(
-                f"First executable node '{next_node.node_id}' is not a decision node"
-            )
+            raise ValueError(f"First executable node '{next_node.node_id}' is not a decision node")
         return next_node
 
     def _precompute_decision_results(
@@ -340,7 +327,7 @@ class BlindShaclRuleRunner:
         if "did not pass" in text or "failed" in text or "not pass" in text:
             return "False"
 
-        if "passed" in text or "pass" == text:
+        if "passed" in text or text == "pass":
             return "True"
 
         return "Unknown"

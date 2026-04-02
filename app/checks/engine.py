@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from app.checks.compiler import RuleCompiler
 from app.checks.evaluator_base import AtomicEvaluator
@@ -124,9 +124,7 @@ class CheckEngine:
             rule_ttl = rule_ttls.get(rule_id)
 
             if compiled is None and not rule_ttl:
-                raise ValueError(
-                    f"Missing rule input for '{rule_id}': expected compiled rule or TTL"
-                )
+                raise ValueError(f"Missing rule input for '{rule_id}': expected compiled rule or TTL")
 
             result = self.run_rule(
                 graph_id=graph_id,
@@ -148,10 +146,7 @@ class CheckEngine:
         return self.compiler.compile_from_ttl(rule_ttl)
 
     def compile_rules(self, rule_ttls: dict[str, str]) -> dict[str, CompiledRuleSet]:
-        return {
-            rule_id: self.compiler.compile_from_ttl(rule_ttl)
-            for rule_id, rule_ttl in rule_ttls.items()
-        }
+        return {rule_id: self.compiler.compile_from_ttl(rule_ttl) for rule_id, rule_ttl in rule_ttls.items()}
 
     def _aggregate_check_run_result(
         self,

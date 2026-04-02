@@ -1,5 +1,6 @@
 import re
-from rdflib import Graph, Namespace, RDF
+
+from rdflib import RDF, Graph, Namespace
 from rdflib.namespace import SH
 
 EX = Namespace("http://example.org/firebim/")
@@ -14,8 +15,8 @@ def _local_name(uri) -> str:
 
 
 def _parse_construct_rule(sparql_text: str):
-    prop_match = re.search(r'OPTIONAL\s*\{\s*\?this\s*<([^>]+)>\s*\?h\s*\}', sparql_text, re.DOTALL)
-    cmp_match = re.search(r'IF\s*\(\s*\?h\s*(<=|>=|=|<|>)\s*(.+?)\s*,\s*fb:True', sparql_text, re.DOTALL)
+    prop_match = re.search(r"OPTIONAL\s*\{\s*\?this\s*<([^>]+)>\s*\?h\s*\}", sparql_text, re.DOTALL)
+    cmp_match = re.search(r"IF\s*\(\s*\?h\s*(<=|>=|=|<|>)\s*(.+?)\s*,\s*fb:True", sparql_text, re.DOTALL)
 
     property_path = prop_match.group(1) if prop_match else None
     operator = None

@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -7,16 +7,16 @@ class RuleElementPayload(BaseModel):
     id: str
     element_type: str = "decision"
 
-    target_class: Optional[str] = None
-    property_path: Optional[str] = None
-    operator: Optional[str] = None
-    value: Optional[Any] = None
+    target_class: str | None = None
+    property_path: str | None = None
+    operator: str | None = None
+    value: Any | None = None
 
-    true_path: Optional[str] = None
-    false_path: Optional[str] = None
-    unknown_path: Optional[str] = None
+    true_path: str | None = None
+    false_path: str | None = None
+    unknown_path: str | None = None
 
-    label: Optional[str] = None
+    label: str | None = None
     config: dict = Field(default_factory=dict)
 
     def as_internal_dict(self) -> dict:
@@ -61,12 +61,12 @@ class RuleValidateRequest(RuleEnvelope):
 class RuleValidateResponse(BaseModel):
     valid: bool
     rule_id: str
-    entry: Optional[str] = None
+    entry: str | None = None
     element_count: int
     errors: list[str] = Field(default_factory=list)
     success: bool = True
-    error: Optional[str] = None
-    message: Optional[str] = None
+    error: str | None = None
+    message: str | None = None
     fallback: bool = False
 
 
@@ -79,8 +79,8 @@ class RuleCompileResponse(BaseModel):
     element_count: int
     ttl: str
     success: bool = True
-    error: Optional[str] = None
-    message: Optional[str] = None
+    error: str | None = None
+    message: str | None = None
     fallback: bool = False
 
 
@@ -91,8 +91,8 @@ class RuleDecompileRequest(BaseModel):
 class RuleDecompileResponse(BaseModel):
     rule: dict | None = None
     success: bool = True
-    error: Optional[str] = None
-    message: Optional[str] = None
+    error: str | None = None
+    message: str | None = None
     fallback: bool = False
 
 
@@ -102,14 +102,14 @@ class RulePublishRequest(RuleEnvelope):
 
 class RulePublishResponse(BaseModel):
     published: bool
-    rule_id: Optional[str] = None
-    graph_uri: Optional[str] = None
-    entry: Optional[str] = None
+    rule_id: str | None = None
+    graph_uri: str | None = None
+    entry: str | None = None
     element_count: int = 0
-    label: Optional[str] = None
+    label: str | None = None
     success: bool = True
-    error: Optional[str] = None
-    message: Optional[str] = None
+    error: str | None = None
+    message: str | None = None
     fallback: bool = False
 
 
@@ -122,8 +122,8 @@ class RuleFetchResponse(BaseModel):
     ttl: str = ""
     rule: dict | None = None
     success: bool = True
-    error: Optional[str] = None
-    message: Optional[str] = None
+    error: str | None = None
+    message: str | None = None
     fallback: bool = False
 
 
@@ -135,16 +135,16 @@ class RuleDeleteResponse(BaseModel):
     deleted: bool
     graph_uri: str
     success: bool = True
-    error: Optional[str] = None
-    message: Optional[str] = None
+    error: str | None = None
+    message: str | None = None
     fallback: bool = False
 
 
 class RuleListItem(BaseModel):
     rule_id: str
     graph_uri: str
-    entry: Optional[str] = None
-    label: Optional[str] = None
+    entry: str | None = None
+    label: str | None = None
     element_count: int = 0
 
 
@@ -152,9 +152,9 @@ class RuleListResponse(BaseModel):
     count: int
     rules: list[RuleListItem] = Field(default_factory=list)
     success: bool = True
-    warning: Optional[str] = None
-    error: Optional[str] = None
-    message: Optional[str] = None
+    warning: str | None = None
+    error: str | None = None
+    message: str | None = None
     fallback: bool = False
 
 
@@ -164,12 +164,12 @@ class RuleElementPublishRequest(RuleElementPayload):
 
 class RuleElementPublishResponse(BaseModel):
     published: bool
-    element_id: Optional[str] = None
-    graph_uri: Optional[str] = None
-    element_type: Optional[str] = None
+    element_id: str | None = None
+    graph_uri: str | None = None
+    element_type: str | None = None
     success: bool = True
-    error: Optional[str] = None
-    message: Optional[str] = None
+    error: str | None = None
+    message: str | None = None
     fallback: bool = False
 
 
@@ -182,8 +182,8 @@ class RuleElementFetchResponse(BaseModel):
     ttl: str = ""
     rule_element: dict | None = None
     success: bool = True
-    error: Optional[str] = None
-    message: Optional[str] = None
+    error: str | None = None
+    message: str | None = None
     fallback: bool = False
 
 
@@ -195,16 +195,16 @@ class RuleElementDeleteResponse(BaseModel):
     deleted: bool
     graph_uri: str
     success: bool = True
-    error: Optional[str] = None
-    message: Optional[str] = None
+    error: str | None = None
+    message: str | None = None
     fallback: bool = False
 
 
 class RuleElementListItem(BaseModel):
     element_id: str
     graph_uri: str
-    element_type: Optional[str] = None
-    label: Optional[str] = None
+    element_type: str | None = None
+    label: str | None = None
 
 
 class RuleElementListResponse(BaseModel):
@@ -212,9 +212,9 @@ class RuleElementListResponse(BaseModel):
     graph_uris: list[str] = Field(default_factory=list)
     rule_elements: list[RuleElementListItem] = Field(default_factory=list)
     success: bool = True
-    warning: Optional[str] = None
-    error: Optional[str] = None
-    message: Optional[str] = None
+    warning: str | None = None
+    error: str | None = None
+    message: str | None = None
     fallback: bool = False
 
 
@@ -228,7 +228,7 @@ class RuleConnectRequest(BaseModel):
 class RuleConnectResponse(BaseModel):
     updated: bool
     overwritten: bool
-    previous_target_id: Optional[str] = None
+    previous_target_id: str | None = None
     rule: dict
 
 
@@ -240,7 +240,7 @@ class RuleDisconnectRequest(BaseModel):
 
 class RuleDisconnectResponse(BaseModel):
     updated: bool
-    previous_target_id: Optional[str] = None
+    previous_target_id: str | None = None
     rule: dict
 
 
@@ -274,7 +274,7 @@ class RuleForceEndResponse(BaseModel):
 
 
 class RuleElementJson(RuleElementPayload):
-    graph_uri: Optional[str] = None
+    graph_uri: str | None = None
 
 
 class RuleElementJsonResponse(BaseModel):
@@ -318,8 +318,8 @@ class RuleAssembleResponse(BaseModel):
     open_branches: list[dict] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
     success: bool = True
-    error: Optional[str] = None
-    message: Optional[str] = None
+    error: str | None = None
+    message: str | None = None
     fallback: bool = False
 
 
@@ -333,6 +333,6 @@ class RuleAssembleCompileResponse(BaseModel):
     broken: bool = False
     errors: list[str] = Field(default_factory=list)
     success: bool = True
-    error: Optional[str] = None
-    message: Optional[str] = None
+    error: str | None = None
+    message: str | None = None
     fallback: bool = False

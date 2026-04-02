@@ -1,8 +1,8 @@
-from rdflib import Graph
 from pyshacl import validate
+from rdflib import Graph
 
-from app.rules.shacl_builder import SHACLBuilder
 from app.rules.dsl import Rule
+from app.rules.shacl_builder import SHACLBuilder
 
 
 class FakeFBO:

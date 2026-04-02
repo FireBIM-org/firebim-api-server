@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Iterable
 
 from app.checks.evaluator_base import AtomicEvaluator
 from app.checks.result_models import (
@@ -139,9 +139,7 @@ class CheckRuntime:
 
         next_node = compiled.get_node(start_node.next_node_id)
         if next_node.node_type != "decision":
-            raise ValueError(
-                f"First executable node '{next_node.node_id}' must be a decision node"
-            )
+            raise ValueError(f"First executable node '{next_node.node_id}' must be a decision node")
         return next_node
 
     def _traverse_from_target(
@@ -200,8 +198,7 @@ class CheckRuntime:
                         final_status="Unknown",
                         terminal_node_id=state.node_id,
                         message=(
-                            f"Traversal cycle detected at node '{state.node_id}' "
-                            f"for target '{state.target_node}'"
+                            f"Traversal cycle detected at node '{state.node_id}' for target '{state.target_node}'"
                         ),
                         steps=state.steps,
                         evidence={
@@ -257,8 +254,7 @@ class CheckRuntime:
                         final_status="Unknown",
                         terminal_node_id=node.node_id,
                         message=(
-                            f"Unsupported executable node type '{node.node_type}' "
-                            f"encountered at '{node.node_id}'"
+                            f"Unsupported executable node type '{node.node_type}' encountered at '{node.node_id}'"
                         ),
                         steps=state.steps,
                         evidence={"reason_code": "unsupported_node_type"},
@@ -313,8 +309,7 @@ class CheckRuntime:
                         final_status=outcome.status,
                         terminal_node_id=decision.node_id,
                         message=(
-                            f"Decision node '{decision.node_id}' has no outgoing branch "
-                            f"for outcome '{outcome.status}'"
+                            f"Decision node '{decision.node_id}' has no outgoing branch for outcome '{outcome.status}'"
                         ),
                         steps=state.steps + [step],
                         evidence={
@@ -459,9 +454,7 @@ class CheckRuntime:
 
             reason_code = self._extract_missing_data_reason(trace)
             if reason_code:
-                summary.missing_data_categories[reason_code] = (
-                    summary.missing_data_categories.get(reason_code, 0) + 1
-                )
+                summary.missing_data_categories[reason_code] = summary.missing_data_categories.get(reason_code, 0) + 1
 
         return summary
 

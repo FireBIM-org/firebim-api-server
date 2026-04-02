@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from rdflib import Graph, Namespace, RDF
+from rdflib import RDF, Graph, Namespace
 from rdflib.namespace import SH
 
 from app.checks.result_models import (
@@ -184,8 +184,7 @@ class RuleCompiler:
             return node
 
         raise ValueError(
-            f"Rule metadata node '{node_id}' has unsupported node_type '{node_type}'. "
-            "Expected 'start' or 'end'."
+            f"Rule metadata node '{node_id}' has unsupported node_type '{node_type}'. Expected 'start' or 'end'."
         )
 
     def _validate_compiled_ruleset(self, compiled: CompiledRuleSet) -> None:
@@ -194,8 +193,7 @@ class RuleCompiler:
 
         if compiled.entry_node_id not in compiled.nodes:
             raise ValueError(
-                f"Rule '{compiled.rule_id}' entry node '{compiled.entry_node_id}' "
-                "does not exist in compiled nodes"
+                f"Rule '{compiled.rule_id}' entry node '{compiled.entry_node_id}' does not exist in compiled nodes"
             )
 
         entry_node = compiled.nodes[compiled.entry_node_id]
@@ -229,9 +227,7 @@ class RuleCompiler:
 
         missing = sorted(node_id for node_id in referenced_node_ids if node_id not in compiled.nodes)
         if missing:
-            raise ValueError(
-                f"Rule '{compiled.rule_id}' contains branch targets that do not exist: {missing}"
-            )
+            raise ValueError(f"Rule '{compiled.rule_id}' contains branch targets that do not exist: {missing}")
 
         end_nodes = [node.node_id for node in compiled.nodes.values() if node.node_type == "end"]
         if not end_nodes:
@@ -285,9 +281,7 @@ class RuleCompiler:
             if not value
         ]
         if missing:
-            raise ValueError(
-                f"Decision node '{node.node_id}' missing required fields: {', '.join(missing)}"
-            )
+            raise ValueError(f"Decision node '{node.node_id}' missing required fields: {', '.join(missing)}")
 
         missing_branches = [
             name
@@ -300,24 +294,19 @@ class RuleCompiler:
         ]
         if missing_branches:
             raise ValueError(
-                f"Decision node '{node.node_id}' missing required outgoing branches: "
-                f"{', '.join(missing_branches)}"
+                f"Decision node '{node.node_id}' missing required outgoing branches: {', '.join(missing_branches)}"
             )
 
     def _validate_start_node(self, node: StartNode, false_obj=None, unknown_obj=None) -> None:
         if false_obj is not None or unknown_obj is not None:
-            raise ValueError(
-                f"Start node '{node.node_id}' should not define false_path or unknown_path"
-            )
+            raise ValueError(f"Start node '{node.node_id}' should not define false_path or unknown_path")
 
         if not node.next_node_id:
             raise ValueError(f"Start node '{node.node_id}' is missing next node")
 
     def _validate_end_node(self, node: EndNode, true_obj=None, false_obj=None, unknown_obj=None) -> None:
         if true_obj is not None or false_obj is not None or unknown_obj is not None:
-            raise ValueError(
-                f"End node '{node.node_id}' should not define outgoing paths"
-            )
+            raise ValueError(f"End node '{node.node_id}' should not define outgoing paths")
 
     def _local_name(self, uri) -> str:
         uri = str(uri)

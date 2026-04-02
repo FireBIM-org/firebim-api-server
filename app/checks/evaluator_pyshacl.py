@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from pyshacl import validate
-from rdflib import BNode, Graph, Literal, Namespace, RDF, URIRef
+from rdflib import RDF, BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import SH
 
 from app.checks.evaluator_base import RDFGraphBackedEvaluator
@@ -176,8 +176,7 @@ class PyShaclAtomicEvaluator(RDFGraphBackedEvaluator):
             return self.unknown_outcome(
                 reason_code="target_not_instance_of_target_class",
                 message=(
-                    f"Target '{target}' is not typed as required class "
-                    f"'{node.target_class}' for node '{node.node_id}'"
+                    f"Target '{target}' is not typed as required class '{node.target_class}' for node '{node.node_id}'"
                 ),
                 evidence={
                     "node_id": node.node_id,

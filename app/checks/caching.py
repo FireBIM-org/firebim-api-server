@@ -19,6 +19,7 @@ class TargetingCache:
     - not process-safe or persistent
     - suitable as an execution cache inside one API request / one engine run
     """
+
     parsed_graphs: dict[str, Graph] = field(default_factory=dict)
     targets_by_class: dict[str, list[str]] = field(default_factory=dict)
 

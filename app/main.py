@@ -8,17 +8,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from sqlmodel import Session
 
-from app.api.graph import router as graph_router
+from app.api.checks import router as checks_router
+from app.api.graphs import router as graphs_router  # for building graphs management endpoints
+
+# from app.api.graph import router as graph_router
+from app.api.rules import router as rules_router
 from app.auth.jwt import get_current_active_user
 from app.auth.router import router as auth_router
 from app.core.config import settings
 from app.models.database import get_db, init_db
 from app.models.models import CheckResult, IdsFile, IfcModel, User
 from app.workers.celery_app import celery_app
-#from app.api.graph import router as graph_router
-from app.api.rules import router as rules_router
-from app.api.checks import router as checks_router
-from app.api.graphs import router as graphs_router # for building graphs management endpoints
 
 app = FastAPI(title="FireBIM API")
 

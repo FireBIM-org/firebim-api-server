@@ -7,7 +7,11 @@ import httpx
 from app.core.config import settings
 from app.rules.publisher import (
     delete_graph_from_fuseki as _delete_graph_from_fuseki,
+)
+from app.rules.publisher import (
     fetch_ttl_from_fuseki as _fetch_ttl_from_fuseki,
+)
+from app.rules.publisher import (
     publish_ttl_to_fuseki as _publish_ttl_to_fuseki,
 )
 
