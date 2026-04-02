@@ -83,6 +83,7 @@ async def health() -> JSONResponse:
 
     # Database
     try:
+
         def _check_db() -> None:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
