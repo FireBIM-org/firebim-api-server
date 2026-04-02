@@ -31,31 +31,78 @@
         ]
       }
     },
-    "/graph/count_fro/{country_code}": {
+    "/graphs/health": {
       "get": {
         "tags": [
-          "graph"
+          "graphs"
         ],
-        "summary": "Count Fro",
-        "description": "Count number of entities per FRO class.",
-        "operationId": "count_fro_graph_count_fro__country_code__get",
-        "parameters": [
-          {
-            "name": "country_code",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Country Code"
-            }
-          }
-        ],
+        "summary": "Graphs Health",
+        "operationId": "graphs_health_graphs_health_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/GraphsHealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/graphs": {
+      "get": {
+        "tags": [
+          "graphs"
+        ],
+        "summary": "List Graphs",
+        "operationId": "list_graphs_graphs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/graphs/publish": {
+      "post": {
+        "tags": [
+          "graphs"
+        ],
+        "summary": "Publish Graph",
+        "operationId": "publish_graph_graphs_publish_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/GraphPublishRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphPublishResponse"
+                }
               }
             }
           },
@@ -72,22 +119,21 @@
         }
       }
     },
-    "/graph/get_english/{country_code}": {
-      "get": {
+    "/graphs/{graph_id}": {
+      "delete": {
         "tags": [
-          "graph"
+          "graphs"
         ],
-        "summary": "Get English",
-        "description": "Get all entities with English original text.",
-        "operationId": "get_english_graph_get_english__country_code__get",
+        "summary": "Delete Graph",
+        "operationId": "delete_graph_graphs__graph_id__delete",
         "parameters": [
           {
-            "name": "country_code",
+            "name": "graph_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Country Code"
+              "title": "Graph Id"
             }
           }
         ],
@@ -96,7 +142,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/GraphDeleteResponse"
+                }
               }
             }
           },
@@ -113,30 +161,816 @@
         }
       }
     },
-    "/graph/select_paragraph/{country_code}/{paragraph_id}": {
+    "/rules/health": {
       "get": {
         "tags": [
-          "graph"
+          "rules"
         ],
-        "summary": "Select Paragraph",
-        "operationId": "select_paragraph_graph_select_paragraph__country_code___paragraph_id__get",
-        "parameters": [
-          {
-            "name": "country_code",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Country Code"
+        "summary": "Rules Health",
+        "operationId": "rules_health_rules_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/validate": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Validate Rule",
+        "operationId": "validate_rule_rules_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleValidateRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
             }
           },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleValidateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/compile": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Compile Rule",
+        "operationId": "compile_rule_rules_compile_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleCompileRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleCompileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/decompile": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Decompile Rule",
+        "operationId": "decompile_rule_rules_decompile_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleDecompileRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleDecompileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/publish": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Publish Rule",
+        "operationId": "publish_rule_rules_publish_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RulePublishRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulePublishResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/list": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "List Rules",
+        "operationId": "list_rules_rules_list_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/fetch": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Fetch Rule",
+        "operationId": "fetch_rule_rules_fetch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleFetchRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleFetchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/delete": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Delete Rule",
+        "operationId": "delete_rule_rules_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleDeleteRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleDeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/assemble": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Assemble Rule",
+        "operationId": "assemble_rule_rules_assemble_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleAssembleRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleAssembleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/assemble/compile": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Assemble And Compile Rule",
+        "operationId": "assemble_and_compile_rule_rules_assemble_compile_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleAssembleRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleAssembleCompileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/rule-elements/derive": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Derive Rule Element",
+        "operationId": "derive_rule_element_rules_rule_elements_derive_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleElementDeriveRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleElementDeriveResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/rule-elements": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "List Rule Elements",
+        "operationId": "list_rule_elements_rules_rule_elements_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleElementListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Publish Rule Element",
+        "operationId": "publish_rule_element_rules_rule_elements_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleElementPublishRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleElementPublishResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/rule-elements/fetch": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Fetch Rule Element",
+        "operationId": "fetch_rule_element_rules_rule_elements_fetch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleElementFetchRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleElementFetchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/rule-elements/delete": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Delete Rule Element",
+        "operationId": "delete_rule_element_rules_rule_elements_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleElementDeleteRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleElementDeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/connect": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Connect Rules",
+        "operationId": "connect_rules_rules_connect_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleConnectRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleConnectResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/disconnect": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Disconnect Rules",
+        "operationId": "disconnect_rules_rules_disconnect_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleDisconnectRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleDisconnectResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/check-completeness": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Check Completeness",
+        "operationId": "check_completeness_rules_check_completeness_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleCompletenessRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleCompletenessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/force-end": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Force End",
+        "operationId": "force_end_rules_force_end_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleForceEndRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleForceEndResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/rule-elements/{element_id}": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Get Rule Element",
+        "operationId": "get_rule_element_rules_rule_elements__element_id__get",
+        "parameters": [
           {
-            "name": "paragraph_id",
+            "name": "element_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Paragraph Id"
+              "title": "Element Id"
             }
           }
         ],
@@ -145,7 +979,295 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleElementFetchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/{rule_id}": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Get Rule",
+        "operationId": "get_rule_rules__rule_id__get",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleFetchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/{rule_id}/ttl": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Get Rule Ttl",
+        "operationId": "get_rule_ttl_rules__rule_id__ttl_get",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Raw Turtle for the rule graph",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/turtle": {
+                "example": "PREFIX ex: <http://example.org/firebim/>\nPREFIX fb: <http://example.org/firebim/rule/>\nPREFIX sh: <http://www.w3.org/ns/shacl#>\n\nex:room_area_rule a ex:RuleSet ;\n    ex:entryPoint ex:check_room_area .\n"
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/{rule_id}/ttl.json": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Get Rule Ttl Json",
+        "operationId": "get_rule_ttl_json_rules__rule_id__ttl_json_get",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleTtlResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/checks/health": {
+      "get": {
+        "tags": [
+          "checks"
+        ],
+        "summary": "Checks Health",
+        "operationId": "checks_health_checks_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
                 "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/checks/run": {
+      "post": {
+        "tags": [
+          "checks"
+        ],
+        "summary": "Run Check",
+        "operationId": "run_check_checks_run_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/CheckRunRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/checks/run-blind": {
+      "post": {
+        "tags": [
+          "checks"
+        ],
+        "summary": "Run Blind Check",
+        "operationId": "run_blind_check_checks_run_blind_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/BlindCheckRunRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlindCheckRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/checks/compatibility": {
+      "post": {
+        "tags": [
+          "checks"
+        ],
+        "summary": "Check Compatibility",
+        "operationId": "check_compatibility_checks_compatibility_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/CheckCompatibilityRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckCompatibilityResponse"
+                }
               }
             }
           },
@@ -630,6 +1752,171 @@
   },
   "components": {
     "schemas": {
+      "BlindCheckRunOptions": {
+        "properties": {
+          "include_targets": {
+            "type": "boolean",
+            "title": "Include Targets",
+            "default": true
+          },
+          "include_debug": {
+            "type": "boolean",
+            "title": "Include Debug",
+            "default": true
+          },
+          "max_steps": {
+            "type": "integer",
+            "title": "Max Steps",
+            "default": 100000
+          }
+        },
+        "type": "object",
+        "title": "BlindCheckRunOptions"
+      },
+      "BlindCheckRunRequest": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "graph_id": {
+            "type": "string",
+            "title": "Graph Id"
+          },
+          "options": {
+            "$ref": "#/components/schemas/BlindCheckRunOptions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "graph_id"
+        ],
+        "title": "BlindCheckRunRequest"
+      },
+      "BlindCheckRunResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": "blind_shacl_construct"
+          },
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "graph_id": {
+            "type": "string",
+            "title": "Graph Id"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CheckRunSummary"
+          },
+          "end_outputs": {
+            "items": {
+              "$ref": "#/components/schemas/BlindCheckTerminalOutput"
+            },
+            "type": "array",
+            "title": "End Outputs"
+          },
+          "terminal_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Terminal Counts"
+          },
+          "message_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Message Counts"
+          },
+          "debug": {
+            "type": "object",
+            "title": "Debug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "graph_id"
+        ],
+        "title": "BlindCheckRunResponse"
+      },
+      "BlindCheckTerminalOutput": {
+        "properties": {
+          "target_node": {
+            "type": "string",
+            "title": "Target Node"
+          },
+          "terminal_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminal Node Id"
+          },
+          "terminal_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminal Value"
+          },
+          "final_status": {
+            "type": "string",
+            "title": "Final Status",
+            "default": "Unknown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_node"
+        ],
+        "title": "BlindCheckTerminalOutput"
+      },
       "Body_upload_ids_ids_files_post": {
         "properties": {
           "file": {
@@ -658,6 +1945,739 @@
         ],
         "title": "Body_upload_model_ifc_models_post"
       },
+      "CheckCompatibilityRequest": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "graph_id": {
+            "type": "string",
+            "title": "Graph Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "graph_id"
+        ],
+        "title": "CheckCompatibilityRequest"
+      },
+      "CheckCompatibilityResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          },
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "graph_id": {
+            "type": "string",
+            "title": "Graph Id"
+          },
+          "compatibility_score": {
+            "type": "number",
+            "title": "Compatibility Score",
+            "default": 0.0
+          },
+          "target_classes_required": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Classes Required"
+          },
+          "properties_required": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Properties Required"
+          },
+          "target_classes_found": {
+            "items": {
+              "$ref": "#/components/schemas/CompatibilityMatch"
+            },
+            "type": "array",
+            "title": "Target Classes Found"
+          },
+          "properties_found": {
+            "items": {
+              "$ref": "#/components/schemas/CompatibilityMatch"
+            },
+            "type": "array",
+            "title": "Properties Found"
+          },
+          "missing_target_classes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Target Classes"
+          },
+          "missing_properties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Properties"
+          },
+          "graph_classes_unused_by_rule": {
+            "items": {
+              "$ref": "#/components/schemas/CompatibilityMatch"
+            },
+            "type": "array",
+            "title": "Graph Classes Unused By Rule"
+          },
+          "graph_properties_unused_by_rule": {
+            "items": {
+              "$ref": "#/components/schemas/CompatibilityMatch"
+            },
+            "type": "array",
+            "title": "Graph Properties Unused By Rule"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/CompatibilityWarning"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "graph_id"
+        ],
+        "title": "CheckCompatibilityResponse"
+      },
+      "CheckRunEngineInfo": {
+        "properties": {
+          "engine": {
+            "type": "string",
+            "title": "Engine",
+            "default": "compiled_runtime"
+          },
+          "inference": {
+            "type": "string",
+            "title": "Inference",
+            "default": "rdfs"
+          },
+          "advanced": {
+            "type": "boolean",
+            "title": "Advanced",
+            "default": true
+          },
+          "runtime": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtime"
+          },
+          "evaluator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluator"
+          },
+          "target_resolver": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Resolver"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mode"
+          }
+        },
+        "type": "object",
+        "title": "CheckRunEngineInfo"
+      },
+      "CheckRunOptions": {
+        "properties": {
+          "inference": {
+            "type": "string",
+            "title": "Inference",
+            "description": "none | rdfs | owlrl | both",
+            "default": "rdfs"
+          },
+          "advanced": {
+            "type": "boolean",
+            "title": "Advanced",
+            "default": true
+          },
+          "include_report_text": {
+            "type": "boolean",
+            "title": "Include Report Text",
+            "default": true
+          },
+          "include_report_graph_ttl": {
+            "type": "boolean",
+            "title": "Include Report Graph Ttl",
+            "default": false
+          },
+          "include_targets": {
+            "type": "boolean",
+            "title": "Include Targets",
+            "default": true
+          },
+          "include_trace": {
+            "type": "boolean",
+            "title": "Include Trace",
+            "default": true
+          },
+          "debug": {
+            "type": "boolean",
+            "title": "Debug",
+            "default": false
+          },
+          "fail_fast": {
+            "type": "boolean",
+            "title": "Fail Fast",
+            "default": false
+          },
+          "max_steps_per_target": {
+            "type": "integer",
+            "title": "Max Steps Per Target",
+            "default": 100
+          }
+        },
+        "type": "object",
+        "title": "CheckRunOptions"
+      },
+      "CheckRunRequest": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "graph_id": {
+            "type": "string",
+            "title": "Graph Id"
+          },
+          "options": {
+            "$ref": "#/components/schemas/CheckRunOptions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "graph_id"
+        ],
+        "title": "CheckRunRequest"
+      },
+      "CheckRunResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          },
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "graph_id": {
+            "type": "string",
+            "title": "Graph Id"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CheckRunSummary"
+          },
+          "engine": {
+            "$ref": "#/components/schemas/CheckRunEngineInfo"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/CheckTargetResult"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "report_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Text"
+          },
+          "report_graph_ttl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Graph Ttl"
+          },
+          "debug": {
+            "type": "object",
+            "title": "Debug"
+          },
+          "compiled_rule": {
+            "type": "object",
+            "title": "Compiled Rule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "graph_id"
+        ],
+        "title": "CheckRunResponse"
+      },
+      "CheckRunSummary": {
+        "properties": {
+          "total_targets": {
+            "type": "integer",
+            "title": "Total Targets",
+            "default": 0
+          },
+          "passed": {
+            "type": "integer",
+            "title": "Passed",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "default": 0
+          },
+          "unknown": {
+            "type": "integer",
+            "title": "Unknown",
+            "default": 0
+          },
+          "conforms": {
+            "type": "boolean",
+            "title": "Conforms",
+            "default": false
+          },
+          "terminal_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Terminal Counts"
+          },
+          "missing_data_categories": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Missing Data Categories"
+          }
+        },
+        "type": "object",
+        "title": "CheckRunSummary"
+      },
+      "CheckTargetResult": {
+        "properties": {
+          "target_node": {
+            "type": "string",
+            "title": "Target Node"
+          },
+          "target_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Class"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "Unknown"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "terminal_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Terminal Node Id"
+          },
+          "trace": {
+            "items": {
+              "$ref": "#/components/schemas/CheckTargetTraceStep"
+            },
+            "type": "array",
+            "title": "Trace"
+          },
+          "evidence": {
+            "type": "object",
+            "title": "Evidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_node"
+        ],
+        "title": "CheckTargetResult"
+      },
+      "CheckTargetTraceStep": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "node_type": {
+            "type": "string",
+            "title": "Node Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "Unknown"
+          },
+          "next_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Node Id"
+          },
+          "evidence": {
+            "type": "object",
+            "title": "Evidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "node_type"
+        ],
+        "title": "CheckTargetTraceStep"
+      },
+      "CompatibilityMatch": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "CompatibilityMatch"
+      },
+      "CompatibilityWarning": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "CompatibilityWarning"
+      },
+      "GraphDeleteResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "graph_id": {
+            "type": "string",
+            "title": "Graph Id"
+          },
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_id",
+          "graph_uri",
+          "dataset",
+          "message"
+        ],
+        "title": "GraphDeleteResponse"
+      },
+      "GraphListItem": {
+        "properties": {
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "triple_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triple Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_uri"
+        ],
+        "title": "GraphListItem"
+      },
+      "GraphListResponse": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "graph_uris": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Graph Uris"
+          },
+          "graphs": {
+            "items": {
+              "$ref": "#/components/schemas/GraphListItem"
+            },
+            "type": "array",
+            "title": "Graphs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "graph_uris"
+        ],
+        "title": "GraphListResponse"
+      },
+      "GraphPublishRequest": {
+        "properties": {
+          "graph_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Graph Id",
+            "description": "Stable graph identifier"
+          },
+          "ttl": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ttl",
+            "description": "Building graph in Turtle format"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_id",
+          "ttl"
+        ],
+        "title": "GraphPublishRequest"
+      },
+      "GraphPublishResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "graph_id": {
+            "type": "string",
+            "title": "Graph Id"
+          },
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "overwritten": {
+            "type": "boolean",
+            "title": "Overwritten"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_id",
+          "graph_uri",
+          "dataset",
+          "overwritten",
+          "message"
+        ],
+        "title": "GraphPublishResponse"
+      },
+      "GraphsHealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "fuseki_connected": {
+            "type": "boolean",
+            "title": "Fuseki Connected"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "fuseki_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fuseki Host"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "fuseki_connected",
+          "dataset"
+        ],
+        "title": "GraphsHealthResponse"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -670,6 +2690,1805 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "RuleAssembleCompileResponse": {
+        "properties": {
+          "rule": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule"
+          },
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "element_count": {
+            "type": "integer",
+            "title": "Element Count",
+            "default": 0
+          },
+          "ttl": {
+            "type": "string",
+            "title": "Ttl",
+            "default": ""
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete",
+            "default": false
+          },
+          "open": {
+            "type": "boolean",
+            "title": "Open",
+            "default": false
+          },
+          "broken": {
+            "type": "boolean",
+            "title": "Broken",
+            "default": false
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id"
+        ],
+        "title": "RuleAssembleCompileResponse"
+      },
+      "RuleAssembleRequest": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "entry": {
+            "type": "string",
+            "title": "Entry"
+          },
+          "element_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Element Ids"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/RuleLinkRequest"
+            },
+            "type": "array",
+            "title": "Links"
+          },
+          "validate": {
+            "type": "boolean",
+            "title": "Validate",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "entry"
+        ],
+        "title": "RuleAssembleRequest"
+      },
+      "RuleAssembleResponse": {
+        "properties": {
+          "rule": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule"
+          },
+          "element_count": {
+            "type": "integer",
+            "title": "Element Count",
+            "default": 0
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete",
+            "default": false
+          },
+          "open": {
+            "type": "boolean",
+            "title": "Open",
+            "default": false
+          },
+          "broken": {
+            "type": "boolean",
+            "title": "Broken",
+            "default": false
+          },
+          "entry_ok": {
+            "type": "boolean",
+            "title": "Entry Ok",
+            "default": false
+          },
+          "missing_entry": {
+            "type": "boolean",
+            "title": "Missing Entry",
+            "default": false
+          },
+          "missing_nodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Nodes"
+          },
+          "open_branches": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Open Branches"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "RuleAssembleResponse"
+      },
+      "RuleCompileRequest": {
+        "properties": {
+          "rule": {
+            "$ref": "#/components/schemas/RuleDraft"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule"
+        ],
+        "title": "RuleCompileRequest"
+      },
+      "RuleCompileResponse": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "element_count": {
+            "type": "integer",
+            "title": "Element Count"
+          },
+          "ttl": {
+            "type": "string",
+            "title": "Ttl"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "element_count",
+          "ttl"
+        ],
+        "title": "RuleCompileResponse"
+      },
+      "RuleCompletenessRequest": {
+        "properties": {
+          "rule": {
+            "$ref": "#/components/schemas/RuleDraft"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule"
+        ],
+        "title": "RuleCompletenessRequest"
+      },
+      "RuleCompletenessResponse": {
+        "properties": {
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "open": {
+            "type": "boolean",
+            "title": "Open"
+          },
+          "broken": {
+            "type": "boolean",
+            "title": "Broken"
+          },
+          "entry_ok": {
+            "type": "boolean",
+            "title": "Entry Ok"
+          },
+          "missing_entry": {
+            "type": "boolean",
+            "title": "Missing Entry"
+          },
+          "missing_nodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Nodes"
+          },
+          "open_branches": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Open Branches"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "complete",
+          "open",
+          "broken",
+          "entry_ok",
+          "missing_entry",
+          "missing_nodes",
+          "open_branches",
+          "errors"
+        ],
+        "title": "RuleCompletenessResponse"
+      },
+      "RuleConnectRequest": {
+        "properties": {
+          "rule": {
+            "$ref": "#/components/schemas/RuleDraft"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "branch": {
+            "type": "string",
+            "title": "Branch"
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule",
+          "source_id",
+          "branch",
+          "target_id"
+        ],
+        "title": "RuleConnectRequest"
+      },
+      "RuleConnectResponse": {
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "title": "Updated"
+          },
+          "overwritten": {
+            "type": "boolean",
+            "title": "Overwritten"
+          },
+          "previous_target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Target Id"
+          },
+          "rule": {
+            "type": "object",
+            "title": "Rule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "updated",
+          "overwritten",
+          "rule"
+        ],
+        "title": "RuleConnectResponse"
+      },
+      "RuleDecompileRequest": {
+        "properties": {
+          "ttl": {
+            "type": "string",
+            "title": "Ttl"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ttl"
+        ],
+        "title": "RuleDecompileRequest"
+      },
+      "RuleDecompileResponse": {
+        "properties": {
+          "rule": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "RuleDecompileResponse"
+      },
+      "RuleDeleteRequest": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id"
+        ],
+        "title": "RuleDeleteRequest"
+      },
+      "RuleDeleteResponse": {
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted"
+          },
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted",
+          "graph_uri"
+        ],
+        "title": "RuleDeleteResponse"
+      },
+      "RuleDisconnectRequest": {
+        "properties": {
+          "rule": {
+            "$ref": "#/components/schemas/RuleDraft"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "branch": {
+            "type": "string",
+            "title": "Branch"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule",
+          "source_id",
+          "branch"
+        ],
+        "title": "RuleDisconnectRequest"
+      },
+      "RuleDisconnectResponse": {
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "title": "Updated"
+          },
+          "previous_target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Target Id"
+          },
+          "rule": {
+            "type": "object",
+            "title": "Rule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "updated",
+          "rule"
+        ],
+        "title": "RuleDisconnectResponse"
+      },
+      "RuleDraft": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "entry": {
+            "type": "string",
+            "title": "Entry"
+          },
+          "elements": {
+            "items": {
+              "$ref": "#/components/schemas/RuleElementPayload"
+            },
+            "type": "array",
+            "title": "Elements"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "entry"
+        ],
+        "title": "RuleDraft"
+      },
+      "RuleElementDeleteRequest": {
+        "properties": {
+          "element_id": {
+            "type": "string",
+            "title": "Element Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "element_id"
+        ],
+        "title": "RuleElementDeleteRequest"
+      },
+      "RuleElementDeleteResponse": {
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted"
+          },
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted",
+          "graph_uri"
+        ],
+        "title": "RuleElementDeleteResponse"
+      },
+      "RuleElementDeriveRequest": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "new_id": {
+            "type": "string",
+            "title": "New Id"
+          },
+          "preserve_paths": {
+            "type": "boolean",
+            "title": "Preserve Paths",
+            "default": false
+          },
+          "overrides": {
+            "type": "object",
+            "title": "Overrides"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "new_id"
+        ],
+        "title": "RuleElementDeriveRequest"
+      },
+      "RuleElementDeriveResponse": {
+        "properties": {
+          "rule_element": {
+            "$ref": "#/components/schemas/RuleElementJson"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_element"
+        ],
+        "title": "RuleElementDeriveResponse"
+      },
+      "RuleElementFetchRequest": {
+        "properties": {
+          "element_id": {
+            "type": "string",
+            "title": "Element Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "element_id"
+        ],
+        "title": "RuleElementFetchRequest"
+      },
+      "RuleElementFetchResponse": {
+        "properties": {
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "ttl": {
+            "type": "string",
+            "title": "Ttl",
+            "default": ""
+          },
+          "rule_element": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Element"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_uri"
+        ],
+        "title": "RuleElementFetchResponse"
+      },
+      "RuleElementJson": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "element_type": {
+            "type": "string",
+            "title": "Element Type",
+            "default": "decision"
+          },
+          "target_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Class"
+          },
+          "property_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Property Path"
+          },
+          "operator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator"
+          },
+          "value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "true_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "True Path"
+          },
+          "false_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "False Path"
+          },
+          "unknown_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unknown Path"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "config": {
+            "type": "object",
+            "title": "Config"
+          },
+          "graph_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Uri"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "RuleElementJson"
+      },
+      "RuleElementListItem": {
+        "properties": {
+          "element_id": {
+            "type": "string",
+            "title": "Element Id"
+          },
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "element_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Element Type"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "element_id",
+          "graph_uri"
+        ],
+        "title": "RuleElementListItem"
+      },
+      "RuleElementListResponse": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "graph_uris": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Graph Uris"
+          },
+          "rule_elements": {
+            "items": {
+              "$ref": "#/components/schemas/RuleElementListItem"
+            },
+            "type": "array",
+            "title": "Rule Elements"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "count"
+        ],
+        "title": "RuleElementListResponse"
+      },
+      "RuleElementPayload": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "element_type": {
+            "type": "string",
+            "title": "Element Type",
+            "default": "decision"
+          },
+          "target_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Class"
+          },
+          "property_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Property Path"
+          },
+          "operator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator"
+          },
+          "value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "true_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "True Path"
+          },
+          "false_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "False Path"
+          },
+          "unknown_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unknown Path"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "config": {
+            "type": "object",
+            "title": "Config"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "RuleElementPayload"
+      },
+      "RuleElementPublishRequest": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "element_type": {
+            "type": "string",
+            "title": "Element Type",
+            "default": "decision"
+          },
+          "target_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Class"
+          },
+          "property_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Property Path"
+          },
+          "operator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator"
+          },
+          "value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "true_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "True Path"
+          },
+          "false_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "False Path"
+          },
+          "unknown_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unknown Path"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "config": {
+            "type": "object",
+            "title": "Config"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "RuleElementPublishRequest"
+      },
+      "RuleElementPublishResponse": {
+        "properties": {
+          "published": {
+            "type": "boolean",
+            "title": "Published"
+          },
+          "element_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Element Id"
+          },
+          "graph_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Uri"
+          },
+          "element_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Element Type"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "published"
+        ],
+        "title": "RuleElementPublishResponse"
+      },
+      "RuleFetchRequest": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id"
+        ],
+        "title": "RuleFetchRequest"
+      },
+      "RuleFetchResponse": {
+        "properties": {
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "ttl": {
+            "type": "string",
+            "title": "Ttl",
+            "default": ""
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_uri"
+        ],
+        "title": "RuleFetchResponse"
+      },
+      "RuleForceEndRequest": {
+        "properties": {
+          "rule": {
+            "$ref": "#/components/schemas/RuleDraft"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": "per_branch"
+          },
+          "node_type": {
+            "type": "string",
+            "title": "Node Type",
+            "default": "end"
+          },
+          "label_prefix": {
+            "type": "string",
+            "title": "Label Prefix",
+            "default": "forced_end"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule"
+        ],
+        "title": "RuleForceEndRequest"
+      },
+      "RuleForceEndResponse": {
+        "properties": {
+          "updated": {
+            "type": "boolean",
+            "title": "Updated"
+          },
+          "filled_count": {
+            "type": "integer",
+            "title": "Filled Count"
+          },
+          "created_node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Created Node Ids"
+          },
+          "rule": {
+            "type": "object",
+            "title": "Rule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "updated",
+          "filled_count",
+          "created_node_ids",
+          "rule"
+        ],
+        "title": "RuleForceEndResponse"
+      },
+      "RuleLinkRequest": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "branch": {
+            "type": "string",
+            "title": "Branch"
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "branch",
+          "target_id"
+        ],
+        "title": "RuleLinkRequest"
+      },
+      "RuleListItem": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "entry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "element_count": {
+            "type": "integer",
+            "title": "Element Count",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "graph_uri"
+        ],
+        "title": "RuleListItem"
+      },
+      "RuleListResponse": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleListItem"
+            },
+            "type": "array",
+            "title": "Rules"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "count"
+        ],
+        "title": "RuleListResponse"
+      },
+      "RulePublishRequest": {
+        "properties": {
+          "rule": {
+            "$ref": "#/components/schemas/RuleDraft"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule"
+        ],
+        "title": "RulePublishRequest"
+      },
+      "RulePublishResponse": {
+        "properties": {
+          "published": {
+            "type": "boolean",
+            "title": "Published"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id"
+          },
+          "graph_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Uri"
+          },
+          "entry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry"
+          },
+          "element_count": {
+            "type": "integer",
+            "title": "Element Count",
+            "default": 0
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "published"
+        ],
+        "title": "RulePublishResponse"
+      },
+      "RuleTtlResponse": {
+        "properties": {
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "ttl": {
+            "type": "string",
+            "title": "Ttl"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type",
+            "default": "text/turtle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_uri",
+          "ttl"
+        ],
+        "title": "RuleTtlResponse"
+      },
+      "RuleValidateRequest": {
+        "properties": {
+          "rule": {
+            "$ref": "#/components/schemas/RuleDraft"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule"
+        ],
+        "title": "RuleValidateRequest"
+      },
+      "RuleValidateResponse": {
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "entry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry"
+          },
+          "element_count": {
+            "type": "integer",
+            "title": "Element Count"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "valid",
+          "rule_id",
+          "element_count"
+        ],
+        "title": "RuleValidateResponse"
       },
       "User": {
         "properties": {
