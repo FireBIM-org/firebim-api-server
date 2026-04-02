@@ -1,18 +1,21 @@
+import asyncio
 import json
 import time
 import uuid
 
 import boto3
+import httpx
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy import text
 from sqlmodel import Session
 
 from app.api.graph import router as graph_router
 from app.auth.jwt import get_current_active_user
 from app.auth.router import router as auth_router
 from app.core.config import settings
-from app.models.database import get_db, init_db
+from app.models.database import engine, get_db, init_db
 from app.models.models import CheckResult, IdsFile, IfcModel, User
 from app.workers.celery_app import celery_app
 
@@ -71,6 +74,60 @@ s3_client = boto3.client(
 )
 
 BUCKET_NAME = settings.S3_BUCKET_NAME
+
+
+@app.get("/health", tags=["health"])
+async def health() -> JSONResponse:
+    checks: dict[str, str] = {}
+    healthy = True
+
+    # Database
+    try:
+        def _check_db() -> None:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+
+        await asyncio.to_thread(_check_db)
+        checks["database"] = "ok"
+    except Exception as e:
+        checks["database"] = f"error: {e}"
+        healthy = False
+
+    # S3
+    try:
+        await asyncio.to_thread(s3_client.head_bucket, Bucket=BUCKET_NAME)
+        checks["s3"] = "ok"
+    except Exception as e:
+        checks["s3"] = f"error: {e}"
+        healthy = False
+
+    # Celery / RabbitMQ
+    try:
+        result = await asyncio.to_thread(celery_app.control.ping, timeout=2)
+        if result:
+            checks["celery"] = "ok"
+        else:
+            checks["celery"] = "no workers responding"
+            healthy = False
+    except Exception as e:
+        checks["celery"] = f"error: {e}"
+        healthy = False
+
+    # Authentik
+    try:
+        issuer = (settings.AUTHENTIK_INTERNAL_URL or settings.AUTHENTIK_ISSUER_URL).rstrip("/")
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{issuer}/.well-known/openid-configuration", timeout=3.0)
+            resp.raise_for_status()
+        checks["authentik"] = "ok"
+    except Exception as e:
+        checks["authentik"] = f"error: {e}"
+        healthy = False
+
+    return JSONResponse(
+        content={"status": "ok" if healthy else "degraded", "checks": checks},
+        status_code=200 if healthy else 503,
+    )
 
 
 @app.post("/ifc-models", status_code=201)
