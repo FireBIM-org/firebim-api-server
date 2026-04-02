@@ -21,6 +21,8 @@ dependencies = [
     "pydantic-settings",
     "celery==5.3.6",
     "rdflib==7.3.0",
+    "pyshacl==0.25.0",
+    "networkx==3.2.1",
 ]
 
 
