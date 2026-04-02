@@ -1,104 +1,93 @@
-from passlib.context import CryptContext
-from datetime import datetime, timedelta
 import jwt
-from typing import Optional
-import os
-from sqlmodel import Session
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt import PyJWKClient
+from sqlmodel import Session
 
 from app.core.config import settings
-
 from app.models.database import get_db
 from app.models.models import User
-from app.schemas.auth import TokenData
 
-# Password hashing settings
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Bearer token extraction
+security = HTTPBearer()
 
-# JWT settings
-SECRET_KEY = settings.SECRET_KEY.get_secret_value()
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-# OAuth2 settings
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+# Cached JWKS client for verifying Authentik-signed tokens
+_jwks_client = None
 
 
-def verify_password(plain_password, hashed_password):
-    """Verify a password against a hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+def get_jwks_client() -> PyJWKClient:
+    global _jwks_client
+    if _jwks_client is None:
+        # Use the internal URL (reachable inside Docker) if set, otherwise the public issuer URL
+        base_url = settings.AUTHENTIK_INTERNAL_URL or settings.AUTHENTIK_ISSUER_URL
+        jwks_url = f"{base_url.rstrip('/')}/jwks/"
+        _jwks_client = PyJWKClient(jwks_url)
+    return _jwks_client
 
 
-def get_password_hash(password):
-    """Hash a password for storing."""
-    return pwd_context.hash(password)
-
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create a JWT token."""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-
-def get_user_by_username(db: Session, username: str):
-    """Get a user from the database by username."""
-    return db.query(User).filter(User.username == username).first()
-
-
-def get_user_by_email(db: Session, email: str):
-    """Get a user from the database by email."""
-    return db.query(User).filter(User.email == email).first()
-
-
-def get_user_by_username_or_email(db: Session, username_or_email: str):
-    """Get a user from the database by either username or email."""
-    # Check if input looks like an email (contains @)
-    if "@" in username_or_email:
-        return get_user_by_email(db, username_or_email)
-    else:
-        return get_user_by_username(db, username_or_email)
-
-
-def authenticate_user(db: Session, username: str, password: str):
-    """Authenticate a user by username/email and password."""
-    # Try to get user by either username or email
-    user = get_user_by_username_or_email(db, username)
-    
-    if not user:
-        return False
-    if not verify_password(password, user.hashed_password):
-        return False
-    return user
-
-
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    """Get the current user from the token."""
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+) -> User:
+    """Validate an Authentik-issued JWT and return the local user (auto-provisioned)."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
+    token = credentials.credentials
+
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        jwks_client = get_jwks_client()
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256", "ES256"],
+            issuer=settings.AUTHENTIK_ISSUER_URL,
+            options={"verify_aud": False},
+        )
+
+        sub: str = payload.get("sub")
+        if sub is None:
             raise credentials_exception
-        token_data = TokenData(username=username)
     except jwt.PyJWTError:
-        raise credentials_exception
-    
-    user = get_user_by_username(db, username=token_data.username)
+        raise credentials_exception from None
+
+    # Find or auto-provision user based on Authentik subject
+    user = db.query(User).filter(User.authentik_sub == sub).first()
+
     if user is None:
-        raise credentials_exception
+        email = payload.get("email", "")
+        username = payload.get("preferred_username", sub)
+
+        user = User(
+            authentik_sub=sub,
+            username=username,
+            email=email,
+            is_active=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    else:
+        # Keep local profile in sync with Authentik claims
+        updated = False
+        email = payload.get("email")
+        username = payload.get("preferred_username")
+
+        if email and user.email != email:
+            user.email = email
+            updated = True
+        if username and user.username != username:
+            user.username = username
+            updated = True
+        if updated:
+            db.commit()
+            db.refresh(user)
+
     return user
 
 

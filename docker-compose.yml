@@ -12,16 +12,18 @@ services:
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL-http://minio:9000}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
-      - S3_SECRET_ACCESS_KEY_FILE=/run/secrets/s3-secret-key
       - S3_REGION=${S3_REGION}
       - POSTGRES_HOST=${POSTGRES_HOST}
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
       - POSTGRES_DB=${POSTGRES_DB}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://guest:guest@rabbitmq:5672//}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
-      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS-https://firebim.org,https://www.firebim.org,https://app.firebim.org,https://www.app.firebim.org}
+      - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS-https://firebim.org,https://www.firebim.org,https://app.firebim.org,https://www.app.firebim.org,http://localhost:3000}
+      # Public issuer URL (matches the iss claim in tokens issued via the browser)
+      - AUTHENTIK_ISSUER_URL=http://localhost:9090/application/o/firebim/
+      # Internal URL for JWKS fetching from inside the Docker network
+      - AUTHENTIK_INTERNAL_URL=http://authentik-server:9000/application/o/firebim/
       - FUSEKI_HOST=${FUSEKI_HOST-http://graph-demo.firebim.org:3030}
       - FUSEKI_USER=${FUSEKI_USER}
       - FUSEKI_PASSWORD=${FUSEKI_PASSWORD}
@@ -31,6 +33,7 @@ services:
       - postgres
       - minio
       - rabbitmq
+      - authentik-server
       - fuseki
  
   fuseki:
@@ -53,12 +56,10 @@ services:
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL-http://minio:9000}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
-      - S3_SECRET_ACCESS_KEY_FILE=/run/secrets/s3-secret-key
       - S3_REGION=${S3_REGION}
       - POSTGRES_HOST=${POSTGRES_HOST}
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
       - POSTGRES_DB=${POSTGRES_DB}
       - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://guest:guest@rabbitmq:5672//}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
@@ -96,6 +97,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d
 
   minio:
     image: minio/minio:latest
@@ -108,6 +110,82 @@ services:
       - MINIO_ROOT_PASSWORD=minioadmin
     volumes:
       - minio_data:/data
+
+  # ── Mailpit (local email catcher) ────────────────────────────────
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"    # Web UI
+      - "1025:1025"    # SMTP
+
+  # ── Authentik (local identity provider) ─────────────────────────
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2025.12
+    command: server
+    ports:
+      - "9090:9000"    # HTTP
+      - "9443:9443"    # HTTPS
+    environment:
+      AUTHENTIK_SECRET_KEY: local-dev-secret-key-change-in-production
+      AUTHENTIK_POSTGRESQL__HOST: postgres
+      AUTHENTIK_POSTGRESQL__PORT: 5432
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik-local-dev
+      AUTHENTIK_BOOTSTRAP_PASSWORD: akadmin
+      AUTHENTIK_BOOTSTRAP_EMAIL: admin@firebim.org
+      # SMTP — local Mailpit
+      AUTHENTIK_EMAIL__HOST: mailpit
+      AUTHENTIK_EMAIL__PORT: 1025
+      AUTHENTIK_EMAIL__USE_TLS: "false"
+      AUTHENTIK_EMAIL__USE_SSL: "false"
+      AUTHENTIK_EMAIL__FROM: noreply@firebim.org
+      AUTHENTIK_EMAIL__TIMEOUT: 10
+      # Blueprint env vars
+      FIREBIM_CLIENT_ID: firebim
+      FIREBIM_CLIENT_SECRET: local-dev-client-secret
+      FIREBIM_REDIRECT_URI: "http://localhost:3000/api/auth/callback/authentik"
+      FIREBIM_LAUNCH_URL: "http://localhost:3000"
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+      - ./blueprints:/blueprints/custom
+    depends_on:
+      postgres:
+        condition: service_started
+      mailpit:
+        condition: service_started
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2025.12
+    command: worker
+    environment:
+      AUTHENTIK_SECRET_KEY: local-dev-secret-key-change-in-production
+      AUTHENTIK_POSTGRESQL__HOST: postgres
+      AUTHENTIK_POSTGRESQL__PORT: 5432
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik-local-dev
+      # SMTP — local Mailpit
+      AUTHENTIK_EMAIL__HOST: mailpit
+      AUTHENTIK_EMAIL__PORT: 1025
+      AUTHENTIK_EMAIL__USE_TLS: "false"
+      AUTHENTIK_EMAIL__USE_SSL: "false"
+      AUTHENTIK_EMAIL__FROM: noreply@firebim.org
+      AUTHENTIK_EMAIL__TIMEOUT: 10
+      FIREBIM_CLIENT_ID: firebim
+      FIREBIM_CLIENT_SECRET: local-dev-client-secret
+      FIREBIM_REDIRECT_URI: "http://localhost:3000/api/auth/callback/authentik"
+      FIREBIM_LAUNCH_URL: "http://localhost:3000"
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+      - ./blueprints:/blueprints/custom
+    depends_on:
+      postgres:
+        condition: service_started
+      mailpit:
+        condition: service_started
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -127,6 +205,8 @@ volumes:
   minio_data:
   pgadmin_data:
   rabbitmq_data:
+  authentik_media:
+  authentik_templates:
   fuseki_data:
 
 secrets:

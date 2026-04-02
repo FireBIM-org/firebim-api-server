@@ -1,0 +1,78 @@
+name: Backport Fix to Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_branch:
+        description: 'Target release branch (e.g., release/1.0)'
+        required: true
+        type: string
+      commit_sha:
+        description: 'Commit SHA to cherry-pick (should already be merged to main)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  backport:
+    name: Cherry-pick to ${{ inputs.release_branch }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.release_branch }}
+
+      - name: Validate inputs
+        run: |
+          # Verify branch exists
+          if ! git ls-remote --heads origin "${{ inputs.release_branch }}" | grep -q "${{ inputs.release_branch }}"; then
+            echo "::error::Branch ${{ inputs.release_branch }} does not exist"
+            exit 1
+          fi
+
+          # Verify commit exists
+          git cat-file -e "${{ inputs.commit_sha }}"
+
+      - name: Cherry-pick commit
+        id: cherry
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          SHORT_SHA="${{ inputs.commit_sha }}"
+          SHORT_SHA="${SHORT_SHA::7}"
+          BRANCH="backport/${SHORT_SHA}-to-${{ inputs.release_branch }}"
+          BRANCH="${BRANCH//\//-}"  # sanitize slashes for branch segment after backport/
+          BRANCH="backport/${SHORT_SHA}-to-$(echo '${{ inputs.release_branch }}' | sed 's|/|-|g')"
+
+          git checkout -b "$BRANCH"
+
+          if ! git cherry-pick "${{ inputs.commit_sha }}"; then
+            echo "::error::Cherry-pick failed — resolve conflicts manually"
+            git cherry-pick --abort
+            exit 1
+          fi
+
+          git push origin "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Create PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMIT_MSG="$(git log -1 --format='%s' "${{ inputs.commit_sha }}")"
+
+          gh pr create \
+            --title "backport: ${COMMIT_MSG}" \
+            --body "Cherry-pick of \`${{ inputs.commit_sha }}\` into \`${{ inputs.release_branch }}\`.
+
+          **Original commit:** [\`${{ steps.cherry.outputs.short_sha }}\`](https://github.com/${{ github.repository }}/commit/${{ inputs.commit_sha }})
+          **Target branch:** \`${{ inputs.release_branch }}\`
+          **Triggered by:** @${{ github.actor }}" \
+            --base "${{ inputs.release_branch }}" \
+            --label "backport"
