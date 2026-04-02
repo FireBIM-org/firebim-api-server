@@ -177,6 +177,9 @@
                 "schema": {}
               }
             }
+          },
+          "503": {
+            "description": "Service Unavailable"
           }
         }
       }
@@ -210,12 +213,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Body_upload_model_ifc_models_post"
-                  }
-                ],
-                "title": "Body"
+                "$ref": "#/components/schemas/Body_upload_model_ifc_models_post"
               }
             }
           },
@@ -363,12 +361,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Body_upload_ids_ids_files_post"
-                  }
-                ],
-                "title": "Body"
+                "$ref": "#/components/schemas/Body_upload_ids_ids_files_post"
               }
             }
           },
@@ -653,7 +646,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -667,7 +660,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -742,6 +735,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",

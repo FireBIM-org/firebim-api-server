@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import time
 import uuid
 
@@ -18,6 +19,8 @@ from app.core.config import settings
 from app.models.database import engine, get_db, init_db
 from app.models.models import CheckResult, IdsFile, IfcModel, User
 from app.workers.celery_app import celery_app
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="FireBIM API")
 
@@ -76,54 +79,69 @@ s3_client = boto3.client(
 BUCKET_NAME = settings.S3_BUCKET_NAME
 
 
-@app.get("/health", tags=["health"])
+@app.get("/health", tags=["health"], responses={503: {"description": "Service Unavailable"}})
 async def health() -> JSONResponse:
+    async def _db_check() -> tuple[str, str, bool]:
+        try:
+
+            def _check_db_sync() -> None:
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+
+            await asyncio.wait_for(asyncio.to_thread(_check_db_sync), timeout=3.0)
+            return "database", "ok", True
+        except Exception as e:
+            logger.error("Health check database error: %s", e)
+            return "database", "error", False
+
+    async def _s3_check() -> tuple[str, str, bool]:
+        try:
+            await asyncio.wait_for(
+                asyncio.to_thread(s3_client.head_bucket, Bucket=BUCKET_NAME),
+                timeout=3.0,
+            )
+            return "s3", "ok", True
+        except Exception as e:
+            logger.error("Health check S3 error: %s", e)
+            return "s3", "error", False
+
+    async def _celery_check() -> tuple[str, str, bool]:
+        try:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(celery_app.control.ping, timeout=2),
+                timeout=3.0,
+            )
+            if result:
+                return "celery", "ok", True
+            return "celery", "no workers responding", False
+        except Exception as e:
+            logger.error("Health check Celery error: %s", e)
+            return "celery", "error", False
+
+    async def _authentik_check() -> tuple[str, str, bool]:
+        try:
+            issuer = (settings.AUTHENTIK_INTERNAL_URL or settings.AUTHENTIK_ISSUER_URL).rstrip("/")
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(f"{issuer}/.well-known/openid-configuration", timeout=3.0)
+                resp.raise_for_status()
+            return "authentik", "ok", True
+        except Exception as e:
+            logger.error("Health check Authentik error: %s", e)
+            return "authentik", "error", False
+
+    results = await asyncio.gather(
+        _db_check(),
+        _s3_check(),
+        _celery_check(),
+        _authentik_check(),
+    )
+
     checks: dict[str, str] = {}
     healthy = True
-
-    # Database
-    try:
-
-        def _check_db() -> None:
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-
-        await asyncio.to_thread(_check_db)
-        checks["database"] = "ok"
-    except Exception as e:
-        checks["database"] = f"error: {e}"
-        healthy = False
-
-    # S3
-    try:
-        await asyncio.to_thread(s3_client.head_bucket, Bucket=BUCKET_NAME)
-        checks["s3"] = "ok"
-    except Exception as e:
-        checks["s3"] = f"error: {e}"
-        healthy = False
-
-    # Celery / RabbitMQ
-    try:
-        result = await asyncio.to_thread(celery_app.control.ping, timeout=2)
-        if result:
-            checks["celery"] = "ok"
-        else:
-            checks["celery"] = "no workers responding"
+    for name, check_status, is_ok in results:
+        checks[name] = check_status
+        if not is_ok:
             healthy = False
-    except Exception as e:
-        checks["celery"] = f"error: {e}"
-        healthy = False
-
-    # Authentik
-    try:
-        issuer = (settings.AUTHENTIK_INTERNAL_URL or settings.AUTHENTIK_ISSUER_URL).rstrip("/")
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{issuer}/.well-known/openid-configuration", timeout=3.0)
-            resp.raise_for_status()
-        checks["authentik"] = "ok"
-    except Exception as e:
-        checks["authentik"] = f"error: {e}"
-        healthy = False
 
     return JSONResponse(
         content={"status": "ok" if healthy else "degraded", "checks": checks},
