@@ -1,20 +1,26 @@
+import asyncio
 import json
+import logging
 import time
 import uuid
 
 import boto3
+import httpx
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy import text
 from sqlmodel import Session
 
 from app.api.graph import router as graph_router
 from app.auth.jwt import get_current_active_user
 from app.auth.router import router as auth_router
 from app.core.config import settings
-from app.models.database import get_db, init_db
+from app.models.database import engine, get_db, init_db
 from app.models.models import CheckResult, IdsFile, IfcModel, User
 from app.workers.celery_app import celery_app
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="FireBIM API")
 
@@ -71,6 +77,76 @@ s3_client = boto3.client(
 )
 
 BUCKET_NAME = settings.S3_BUCKET_NAME
+
+
+@app.get("/health", tags=["health"], responses={503: {"description": "Service Unavailable"}})
+async def health() -> JSONResponse:
+    async def _db_check() -> tuple[str, str, bool]:
+        try:
+
+            def _check_db_sync() -> None:
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+
+            await asyncio.wait_for(asyncio.to_thread(_check_db_sync), timeout=3.0)
+            return "database", "ok", True
+        except Exception as e:
+            logger.error("Health check database error: %s", e)
+            return "database", "error", False
+
+    async def _s3_check() -> tuple[str, str, bool]:
+        try:
+            await asyncio.wait_for(
+                asyncio.to_thread(s3_client.head_bucket, Bucket=BUCKET_NAME),
+                timeout=3.0,
+            )
+            return "s3", "ok", True
+        except Exception as e:
+            logger.error("Health check S3 error: %s", e)
+            return "s3", "error", False
+
+    async def _celery_check() -> tuple[str, str, bool]:
+        try:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(celery_app.control.ping, timeout=2),
+                timeout=3.0,
+            )
+            if result:
+                return "celery", "ok", True
+            return "celery", "no workers responding", False
+        except Exception as e:
+            logger.error("Health check Celery error: %s", e)
+            return "celery", "error", False
+
+    async def _authentik_check() -> tuple[str, str, bool]:
+        try:
+            issuer = (settings.AUTHENTIK_INTERNAL_URL or settings.AUTHENTIK_ISSUER_URL).rstrip("/")
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(f"{issuer}/.well-known/openid-configuration", timeout=3.0)
+                resp.raise_for_status()
+            return "authentik", "ok", True
+        except Exception as e:
+            logger.error("Health check Authentik error: %s", e)
+            return "authentik", "error", False
+
+    results = await asyncio.gather(
+        _db_check(),
+        _s3_check(),
+        _celery_check(),
+        _authentik_check(),
+    )
+
+    checks: dict[str, str] = {}
+    healthy = True
+    for name, check_status, is_ok in results:
+        checks[name] = check_status
+        if not is_ok:
+            healthy = False
+
+    return JSONResponse(
+        content={"status": "ok" if healthy else "degraded", "checks": checks},
+        status_code=200 if healthy else 503,
+    )
 
 
 @app.post("/ifc-models", status_code=201)
