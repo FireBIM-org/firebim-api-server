@@ -31,10 +31,7 @@ class Property:
         return Condition(self.uri, "<=", value)
 
     def eq(self, *values):
-        if len(values) == 1:
-            value = values[0]
-        else:
-            value = list(values)
+        value = values[0] if len(values) == 1 else list(values)
         return Condition(self.uri, "==", value)
 
 
