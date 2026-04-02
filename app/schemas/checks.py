@@ -140,6 +140,8 @@ class CheckCompatibilityResponse(CheckApiBaseResponse):
     missing_properties: list[str] = Field(default_factory=list)
 
     graph_classes_unused_by_rule: list[CompatibilityMatch] = Field(default_factory=list)
-    graph_properties_unused_by_rule: list[CompatibilityMatch] = Field(default_factory=list)
+    graph_properties_unused_by_rule: list[CompatibilityMatch] = Field(
+        default_factory=list
+    )
 
     warnings: list[CompatibilityWarning] = Field(default_factory=list)

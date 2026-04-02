@@ -15,7 +15,7 @@ class TokenData(SQLModel):
 class UserBase(SQLModel):
     username: str
     email: EmailStr
-    
+
 
 class UserCreate(UserBase):
     password: str

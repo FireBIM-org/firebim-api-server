@@ -15,6 +15,7 @@ DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST
 # Create the SQLModel engine
 engine = create_engine(DATABASE_URL)
 
+
 def get_db():
     """
     Dependency for database session management.
@@ -23,11 +24,12 @@ def get_db():
     with Session(engine) as session:
         yield session
 
+
 # Function to initialize the database
 def init_db():
     """Initialize the database by creating all tables"""
     # Import models here to avoid circular imports
     from .models import IfcModel, IdsFile, CheckResult, User
-    
+
     # Create all tables
     SQLModel.metadata.create_all(bind=engine)

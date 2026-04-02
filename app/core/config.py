@@ -32,7 +32,7 @@ class Settings(BaseSettings):
         env_file="../.env",
         env_ignore_empty=True,
         extra="ignore",
-        secrets_dir='/run/secrets',
+        secrets_dir="/run/secrets",
     )
     # API_V1_STR: str = "/api/v1"
     SECRET_KEY: SecretStr = secrets.token_urlsafe(32)
@@ -48,9 +48,12 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def all_cors_origins(self) -> list[str]:
-        return [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS] + [
-            # self.FRONTEND_HOST
-        ]
+        return (
+            [str(origin).rstrip("/") for origin in self.BACKEND_CORS_ORIGINS]
+            + [
+                # self.FRONTEND_HOST
+            ]
+        )
 
     FUSEKI_USER: str | None = None
     FUSEKI_PASSWORD: str | None = None
@@ -60,7 +63,7 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str
-    POSTGRES_PASSWORD: SecretStr = Field(alias='db-password')
+    POSTGRES_PASSWORD: SecretStr = Field(alias="db-password")
     # POSTGRES_PASSWORD_FILE: str = ""
     POSTGRES_DB: str = ""
 
@@ -76,12 +79,11 @@ class Settings(BaseSettings):
             path=self.POSTGRES_DB,
         )
 
-
     # S3
     S3_ENDPOINT_URL: str
     S3_BUCKET_NAME: str
     S3_ACCESS_KEY_ID: str
-    S3_SECRET_ACCESS_KEY: SecretStr = Field(alias='s3-secret-key')
+    S3_SECRET_ACCESS_KEY: SecretStr = Field(alias="s3-secret-key")
     # S3_SECRET_ACCESS_KEY_FILE: str
     S3_REGION: str
 

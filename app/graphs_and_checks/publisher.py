@@ -100,7 +100,9 @@ def list_building_graphs() -> list[dict]:
     return sorted(_GRAPH_INDEX.values(), key=lambda item: item["graph_uri"])
 
 
-def build_graph_store_endpoint(dataset: str, graph_uri: str) -> tuple[str, tuple[str, str] | None]:
+def build_graph_store_endpoint(
+    dataset: str, graph_uri: str
+) -> tuple[str, tuple[str, str] | None]:
     base = settings.FUSEKI_HOST.rstrip("/")
     endpoint = f"{base}/{dataset}/data?{urlencode({'graph': graph_uri})}"
 

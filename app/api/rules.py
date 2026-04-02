@@ -79,6 +79,7 @@ class RuleTtlResponse(BaseModel):
     ttl: str
     content_type: str = "text/turtle"
 
+
 def _publish_error_payload(error_code: str, message: str, exc: Exception):
     logger.exception(message, exc_info=exc)
     return {
@@ -89,7 +90,9 @@ def _publish_error_payload(error_code: str, message: str, exc: Exception):
     }
 
 
-def _rule_element_to_json(element: dict, graph_uri: str | None = None) -> RuleElementJson:
+def _rule_element_to_json(
+    element: dict, graph_uri: str | None = None
+) -> RuleElementJson:
     element_type = element.get("element_type") or element.get("node_type") or "decision"
     return RuleElementJson(
         id=element.get("id"),
@@ -214,7 +217,11 @@ def _fetch_rule_element_by_id(element_id: str) -> RuleElementFetchResponse:
     try:
         rule_element = decompile_rule_element_ttl(ttl)
         if rule_element is not None:
-            element_type = rule_element.get("element_type") or rule_element.get("node_type") or "decision"
+            element_type = (
+                rule_element.get("element_type")
+                or rule_element.get("node_type")
+                or "decision"
+            )
             remember_rule_element_graph(
                 graph_uri=graph_uri,
                 element_id=rule_element.get("id"),
@@ -224,7 +231,9 @@ def _fetch_rule_element_by_id(element_id: str) -> RuleElementFetchResponse:
     except Exception:
         logger.exception("Rule element fetch succeeded but SHACL decompile failed")
         rule_element = None
-    return RuleElementFetchResponse(graph_uri=graph_uri, ttl=ttl, rule_element=rule_element)
+    return RuleElementFetchResponse(
+        graph_uri=graph_uri, ttl=ttl, rule_element=rule_element
+    )
 
 
 def _apply_links(rule: dict, links: list) -> dict:
@@ -258,7 +267,9 @@ def _assemble_rule(payload: RuleAssembleRequest) -> tuple[dict, dict, list[str]]
             if not element:
                 errors.append(f"Rule element '{element_id}' could not be decompiled")
                 continue
-            elements.append(_rule_element_to_json(element).model_dump(exclude_none=True))
+            elements.append(
+                _rule_element_to_json(element).model_dump(exclude_none=True)
+            )
         except Exception as exc:
             errors.append(f"Rule element '{element_id}' could not be fetched: {exc}")
 
@@ -327,7 +338,9 @@ def validate_rule(payload: RuleValidateRequest):
         )
     except Exception as exc:
         count = len(payload.rule.elements)
-        error_bits = _publish_error_payload("rule_validation_error", "Unexpected error while validating rule", exc)
+        error_bits = _publish_error_payload(
+            "rule_validation_error", "Unexpected error while validating rule", exc
+        )
         return RuleValidateResponse(
             valid=False,
             rule_id=payload.rule.id,
@@ -355,7 +368,9 @@ def compile_rule(payload: RuleCompileRequest):
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         count = len(payload.rule.elements)
-        error_bits = _publish_error_payload("rule_compile_error", "Unexpected error while compiling rule", exc)
+        error_bits = _publish_error_payload(
+            "rule_compile_error", "Unexpected error while compiling rule", exc
+        )
         return RuleCompileResponse(
             rule_id=payload.rule.id,
             element_count=count,
@@ -372,7 +387,9 @@ def decompile_rule(payload: RuleDecompileRequest):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        error_bits = _publish_error_payload("rule_decompile_error", "Unexpected error while decompiling SHACL rule", exc)
+        error_bits = _publish_error_payload(
+            "rule_decompile_error", "Unexpected error while decompiling SHACL rule", exc
+        )
         return RuleDecompileResponse(rule=None, **error_bits)
 
 
@@ -385,7 +402,9 @@ def publish_rule(payload: RulePublishRequest):
         builder = SHACLBuilder()
         builder.add_rule_set(rule)
         ttl = builder.get_graph().serialize(format="turtle")
-        publish_ttl_to_fuseki(ttl_text=str(ttl), dataset="rulebook", graph_uri=graph_uri)
+        publish_ttl_to_fuseki(
+            ttl_text=str(ttl), dataset="rulebook", graph_uri=graph_uri
+        )
 
         count = len(rule.elements)
         label = _rule_label(payload.rule)
@@ -409,7 +428,9 @@ def publish_rule(payload: RulePublishRequest):
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         count = len(payload.rule.elements)
-        error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while publishing rule", exc)
+        error_bits = _publish_error_payload(
+            "fuseki_error", "Temporary backend storage issue while publishing rule", exc
+        )
         return RulePublishResponse(
             published=False,
             rule_id=payload.rule.id,
@@ -427,8 +448,12 @@ def list_rules():
         items = [RuleListItem(**item) for item in list_rule_graphs()]
         return RuleListResponse(count=len(items), rules=items)
     except Exception as exc:
-        error_bits = _publish_error_payload("fuseki_error", "Rule list unavailable, returning fallback response", exc)
-        return RuleListResponse(count=0, rules=[], warning="Fuseki temporarily unavailable", **error_bits)
+        error_bits = _publish_error_payload(
+            "fuseki_error", "Rule list unavailable, returning fallback response", exc
+        )
+        return RuleListResponse(
+            count=0, rules=[], warning="Fuseki temporarily unavailable", **error_bits
+        )
 
 
 @router.post("/fetch", response_model=RuleFetchResponse)
@@ -439,7 +464,9 @@ def fetch_rule(payload: RuleFetchRequest):
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         graph_uri = _resolve_rule_graph_uri(payload.rule_id)
-        error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while fetching rule", exc)
+        error_bits = _publish_error_payload(
+            "fuseki_error", "Temporary backend storage issue while fetching rule", exc
+        )
         return RuleFetchResponse(graph_uri=graph_uri, ttl="", rule=None, **error_bits)
 
 
@@ -454,7 +481,9 @@ def delete_rule(payload: RuleDeleteRequest):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while deleting rule", exc)
+        error_bits = _publish_error_payload(
+            "fuseki_error", "Temporary backend storage issue while deleting rule", exc
+        )
         return RuleDeleteResponse(deleted=False, graph_uri=graph_uri, **error_bits)
 
 
@@ -479,7 +508,9 @@ def assemble_rule(payload: RuleAssembleRequest):
             fallback=False,
         )
     except Exception as exc:
-        error_bits = _publish_error_payload("assembly_error", "Unexpected error while assembling rule", exc)
+        error_bits = _publish_error_payload(
+            "assembly_error", "Unexpected error while assembling rule", exc
+        )
         return RuleAssembleResponse(rule=None, **error_bits)
 
 
@@ -504,13 +535,19 @@ def assemble_and_compile_rule(payload: RuleAssembleRequest):
             errors=all_errors,
             success=not all_errors,
             error=None if not all_errors else "assembly_validation_warning",
-            message=None if not all_errors else "Rule compiled but one or more issues were detected",
+            message=None
+            if not all_errors
+            else "Rule compiled but one or more issues were detected",
             fallback=False,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        error_bits = _publish_error_payload("assembly_compile_error", "Unexpected error while assembling and compiling rule", exc)
+        error_bits = _publish_error_payload(
+            "assembly_compile_error",
+            "Unexpected error while assembling and compiling rule",
+            exc,
+        )
         return RuleAssembleCompileResponse(
             rule=None,
             rule_id=payload.rule_id,
@@ -569,7 +606,9 @@ def publish_rule_element(payload: RuleElementPublishRequest):
         builder = SHACLBuilder()
         builder.add_rule_element(element)
         ttl = builder.get_graph().serialize(format="turtle")
-        publish_ttl_to_fuseki(ttl_text=str(ttl), dataset="rulebook", graph_uri=graph_uri)
+        publish_ttl_to_fuseki(
+            ttl_text=str(ttl), dataset="rulebook", graph_uri=graph_uri
+        )
 
         remember_rule_element_graph(
             graph_uri=graph_uri,
@@ -587,7 +626,11 @@ def publish_rule_element(payload: RuleElementPublishRequest):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while publishing rule element", exc)
+        error_bits = _publish_error_payload(
+            "fuseki_error",
+            "Temporary backend storage issue while publishing rule element",
+            exc,
+        )
         return RuleElementPublishResponse(
             published=False,
             element_id=payload.id,
@@ -605,8 +648,14 @@ def fetch_rule_element(payload: RuleElementFetchRequest):
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         graph_uri = _resolve_rule_element_graph_uri(payload.element_id)
-        error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while fetching rule element", exc)
-        return RuleElementFetchResponse(graph_uri=graph_uri, ttl="", rule_element=None, **error_bits)
+        error_bits = _publish_error_payload(
+            "fuseki_error",
+            "Temporary backend storage issue while fetching rule element",
+            exc,
+        )
+        return RuleElementFetchResponse(
+            graph_uri=graph_uri, ttl="", rule_element=None, **error_bits
+        )
 
 
 @router.post("/rule-elements/delete", response_model=RuleElementDeleteResponse)
@@ -620,8 +669,14 @@ def delete_rule_element(payload: RuleElementDeleteRequest):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while deleting rule element", exc)
-        return RuleElementDeleteResponse(deleted=False, graph_uri=graph_uri, **error_bits)
+        error_bits = _publish_error_payload(
+            "fuseki_error",
+            "Temporary backend storage issue while deleting rule element",
+            exc,
+        )
+        return RuleElementDeleteResponse(
+            deleted=False, graph_uri=graph_uri, **error_bits
+        )
 
 
 @router.get("/rule-elements", response_model=RuleElementListResponse)
@@ -629,9 +684,15 @@ def list_rule_elements():
     try:
         entries = [RuleElementListItem(**item) for item in list_rule_element_entries()]
         graph_uris = [item.graph_uri for item in entries]
-        return RuleElementListResponse(count=len(entries), graph_uris=graph_uris, rule_elements=entries)
+        return RuleElementListResponse(
+            count=len(entries), graph_uris=graph_uris, rule_elements=entries
+        )
     except Exception as exc:
-        error_bits = _publish_error_payload("fuseki_error", "Rule element list unavailable, returning fallback response", exc)
+        error_bits = _publish_error_payload(
+            "fuseki_error",
+            "Rule element list unavailable, returning fallback response",
+            exc,
+        )
         return RuleElementListResponse(
             count=0,
             graph_uris=[],
@@ -686,7 +747,9 @@ def disconnect_rules(payload: RuleDisconnectRequest):
 @router.post("/check-completeness", response_model=RuleCompletenessResponse)
 def check_completeness(payload: RuleCompletenessRequest):
     try:
-        result = check_ruleset_completeness(ruleset=_rule_to_composer_dict(payload.rule.as_internal_dict()))
+        result = check_ruleset_completeness(
+            ruleset=_rule_to_composer_dict(payload.rule.as_internal_dict())
+        )
         return RuleCompletenessResponse(
             complete=result["complete"],
             open=result["open"],
@@ -733,8 +796,14 @@ def get_rule_element(element_id: str):
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
         graph_uri = _resolve_rule_element_graph_uri(element_id)
-        error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while fetching rule element", exc)
-        return RuleElementFetchResponse(graph_uri=graph_uri, ttl="", rule_element=None, **error_bits)
+        error_bits = _publish_error_payload(
+            "fuseki_error",
+            "Temporary backend storage issue while fetching rule element",
+            exc,
+        )
+        return RuleElementFetchResponse(
+            graph_uri=graph_uri, ttl="", rule_element=None, **error_bits
+        )
 
 
 @router.get("/{rule_id}", response_model=RuleFetchResponse)
@@ -745,8 +814,11 @@ def get_rule(rule_id: str):
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
         graph_uri = _resolve_rule_graph_uri(rule_id)
-        error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while fetching rule", exc)
+        error_bits = _publish_error_payload(
+            "fuseki_error", "Temporary backend storage issue while fetching rule", exc
+        )
         return RuleFetchResponse(graph_uri=graph_uri, ttl="", rule=None, **error_bits)
+
 
 @router.get(
     "/{rule_id}/ttl",
@@ -782,7 +854,8 @@ def get_rule_ttl(rule_id: str):
             status_code=500,
             detail=f"Failed to fetch raw TTL for rule '{rule_id}': {exc}",
         )
-    
+
+
 @router.get("/{rule_id}/ttl.json", response_model=RuleTtlResponse)
 def get_rule_ttl_json(rule_id: str):
     try:

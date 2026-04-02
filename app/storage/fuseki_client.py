@@ -67,7 +67,9 @@ class FusekiClient:
             raise FusekiError(f"Fuseki publish failed: {exc}") from exc
 
         if response.status_code not in (200, 201, 204):
-            raise FusekiError(f"Fuseki publish failed: {response.status_code} {response.text}")
+            raise FusekiError(
+                f"Fuseki publish failed: {response.status_code} {response.text}"
+            )
 
     def get_graph_ttl(self, dataset: str, graph_uri: str) -> str:
         try:
@@ -84,7 +86,9 @@ class FusekiClient:
             raise FusekiNotFoundError(f"Named graph not found: {graph_uri}")
 
         if response.status_code != 200:
-            raise FusekiError(f"Fuseki fetch failed: {response.status_code} {response.text}")
+            raise FusekiError(
+                f"Fuseki fetch failed: {response.status_code} {response.text}"
+            )
 
         return response.text
 
@@ -102,7 +106,9 @@ class FusekiClient:
             raise FusekiNotFoundError(f"Named graph not found: {graph_uri}")
 
         if response.status_code not in (200, 202, 204):
-            raise FusekiError(f"Fuseki delete failed: {response.status_code} {response.text}")
+            raise FusekiError(
+                f"Fuseki delete failed: {response.status_code} {response.text}"
+            )
 
     def list_named_graphs(self, dataset: str, base_uri: str) -> list[dict]:
         query = f"""
@@ -129,7 +135,9 @@ class FusekiClient:
             raise FusekiError(f"Fuseki list failed: {exc}") from exc
 
         if response.status_code != 200:
-            raise FusekiError(f"Fuseki list failed: {response.status_code} {response.text}")
+            raise FusekiError(
+                f"Fuseki list failed: {response.status_code} {response.text}"
+            )
 
         payload = response.json()
         bindings = payload.get("results", {}).get("bindings", [])
@@ -138,7 +146,9 @@ class FusekiClient:
         for row in bindings:
             graph_uri = row["graph"]["value"]
             triple_count_raw = row.get("tripleCount", {}).get("value")
-            triple_count = int(triple_count_raw) if triple_count_raw is not None else None
+            triple_count = (
+                int(triple_count_raw) if triple_count_raw is not None else None
+            )
             items.append(
                 {
                     "graph_uri": graph_uri,

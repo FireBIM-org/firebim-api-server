@@ -14,10 +14,8 @@ _GRAPH_INDEX = {
 }
 
 
-
 def default_rule_graph_uri(rule_id: str) -> str:
     return f"https://firebim.org/graphs/rulebook/{rule_id}"
-
 
 
 def default_ruleset_graph_uri(ruleset_id: str) -> str:
@@ -25,13 +23,17 @@ def default_ruleset_graph_uri(ruleset_id: str) -> str:
     return default_rule_graph_uri(ruleset_id)
 
 
-
 def default_rule_element_graph_uri(element_id: str) -> str:
     return f"https://firebim.org/graphs/rule-elements/{element_id}"
 
 
-
-def remember_rule_graph(graph_uri: str, rule_id: str, entry: str | None = None, label: str | None = None, element_count: int = 0) -> None:
+def remember_rule_graph(
+    graph_uri: str,
+    rule_id: str,
+    entry: str | None = None,
+    label: str | None = None,
+    element_count: int = 0,
+) -> None:
     _GRAPH_INDEX["rules"][graph_uri] = {
         "graph_uri": graph_uri,
         "rule_id": rule_id,
@@ -43,8 +45,9 @@ def remember_rule_graph(graph_uri: str, rule_id: str, entry: str | None = None, 
     }
 
 
-
-def remember_rule_element_graph(graph_uri: str, element_id: str, element_type: str, label: str | None = None) -> None:
+def remember_rule_element_graph(
+    graph_uri: str, element_id: str, element_type: str, label: str | None = None
+) -> None:
     _GRAPH_INDEX["rule_elements"][graph_uri] = {
         "graph_uri": graph_uri,
         "element_id": element_id,
@@ -55,16 +58,13 @@ def remember_rule_element_graph(graph_uri: str, element_id: str, element_type: s
     }
 
 
-
 def forget_graph(graph_uri: str) -> None:
     _GRAPH_INDEX["rules"].pop(graph_uri, None)
     _GRAPH_INDEX["rule_elements"].pop(graph_uri, None)
 
 
-
 def list_rule_graphs() -> list[dict]:
     return sorted(_GRAPH_INDEX["rules"].values(), key=lambda item: item["graph_uri"])
-
 
 
 def list_rule_element_graphs(dataset: str | None = None) -> list[str]:
@@ -72,13 +72,15 @@ def list_rule_element_graphs(dataset: str | None = None) -> list[str]:
     return sorted(_GRAPH_INDEX["rule_elements"].keys())
 
 
-
 def list_rule_element_entries() -> list[dict]:
-    return sorted(_GRAPH_INDEX["rule_elements"].values(), key=lambda item: item["graph_uri"])
+    return sorted(
+        _GRAPH_INDEX["rule_elements"].values(), key=lambda item: item["graph_uri"]
+    )
 
 
-
-def _build_graph_store_endpoint(dataset: str, graph_uri: str) -> tuple[str, tuple[str, str] | None]:
+def _build_graph_store_endpoint(
+    dataset: str, graph_uri: str
+) -> tuple[str, tuple[str, str] | None]:
     base = settings.FUSEKI_HOST.rstrip("/")
     endpoint = f"{base}/{dataset}/data?{urlencode({'graph': graph_uri})}"
 
@@ -87,7 +89,6 @@ def _build_graph_store_endpoint(dataset: str, graph_uri: str) -> tuple[str, tupl
         auth = (settings.FUSEKI_USER, settings.FUSEKI_PASSWORD)
 
     return endpoint, auth
-
 
 
 def publish_ttl_to_fuseki(ttl_text: str, dataset: str, graph_uri: str) -> None:
@@ -105,8 +106,9 @@ def publish_ttl_to_fuseki(ttl_text: str, dataset: str, graph_uri: str) -> None:
         raise ValueError(f"Fuseki publish failed: {exc}") from exc
 
     if response.status_code not in (200, 201, 204):
-        raise ValueError(f"Fuseki publish failed: {response.status_code} {response.text}")
-
+        raise ValueError(
+            f"Fuseki publish failed: {response.status_code} {response.text}"
+        )
 
 
 def fetch_ttl_from_fuseki(dataset: str, graph_uri: str) -> str:
@@ -128,7 +130,6 @@ def fetch_ttl_from_fuseki(dataset: str, graph_uri: str) -> str:
     return response.text
 
 
-
 def delete_graph_from_fuseki(dataset: str, graph_uri: str) -> None:
     endpoint, auth = _build_graph_store_endpoint(dataset, graph_uri)
 
@@ -142,6 +143,8 @@ def delete_graph_from_fuseki(dataset: str, graph_uri: str) -> None:
         raise ValueError(f"Fuseki delete failed: {exc}") from exc
 
     if response.status_code not in (200, 202, 204):
-        raise ValueError(f"Fuseki delete failed: {response.status_code} {response.text}")
+        raise ValueError(
+            f"Fuseki delete failed: {response.status_code} {response.text}"
+        )
 
     forget_graph(graph_uri)

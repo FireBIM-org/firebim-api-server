@@ -19,6 +19,7 @@ class TargetingCache:
     - not process-safe or persistent
     - suitable as an execution cache inside one API request / one engine run
     """
+
     parsed_graphs: dict[str, Graph] = field(default_factory=dict)
     targets_by_class: dict[str, list[str]] = field(default_factory=dict)
 
@@ -35,7 +36,9 @@ class TargetingCache:
         key = self.make_target_class_key(graph_uri, target_class)
         return self.targets_by_class.get(key)
 
-    def set_targets(self, graph_uri: str, target_class: str, targets: list[str]) -> None:
+    def set_targets(
+        self, graph_uri: str, target_class: str, targets: list[str]
+    ) -> None:
         key = self.make_target_class_key(graph_uri, target_class)
         self.targets_by_class[key] = targets
 
