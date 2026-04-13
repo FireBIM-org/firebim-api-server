@@ -26,7 +26,7 @@ services:
       - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://firebim:firebim@rabbitmq:5672/firebim}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS-https://firebim.org,https://www.firebim.org,https://app.firebim.org,https://www.app.firebim.org,http://localhost:3000}
-      - FUSEKI_HOST=${FUSEKI_HOST-http://localhost:3030}
+      - FUSEKI_HOST=${FUSEKI_HOST-http://fuseki:3030}
       # Public issuer URL (matches the iss claim in tokens issued via the browser)
       - AUTHENTIK_ISSUER_URL=http://localhost:9090/application/o/firebim/
       # Internal URL for JWKS fetching from inside the Docker network
@@ -36,6 +36,7 @@ services:
       - minio
       - rabbitmq
       - authentik-server
+      - fuseki
 
   celery-worker:
     build:
@@ -59,12 +60,14 @@ services:
       # - db-password=postgres
       - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://firebim:firebim@rabbitmq:5672/firebim}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
-      - FUSEKI_HOST=${FUSEKI_HOST-http://localhost:3030}
+      - FUSEKI_HOST=${FUSEKI_HOST-http://fuseki:3030}
     command: celery -A app.workers.celery_worker worker --loglevel=info
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      fuseki:
         condition: service_healthy
       # minio-init:
       #   condition: service_completed_successfully
@@ -205,6 +208,22 @@ services:
       mailpit:
         condition: service_started
 
+  # ── Apache Jena Fuseki (SPARQL triplestore) ────────────────────
+  fuseki:
+    image: stain/jena-fuseki:latest
+    ports:
+      - "3030:3030"
+    environment:
+      - FUSEKI_DATASET_1=firebim
+      - ADMIN_PASSWORD=admin
+    volumes:
+      - fuseki_data:/fuseki
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3030/$/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   pgadmin:
     image: dpage/pgadmin4:latest
     environment:
@@ -225,6 +244,7 @@ volumes:
   rabbitmq_data:
   authentik_media:
   authentik_templates:
+  fuseki_data:
 
 # TODO: Consistent secrets management.
 # secrets:
