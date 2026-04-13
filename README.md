@@ -20,7 +20,7 @@ This repository depends on on other FireBIM-repositories for the logic. E.g. `fi
 3. Start all services:
 
 ```bash
-make dev-up
+make up-build
 ```
 
 4. Access the services:
