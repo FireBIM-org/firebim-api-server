@@ -5,28 +5,32 @@ services:
       dockerfile: docker/api/Dockerfile
     ports:
       - "8000:8000"
-    secrets:
-      - db-password
-      - s3-secret-key
+    # secrets:
+    #   - db-password
+    #   - s3-secret-key
     environment:
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL-http://minio:9000}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=minioadmin
+      # TODO: Clean up duplicate env var names (e.g., S3_SECRET_ACCESS_KEY vs s3-secret-access-key), also for worker.
+      # Use consistent secret files.
+      # - s3-secret-access-key=minioadmin
       - S3_REGION=${S3_REGION}
       - POSTGRES_HOST=${POSTGRES_HOST}
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_DB=${POSTGRES_DB}
-      - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://guest:guest@rabbitmq:5672//}
+      - POSTGRES_PASSWORD=postgres
+      # - db-password=postgres
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://firebim:firebim@rabbitmq:5672/firebim}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS-https://firebim.org,https://www.firebim.org,https://app.firebim.org,https://www.app.firebim.org,http://localhost:3000}
-      - FUSEKI_HOST=${FUSEKI_HOST-http://graph-demo.firebim.org:3030}
+      - FUSEKI_HOST=${FUSEKI_HOST-http://localhost:3030}
       # Public issuer URL (matches the iss claim in tokens issued via the browser)
       - AUTHENTIK_ISSUER_URL=http://localhost:9090/application/o/firebim/
       # Internal URL for JWKS fetching from inside the Docker network
       - AUTHENTIK_INTERNAL_URL=http://authentik-server:9000/application/o/firebim/
-    volumes:
-      - ./app:/app
     depends_on:
       - postgres
       - minio
@@ -37,55 +41,77 @@ services:
     build:
       context: .
       dockerfile: docker/worker/Dockerfile
-    secrets:
-      - db-password
-      - s3-secret-key
+    # secrets:
+    #   - db-password
+    #   - s3-secret-key
     environment:
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL-http://minio:9000}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
       - S3_REGION=${S3_REGION}
+      - S3_SECRET_ACCESS_KEY=minioadmin
+      # - s3-secret-access-key=minioadmin
       - POSTGRES_HOST=${POSTGRES_HOST}
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_DB=${POSTGRES_DB}
-      - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://guest:guest@rabbitmq:5672//}
+      - POSTGRES_PASSWORD=postgres
+      # - db-password=postgres
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://firebim:firebim@rabbitmq:5672/firebim}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
-    volumes:
-      - ./app:/app
-    depends_on:
-      - minio
-      - rabbitmq
-      - postgres
+      - FUSEKI_HOST=${FUSEKI_HOST-http://localhost:3030}
     command: celery -A app.workers.celery_worker worker --loglevel=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      # minio-init:
+      #   condition: service_completed_successfully
 
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: firebim
+      RABBITMQ_DEFAULT_PASS: firebim
+      RABBITMQ_DEFAULT_VHOST: firebim
     ports:
-      - "5672:5672"  # AMQP protocol
-      - "15672:15672"  # Management interface
+      - "5672:5672"
+      - "15672:15672"  # Management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmqctl", "status"]
+      # test: ["CMD", "rabbitmqctl", "status"]
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   postgres:
-    image: postgres:15-alpine
-    secrets:
-      - db-password
+    image: postgres:17-alpine
+    # secrets:
+    #   - db-password
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
+      - POSTGRES_PASSWORD=postgres
+      # - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/initdb:/docker-entrypoint-initdb.d
+      # NOTE: Scripts in /docker-entrypoint-initdb.d run only when postgres_data is initialized the first time.
+      # If you added Authentik DB/user creation here and already have an existing postgres_data volume,
+      # you must either recreate the volume (e.g., `docker compose down -v`) or manually provision the
+      # Authentik database and user before starting the stack.
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bimscore -d bimscore"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 
   minio:
     image: minio/minio:latest
@@ -154,6 +180,10 @@ services:
       AUTHENTIK_POSTGRESQL__NAME: authentik
       AUTHENTIK_POSTGRESQL__USER: authentik
       AUTHENTIK_POSTGRESQL__PASSWORD: authentik-local-dev
+      # Authentik Bootstrap
+      AUTHENTIK_BOOTSTRAP_PASSWORD: "Password123!"
+      AUTHENTIK_BOOTSTRAP_EMAIL: "admin@firebim.local"
+      AUTHENTIK_BOOTSTRAP_TOKEN: "dev-api-token-not-for-production"
       # SMTP — local Mailpit
       AUTHENTIK_EMAIL__HOST: mailpit
       AUTHENTIK_EMAIL__PORT: 1025
@@ -196,12 +226,13 @@ volumes:
   authentik_media:
   authentik_templates:
 
-secrets:
-  db-password:
-    # external: true
-    file: secrets/db_password
-  s3-secret-key:
-    file: secrets/s3_secret_key
-  # secret-key:
-  #   file: secrets/secret_key
+# TODO: Consistent secrets management.
+# secrets:
+#   db-password:
+#     # external: true
+#     file: secrets/db_password
+#   s3-secret-key:
+#     file: secrets/s3_secret_key
+#   # secret-key:
+#   #   file: secrets/secret_key
 
