@@ -31,6 +31,27 @@ make dev-up
    - MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
    - Mailpit (email UI): http://localhost:8025
 
+### Updating `openapi.json`
+
+Do not edit `openapi.json` manually.
+
+To update `openapi.json` run:
+```bash
+make openapi
+```
+
+Always run this before committing if making changes to the API.
+
+
+### Lint and format
+
+To lint and format all Python code run:
+```bash
+make format
+```
+
+Always run this before committing.
+
 
 ## Deployment
 This repository can be deployed for self-hosting, or you can use one of the offical API-endpoints.
