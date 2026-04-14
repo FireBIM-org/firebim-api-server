@@ -425,9 +425,7 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
             "graph_index": self._active_execution_context.graph_index if self._active_execution_context else None,
             "execution_context": self._active_execution_context,
         }
-        if isinstance(
-            self.evaluator, HybridAtomicEvaluator
-        ) and self.evaluator.direct_evaluator.supports(decision):
+        if isinstance(self.evaluator, HybridAtomicEvaluator) and self.evaluator.direct_evaluator.supports(decision):
             increment_counter(metrics, "vertical_column_direct_batches")
             targets = [state.target_node for state in states]
             row_ctx = EvalContext(
@@ -451,9 +449,7 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
                 ctx=row_ctx,
             )
             counters = row_ctx.extra.setdefault("metrics", {}).setdefault("counters", {})
-            counters["direct_evaluator_attempts"] = (
-                int(counters.get("direct_evaluator_attempts", 0)) + len(targets)
-            )
+            counters["direct_evaluator_attempts"] = int(counters.get("direct_evaluator_attempts", 0)) + len(targets)
             total_seconds = perf_counter() - started
             total_ms = round(total_seconds * 1000.0, 3)
             accumulate_timing(metrics, "evaluate_atomic_total", total_seconds)
@@ -566,9 +562,7 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
             metrics=metrics,
         )
         matching_targets = [
-            target
-            for target, outcome in zip(terminal_targets, outcomes, strict=True)
-            if outcome.status == "True"
+            target for target, outcome in zip(terminal_targets, outcomes, strict=True) if outcome.status == "True"
         ]
         increment_counter(metrics, "backward_seed_count", len(matching_targets))
         if not matching_targets:

@@ -10,6 +10,11 @@ PARENT = ROOT.parent
 if str(PARENT) not in sys.path:
     sys.path.insert(0, str(PARENT))
 
+combo = import_module("tests.test_complex_rule_combo_integration")
+generated_data_ops = import_module("tests.generated_data_ops")
+delete_rule = generated_data_ops.delete_rule
+delete_rule_element = generated_data_ops.delete_rule_element
+
 RUN_MATRIX = [
     {
         "label": "standard-simple",
@@ -56,7 +61,7 @@ RUN_MATRIX = [
 ]
 
 
-def _should_cleanup_after_run(argv: list[str]) -> bool:
+def _should_purge_after_run(argv: list[str]) -> bool:
     return "--cleanup-generated" in argv
 
 
@@ -345,8 +350,8 @@ def _run_single_check(bundle: dict[str, Any], run_spec: dict[str, Any]) -> dict[
     }
 
 
-def _cleanup_bundle(bundle: dict[str, Any]) -> None:
-    print("\nCleaning generated combo rule data ...")
+def _purge_bundle(bundle: dict[str, Any]) -> None:
+    print("\nPurging generated combo rule data ...")
     try:
         delete_rule(bundle["rule_id"])
     except Exception as exc:
@@ -390,10 +395,10 @@ def _print_results_table(results: list[dict[str, Any]]) -> None:
 
 
 def main() -> int:
-    cleanup_enabled = _should_cleanup_after_run(sys.argv[1:])
+    purge_enabled = _should_purge_after_run(sys.argv[1:])
     print("FireBIM complex combo integration runner")
     print(f"API base URL: {combo.BASE_URL.rstrip('/')}")
-    print(f"Cleanup after run: {'enabled' if cleanup_enabled else 'disabled'}")
+    print(f"Generated-data purge after run: {'enabled' if purge_enabled else 'disabled'}")
 
     bundle: dict[str, Any] | None = None
     results: list[dict[str, Any]] = []
@@ -413,13 +418,9 @@ def main() -> int:
         exit_code = 1
         raise
     finally:
-        if cleanup_enabled and exit_code == 0 and bundle is not None:
-            _cleanup_bundle(bundle)
+        if purge_enabled and exit_code == 0 and bundle is not None:
+            _purge_bundle(bundle)
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-combo = import_module("tests.test_complex_rule_combo_integration")
-cleanup = import_module("tests.generated_cleanup")
-delete_rule = cleanup.delete_rule
-delete_rule_element = cleanup.delete_rule_element

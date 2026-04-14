@@ -9,7 +9,7 @@ import pytest
 from rdflib import Graph, URIRef
 from rdflib.namespace import RDF
 
-from tests.generated_cleanup import delete_rule, delete_rule_element, should_cleanup_generated_data
+from tests.generated_data_ops import delete_rule, delete_rule_element, should_prune_generated_data
 
 BASE_URL = os.getenv("FIREBIM_API_BASE_URL", "http://127.0.0.1:8000")
 GRAPH_ID = "ifc-inspired-large"
@@ -466,8 +466,8 @@ def complex_rule_bundle(discovered_large_graph_data):
         "assembled_rule": assembled_rule,
     }
     yield bundle
-    if should_cleanup_generated_data():
-        print("\nCleaning generated combo rule data ...")
+    if should_prune_generated_data():
+        print("\nPurging generated combo rule data ...")
         try:
             delete_rule(rule_id)
         except Exception as exc:

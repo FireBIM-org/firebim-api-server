@@ -11,10 +11,8 @@ if str(PARENT) not in sys.path:
 
 
 def main() -> int:
-    cleanup_generated_rulebook = import_module(
-        "tests.generated_cleanup"
-    ).cleanup_generated_rulebook
-    summary = cleanup_generated_rulebook(verbose=True)
+    purge_generated_rulebook_data = import_module("tests.generated_data_ops").purge_generated_rulebook_data
+    summary = purge_generated_rulebook_data(verbose=True)
     if summary["failed_rules"] or summary["failed_rule_elements"]:
         return 1
     return 0

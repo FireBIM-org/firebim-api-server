@@ -13,21 +13,21 @@ DEFAULT_SEQUENCE = [
     ROOT / "test_rule_assembly_integration.py",
     ROOT / "test_checks_api_integration.py",
 ]
-CLEANUP_SCRIPT = ROOT / "cleanup_generated_rulebook.py"
+GENERATED_DATA_SCRIPT = ROOT / "purge_generated_rulebook.py"
 
 
-def _should_cleanup_after_run(argv: list[str]) -> bool:
+def _should_purge_after_run(argv: list[str]) -> bool:
     return "--cleanup-generated" in argv
 
 
 def main() -> int:
-    cleanup_enabled = _should_cleanup_after_run(sys.argv[1:])
+    purge_enabled = _should_purge_after_run(sys.argv[1:])
     api_base = os.getenv("FIREBIM_API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
     integration_env = os.environ.copy()
     integration_env["FIREBIM_RUN_INTEGRATION"] = "1"
     print("FireBIM integration test runner")
     print(f"API base URL: {api_base}")
-    print(f"Cleanup after run: {'enabled' if cleanup_enabled else 'disabled'}")
+    print(f"Generated-data purge after run: {'enabled' if purge_enabled else 'disabled'}")
     print("Execution order:")
     for path in DEFAULT_SEQUENCE:
         print(f" - {path.name}")
@@ -55,15 +55,15 @@ def main() -> int:
             print("\nAll integration test modules passed.")
         return exit_code
     finally:
-        if cleanup_enabled and exit_code == 0:
-            print("\nCleaning generated Fuseki rule data ...")
+        if purge_enabled and exit_code == 0:
+            print("\nPurging generated Fuseki rule data ...")
             cleanup_result = subprocess.run(
-                [sys.executable, str(CLEANUP_SCRIPT)],
+                [sys.executable, str(GENERATED_DATA_SCRIPT)],
                 cwd=str(ROOT),
                 env=os.environ.copy(),
             )
             if cleanup_result.returncode != 0:
-                print("Generated Fuseki rule cleanup reported failures.")
+                print("Generated Fuseki rule data purge reported failures.")
 
 
 if __name__ == "__main__":
