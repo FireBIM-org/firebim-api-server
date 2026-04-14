@@ -162,7 +162,6 @@ services:
       FIREBIM_CLIENT_ID: firebim
       FIREBIM_CLIENT_SECRET: local-dev-client-secret
       FIREBIM_REDIRECT_URI: "http://localhost:3000/api/auth/callback/authentik"
-      FIREBIM_REDIRECT_URI_HTTPS: "https://localhost/api/auth/callback/authentik"
       FIREBIM_LAUNCH_URL: "http://localhost:3000"
     volumes:
       - authentik_media:/media
@@ -198,7 +197,6 @@ services:
       FIREBIM_CLIENT_ID: firebim
       FIREBIM_CLIENT_SECRET: local-dev-client-secret
       FIREBIM_REDIRECT_URI: "http://localhost:3000/api/auth/callback/authentik"
-      FIREBIM_REDIRECT_URI_HTTPS: "https://localhost/api/auth/callback/authentik"
       FIREBIM_LAUNCH_URL: "http://localhost:3000"
     volumes:
       - authentik_media:/media
@@ -247,12 +245,6 @@ volumes:
   authentik_media:
   authentik_templates:
   fuseki_data:
-
-# Give the default network an explicit name so the webapp stack can join it
-# as an external network (networks.firebim_network.external: true).
-networks:
-  default:
-    name: firebim_network
 
 # TODO: Consistent secrets management.
 # secrets:
