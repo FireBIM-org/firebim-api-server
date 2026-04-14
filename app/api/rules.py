@@ -418,8 +418,8 @@ def fetch_rule(payload: RuleFetchRequest):
         return _fetch_rule_by_id(payload.rule_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except FusekiNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Rule not found: {payload.rule_id}")
+    except FusekiNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"Rule not found: {payload.rule_id}") from exc
     except Exception as exc:
         graph_uri = _resolve_rule_graph_uri(payload.rule_id)
         error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while fetching rule", exc)
@@ -588,8 +588,8 @@ def fetch_rule_element(payload: RuleElementFetchRequest):
         return _fetch_rule_element_by_id(payload.element_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except FusekiNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Rule element not found: {payload.element_id}")
+    except FusekiNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"Rule element not found: {payload.element_id}") from exc
     except Exception as exc:
         graph_uri = _resolve_rule_element_graph_uri(payload.element_id)
         error_bits = _publish_error_payload(
@@ -724,8 +724,8 @@ def get_rule_element(element_id: str):
         return _fetch_rule_element_by_id(element_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except FusekiNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Rule element not found: {element_id}")
+    except FusekiNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"Rule element not found: {element_id}") from exc
     except Exception as exc:
         graph_uri = _resolve_rule_element_graph_uri(element_id)
         error_bits = _publish_error_payload(
@@ -740,8 +740,8 @@ def get_rule(rule_id: str):
         return _fetch_rule_by_id(rule_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except FusekiNotFoundError:
-        raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}")
+    except FusekiNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}") from exc
     except Exception as exc:
         graph_uri = _resolve_rule_graph_uri(rule_id)
         error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while fetching rule", exc)

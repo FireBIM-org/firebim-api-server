@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import traceback
 from collections import Counter
+from contextlib import suppress
 from time import perf_counter
 from typing import Any
 
@@ -614,17 +615,15 @@ def run_check(payload: CheckRunRequest):
             result=result,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
-        raise HTTPException(status_code=501, detail=str(exc))
+        raise HTTPException(status_code=501, detail=str(exc)) from exc
     except Exception as exc:
         selected_solver = None
-        try:
+        with suppress(Exception):
             selected_solver = CheckSolverSelector(default_mode=settings.CHECKS_SOLVER).resolve_mode(
                 payload.options.solver
             )
-        except Exception:
-            pass
         return _error_run_response(
             payload=payload,
             selected_solver=selected_solver,
@@ -659,9 +658,9 @@ def run_check_vertical(payload: CheckRunRequest):
             result=result,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
-        raise HTTPException(status_code=501, detail=str(exc))
+        raise HTTPException(status_code=501, detail=str(exc)) from exc
     except Exception as exc:
         return _error_run_response(
             payload=payload,
@@ -697,9 +696,9 @@ def run_check_horisontal(payload: CheckRunRequest):
             result=result,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
-        raise HTTPException(status_code=501, detail=str(exc))
+        raise HTTPException(status_code=501, detail=str(exc)) from exc
     except Exception as exc:
         return _error_run_response(
             payload=payload,
@@ -735,17 +734,15 @@ def run_check_diagnostic(payload: CheckRunRequest):
             result=result,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
-        raise HTTPException(status_code=501, detail=str(exc))
+        raise HTTPException(status_code=501, detail=str(exc)) from exc
     except Exception as exc:
         selected_solver = None
-        try:
+        with suppress(Exception):
             selected_solver = CheckSolverSelector(default_mode=settings.CHECKS_SOLVER).resolve_mode(
                 payload.options.solver
             )
-        except Exception:
-            pass
         return _error_run_response(
             payload=payload,
             selected_solver=selected_solver,
@@ -806,7 +803,7 @@ def run_blind_check(payload: BlindCheckRunRequest):
         )
 
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         error_bits = _error_payload(
             "blind_check_run_error",
@@ -840,7 +837,7 @@ def check_compatibility(payload: CheckCompatibilityRequest):
         )
 
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         error_bits = _error_payload(
             "check_compatibility_error",
