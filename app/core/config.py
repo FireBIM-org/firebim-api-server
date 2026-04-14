@@ -3,6 +3,7 @@ import warnings
 from typing import Annotated, Any, Literal, Self
 
 from pydantic import (
+    AliasChoices,
     AnyUrl,
     BeforeValidator,
     Field,
@@ -131,6 +132,15 @@ class Settings(BaseSettings):
         return self
 
     FUSEKI_HOST: str
+    FUSEKI_APP_USER: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("FUSEKI_APP_USER", "FUSEKI_USER"),
+    )
+    FUSEKI_APP_PASSWORD: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("FUSEKI_APP_PASSWORD", "FUSEKI_PASSWORD"),
+    )
+    CHECKS_SOLVER: str = "standard"
 
 
 settings = Settings()
