@@ -15,6 +15,9 @@ RUN uv sync --package firebim-api-server --no-dev
 # Stage 2: Runtime
 FROM python:3.12-slim-bookworm AS runtime
 
+# Patch OS-level vulnerabilities (CVE-2026-28390: libssl3/openssl)
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy the virtual environment from builder
