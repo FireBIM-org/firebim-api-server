@@ -12,7 +12,7 @@ services:
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL-http://minio:9000}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
-      - S3_SECRET_ACCESS_KEY=minioadmin
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY-minioadmin}
       # TODO: Clean up duplicate env var names (e.g., S3_SECRET_ACCESS_KEY vs s3-secret-access-key), also for worker.
       # Use consistent secret files.
       # - s3-secret-access-key=minioadmin
@@ -21,22 +21,34 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       # - db-password=postgres
       - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://firebim:firebim@rabbitmq:5672/firebim}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS-https://firebim.org,https://www.firebim.org,https://app.firebim.org,https://www.app.firebim.org,http://localhost:3000}
       - FUSEKI_HOST=${FUSEKI_HOST-http://fuseki:3030}
+      - FUSEKI_APP_USER=${FUSEKI_APP_USER-${FUSEKI_USER-admin}}
+      - FUSEKI_APP_PASSWORD=${FUSEKI_APP_PASSWORD-${FUSEKI_PASSWORD-admin}}
+      - CHECKS_SOLVER=${CHECKS_SOLVER-standard}
       # Public issuer URL (matches the iss claim in tokens issued via the browser)
       - AUTHENTIK_ISSUER_URL=http://localhost:9090/application/o/firebim/
       # Internal URL for JWKS fetching from inside the Docker network
       - AUTHENTIK_INTERNAL_URL=http://authentik-server:9000/application/o/firebim/
     depends_on:
-      - postgres
-      - minio
-      - rabbitmq
-      - authentik-server
-      - fuseki
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      authentik-server:
+        condition: service_started
+      fuseki:
+        condition: service_healthy
+      fuseki-init:
+        condition: service_completed_successfully
 
   celery-worker:
     build:
@@ -50,27 +62,32 @@ services:
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
       - S3_REGION=${S3_REGION}
-      - S3_SECRET_ACCESS_KEY=minioadmin
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY-minioadmin}
       # - s3-secret-access-key=minioadmin
       - POSTGRES_HOST=${POSTGRES_HOST}
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       # - db-password=postgres
       - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://firebim:firebim@rabbitmq:5672/firebim}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
       - FUSEKI_HOST=${FUSEKI_HOST-http://fuseki:3030}
+      - FUSEKI_APP_USER=${FUSEKI_APP_USER-${FUSEKI_USER-admin}}
+      - FUSEKI_APP_PASSWORD=${FUSEKI_APP_PASSWORD-${FUSEKI_PASSWORD-admin}}
+      - CHECKS_SOLVER=${CHECKS_SOLVER-standard}
     command: celery -A app.workers.celery_worker worker --loglevel=info
     depends_on:
       postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
       fuseki:
         condition: service_healthy
-      # minio-init:
-      #   condition: service_completed_successfully
+      fuseki-init:
+        condition: service_completed_successfully
 
   rabbitmq:
     image: rabbitmq:4-management-alpine
@@ -96,7 +113,7 @@ services:
     #   - db-password
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       # - POSTGRES_PASSWORD_FILE=/run/secrets/db-password
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB}
@@ -110,7 +127,7 @@ services:
       # Authentik database and user before starting the stack.
       - ./docker/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bimscore -d bimscore"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -127,6 +144,16 @@ services:
       - MINIO_ROOT_PASSWORD=minioadmin
     volumes:
       - minio_data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      [
+        'until /usr/bin/mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 2; done; /usr/bin/mc mb --ignore-existing local/${S3_BUCKET_NAME}; echo "MinIO bucket ready: ${S3_BUCKET_NAME}";',
+      ]
 
   # ── Mailpit (local email catcher) ────────────────────────────────
   mailpit:
@@ -224,6 +251,14 @@ services:
       timeout: 5s
       retries: 5
 
+  fuseki-init:
+    image: curlimages/curl:8.13.0
+    depends_on:
+      fuseki:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-ec"]
+    command: 'datasets_url="http://fuseki:3030/\$$/datasets"; until curl -fsS -u admin:admin "$$datasets_url" >/dev/null; do sleep 2; done; for dataset in buildings rulebook; do if ! curl -fsS -u admin:admin "$$datasets_url" | grep -q "\"ds.name\"[[:space:]]*:[[:space:]]*\"/$$dataset\""; then curl -fsS -u admin:admin -X POST "$$datasets_url" -d "dbName=$$dataset" -d "dbType=tdb2" >/dev/null; echo "Created Fuseki dataset: $$dataset"; else echo "Fuseki dataset already exists: $$dataset"; fi; done;'
+
   pgadmin:
     image: dpage/pgadmin4:latest
     environment:
@@ -255,4 +290,3 @@ volumes:
 #     file: secrets/s3_secret_key
 #   # secret-key:
 #   #   file: secrets/secret_key
-
