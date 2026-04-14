@@ -336,7 +336,7 @@ def compile_rule(payload: RuleCompileRequest):
             ttl=str(ttl),
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         count = len(payload.rule.elements)
         error_bits = _publish_error_payload("rule_compile_error", "Unexpected error while compiling rule", exc)
@@ -354,7 +354,7 @@ def decompile_rule(payload: RuleDecompileRequest):
         rule = _normalize_rule_dict(decompile_ruleset_ttl(payload.ttl))
         return RuleDecompileResponse(rule=rule)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         error_bits = _publish_error_payload(
             "rule_decompile_error", "Unexpected error while decompiling SHACL rule", exc
@@ -385,7 +385,7 @@ def publish_rule(payload: RulePublishRequest):
             label=label,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         count = len(payload.rule.elements)
         error_bits = _publish_error_payload(
@@ -417,7 +417,7 @@ def fetch_rule(payload: RuleFetchRequest):
     try:
         return _fetch_rule_by_id(payload.rule_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FusekiNotFoundError:
         raise HTTPException(status_code=404, detail=f"Rule not found: {payload.rule_id}")
     except Exception as exc:
@@ -434,7 +434,7 @@ def delete_rule(payload: RuleDeleteRequest):
         delete_graph_from_fuseki(dataset="rulebook", graph_uri=graph_uri)
         return RuleDeleteResponse(deleted=True, graph_uri=graph_uri)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while deleting rule", exc)
         return RuleDeleteResponse(deleted=False, graph_uri=graph_uri, **error_bits)
@@ -490,7 +490,7 @@ def assemble_and_compile_rule(payload: RuleAssembleRequest):
             fallback=False,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         error_bits = _publish_error_payload(
             "assembly_compile_error", "Unexpected error while assembling and compiling rule", exc
@@ -523,10 +523,10 @@ def derive_rule_element(payload: RuleElementDeriveRequest):
 
         return RuleElementDeriveResponse(rule_element=RuleElementJson(**derived))
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Unexpected error while deriving rule element", exc_info=exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/rule-elements", response_model=RuleElementPublishResponse)
@@ -568,7 +568,7 @@ def publish_rule_element(payload: RuleElementPublishRequest):
             element_type=payload.element_type,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         error_bits = _publish_error_payload(
             "fuseki_error", "Temporary backend storage issue while publishing rule element", exc
@@ -587,7 +587,7 @@ def fetch_rule_element(payload: RuleElementFetchRequest):
     try:
         return _fetch_rule_element_by_id(payload.element_id)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except FusekiNotFoundError:
         raise HTTPException(status_code=404, detail=f"Rule element not found: {payload.element_id}")
     except Exception as exc:
@@ -607,7 +607,7 @@ def delete_rule_element(payload: RuleElementDeleteRequest):
         forget_graph(graph_uri)
         return RuleElementDeleteResponse(deleted=True, graph_uri=graph_uri)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         error_bits = _publish_error_payload(
             "fuseki_error", "Temporary backend storage issue while deleting rule element", exc
@@ -651,9 +651,9 @@ def connect_rules(payload: RuleConnectRequest):
             rule=rule,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/disconnect", response_model=RuleDisconnectResponse)
@@ -671,9 +671,9 @@ def disconnect_rules(payload: RuleDisconnectRequest):
             rule=rule,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/check-completeness", response_model=RuleCompletenessResponse)
@@ -691,9 +691,9 @@ def check_completeness(payload: RuleCompletenessRequest):
             errors=result["errors"],
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/force-end", response_model=RuleForceEndResponse)
@@ -713,9 +713,9 @@ def force_end(payload: RuleForceEndRequest):
             rule=rule,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/rule-elements/{element_id}", response_model=RuleElementFetchResponse)
@@ -723,7 +723,7 @@ def get_rule_element(element_id: str):
     try:
         return _fetch_rule_element_by_id(element_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except FusekiNotFoundError:
         raise HTTPException(status_code=404, detail=f"Rule element not found: {element_id}")
     except Exception as exc:
@@ -739,7 +739,7 @@ def get_rule(rule_id: str):
     try:
         return _fetch_rule_by_id(rule_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except FusekiNotFoundError:
         raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}")
     except Exception as exc:
@@ -776,12 +776,12 @@ def get_rule_ttl(rule_id: str):
             media_type="text/turtle; charset=utf-8",
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch raw TTL for rule '{rule_id}': {exc}",
-        )
+        ) from exc
 
 
 @router.get("/{rule_id}/ttl.json", response_model=RuleTtlResponse)
@@ -793,9 +793,9 @@ def get_rule_ttl_json(rule_id: str):
             ttl=ttl,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch TTL JSON for rule '{rule_id}': {exc}",
-        )
+        ) from exc
