@@ -8,6 +8,8 @@ metadata:
 context:
   firebim_client_id: !Env [FIREBIM_CLIENT_ID, firebim]
   firebim_redirect_uri: !Env [FIREBIM_REDIRECT_URI, "http://localhost:3000/api/auth/callback/authentik"]
+  # HTTPS redirect URI — used when the webapp runs behind Traefik (docker-compose HTTPS setup)
+  firebim_redirect_uri_https: !Env [FIREBIM_REDIRECT_URI_HTTPS, "https://localhost/api/auth/callback/authentik"]
   firebim_launch_url: !Env [FIREBIM_LAUNCH_URL, "http://localhost:3000"]
 
 entries:
@@ -155,6 +157,8 @@ entries:
       redirect_uris:
         - matching_mode: strict
           url: !Context firebim_redirect_uri
+        - matching_mode: strict
+          url: !Context firebim_redirect_uri_https
       signing_key: !Find [authentik_crypto.certificatekeypair, [name, "authentik Self-signed Certificate"]]
       property_mappings:
         - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
