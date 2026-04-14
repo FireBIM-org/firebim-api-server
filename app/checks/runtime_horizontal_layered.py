@@ -162,7 +162,8 @@ class HorizontalLayeredCheckRuntime(CheckRuntime):
                         final_status="Unknown",
                         terminal_node_id=None,
                         message=(
-                            f"Traversal stopped for target '{state.target_node}' because max_steps_per_target={options.max_steps_per_target} was reached"
+                            f"Traversal stopped for target '{state.target_node}' because "
+                            f"max_steps_per_target={options.max_steps_per_target} was reached"
                         ),
                         steps=state.steps,
                         evidence={"reason_code": "max_steps_reached", "visited_node_ids": state.visited_node_ids},
@@ -252,7 +253,7 @@ class HorizontalLayeredCheckRuntime(CheckRuntime):
             metrics=metrics,
         )
 
-        for state, outcome in zip(executable_states, outcomes):
+        for state, outcome in zip(executable_states, outcomes, strict=True):
             next_node_id = self._branch_next_node_id(node, outcome.status)
             step = TargetTraceStep(
                 node_id=node.node_id,

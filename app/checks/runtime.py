@@ -141,7 +141,8 @@ class CheckRuntime:
         if entry_node.node_type == "start":
             return self._resolve_first_decision_from_start(compiled, entry_node)
         raise ValueError(
-            f"Compiled rule '{compiled.rule_id}' entry node '{compiled.entry_node_id}' must be a start or decision node, got '{entry_node.node_type}'"
+            f"Compiled rule '{compiled.rule_id}' entry node '{compiled.entry_node_id}' "
+            f"must be a start or decision node, got '{entry_node.node_type}'"
         )
 
     def _resolve_first_decision_from_start(self, compiled: CompiledRuleSet, start_node: StartNode) -> DecisionNode:
@@ -235,7 +236,8 @@ class CheckRuntime:
                         final_status="Unknown",
                         terminal_node_id=None,
                         message=(
-                            f"Traversal stopped for target '{state.target_node}' because max_steps_per_target={options.max_steps_per_target} was reached"
+                            f"Traversal stopped for target '{state.target_node}' because "
+                            f"max_steps_per_target={options.max_steps_per_target} was reached"
                         ),
                         steps=state.steps,
                         evidence={"reason_code": "max_steps_reached", "visited_node_ids": state.visited_node_ids},
@@ -426,7 +428,8 @@ class CheckRuntime:
                         final_status="Unknown",
                         terminal_node_id=next_node_id,
                         message=(
-                            f"No candidate targets resolved for next node '{next_node_id}' after decision '{decision.node_id}'"
+                            f"No candidate targets resolved for next node '{next_node_id}' "
+                            f"after decision '{decision.node_id}'"
                         ),
                         steps=state.steps + [step],
                         evidence={

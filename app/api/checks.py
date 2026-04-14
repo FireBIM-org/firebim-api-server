@@ -797,7 +797,10 @@ def run_blind_check(payload: BlindCheckRunRequest):
                 "compatibility_notes": [
                     "This endpoint uses blind SHACL CONSTRUCT via BlindShaclRuleRunner.",
                     "Only terminal outputs and aggregate terminal/message counts are returned.",
-                    "Per-target decision traces are not available from /checks/run-blind; use /checks/run for traced execution.",
+                    (
+                        "Per-target decision traces are not available from /checks/run-blind; "
+                        "use /checks/run for traced execution."
+                    ),
                 ],
             },
         )

@@ -189,7 +189,8 @@ class RuleCompiler:
         entry_node = compiled.nodes[compiled.entry_node_id]
         if entry_node.node_type not in {"start", "decision"}:
             raise ValueError(
-                f"Rule '{compiled.rule_id}' entry node '{compiled.entry_node_id}' must be a start or decision node, got '{entry_node.node_type}'"
+                f"Rule '{compiled.rule_id}' entry node '{compiled.entry_node_id}' "
+                f"must be a start or decision node, got '{entry_node.node_type}'"
             )
         if not compiled.nodes:
             raise ValueError(f"Rule '{compiled.rule_id}' compiled to zero nodes")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from importlib import import_module
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -8,10 +9,8 @@ PARENT = ROOT.parent
 if str(PARENT) not in sys.path:
     sys.path.insert(0, str(PARENT))
 
-from tests.generated_cleanup import cleanup_generated_rulebook
-
-
 def main() -> int:
+    cleanup_generated_rulebook = import_module("tests.generated_cleanup").cleanup_generated_rulebook
     summary = cleanup_generated_rulebook(verbose=True)
     if summary["failed_rules"] or summary["failed_rule_elements"]:
         return 1

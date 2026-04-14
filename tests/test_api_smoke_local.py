@@ -359,16 +359,18 @@ def client(monkeypatch):
         "fetch_rule_ttl",
         lambda rule_id: (
             f"https://firebim.org/graphs/rulebook/{rule_id}",
-            """
-@prefix sh: <http://www.w3.org/ns/shacl#> .
-@prefix fbo: <http://example.org/fbo/1.0/> .
-@prefix ex: <http://example.org/rules/> .
-
-ex:Shape a sh:NodeShape ;
-    sh:targetClass fbo:Room ;
-    sh:path fbo:roomArea ;
-    sh:construct \"CONSTRUCT { ?this <http://example.org/firebim/result> fb:True . } WHERE { ?this fbo:roomArea ?h . FILTER(?h >= 12) }\" .
-""",
+            (
+                "@prefix sh: <http://www.w3.org/ns/shacl#> .\n"
+                "@prefix fb: <http://example.org/firebim/result/> .\n"
+                "@prefix fbo: <http://example.org/fbo/1.0/> .\n"
+                "@prefix ex: <http://example.org/rules/> .\n"
+                "\n"
+                "ex:Shape a sh:NodeShape ;\n"
+                "    sh:targetClass fbo:Room ;\n"
+                "    sh:path fbo:roomArea ;\n"
+                '    sh:construct "CONSTRUCT { ?this <http://example.org/firebim/result> fb:True . } '
+                'WHERE { ?this fbo:roomArea ?h . FILTER(?h >= 12) }" .\n'
+            ),
         ),
     )
     monkeypatch.setattr(

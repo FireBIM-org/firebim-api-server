@@ -219,7 +219,7 @@ def _best_connected_spec_chain(
     dfs([], set(range(len(available_specs))))
     connected_specs = [available_specs[idx] for idx in best_indices]
     transition_notes: list[dict[str, Any]] = []
-    for left, right in zip(best_indices, best_indices[1:]):
+    for left, right in zip(best_indices, best_indices[1:], strict=False):
         from_class = available_specs[left]["target_class"]
         to_class = available_specs[right]["target_class"]
         if (from_class, to_class) in forward_edges:
@@ -293,9 +293,10 @@ def _print_check_response_stats(label: str, body: dict[str, Any], request_elapse
     print(f"target_resolver={engine.get('target_resolver')}")
     print(f"inference={engine.get('inference')}")
     print(f"advanced={engine.get('advanced')}")
-    print(
-        f"compiled_rule_keys={sorted(compiled_rule.keys()) if isinstance(compiled_rule, dict) else type(compiled_rule).__name__}"
+    compiled_rule_keys = (
+        sorted(compiled_rule.keys()) if isinstance(compiled_rule, dict) else type(compiled_rule).__name__
     )
+    print(f"compiled_rule_keys={compiled_rule_keys}")
     print(
         "summary=",
         _pretty(

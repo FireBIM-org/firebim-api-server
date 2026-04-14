@@ -251,7 +251,8 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
                         final_status="Unknown",
                         terminal_node_id=None,
                         message=(
-                            f"Traversal stopped for target '{state.target_node}' because max_steps_per_target={options.max_steps_per_target} was reached"
+                            f"Traversal stopped for target '{state.target_node}' because "
+                            f"max_steps_per_target={options.max_steps_per_target} was reached"
                         ),
                         steps=state.steps,
                         evidence={"reason_code": "max_steps_reached", "visited_node_ids": state.visited_node_ids},
@@ -345,7 +346,7 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
             metrics=metrics,
         )
 
-        for state, outcome in zip(executable_states, outcomes):
+        for state, outcome in zip(executable_states, outcomes, strict=True):
             next_node_id = self._branch_next_node_id(node, outcome.status)
             step = TargetTraceStep(
                 node_id=node.node_id,
@@ -554,7 +555,11 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
             options=options,
             metrics=metrics,
         )
-        matching_targets = [target for target, outcome in zip(terminal_targets, outcomes) if outcome.status == "True"]
+        matching_targets = [
+            target
+            for target, outcome in zip(terminal_targets, outcomes, strict=True)
+            if outcome.status == "True"
+        ]
         increment_counter(metrics, "backward_seed_count", len(matching_targets))
         if not matching_targets:
             execution_context.metrics.warnings.append(
@@ -577,7 +582,8 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
             ).targets
             if not current_targets:
                 execution_context.metrics.warnings.append(
-                    f"Backward planning pruned all candidates at transition {from_node.node_id}->{to_node.node_id}; using forward entry targets."
+                    f"Backward planning pruned all candidates at transition "
+                    f"{from_node.node_id}->{to_node.node_id}; using forward entry targets."
                 )
                 return initial_targets
 

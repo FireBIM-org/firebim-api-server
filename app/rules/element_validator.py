@@ -23,7 +23,8 @@ def validate_rule_element_payload(node: dict) -> None:
                 value = node.get("value")
                 if not isinstance(value, (list, tuple)) or len(value) != 2:
                     raise ValueError(
-                        f"Decision node '{node_id}' with operator 'between' must define value as a list or tuple of length 2"
+                        f"Decision node '{node_id}' with operator 'between' must define "
+                        "value as a list or tuple of length 2"
                     )
 
     elif node_type == "start":

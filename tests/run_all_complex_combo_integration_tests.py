@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 
@@ -8,9 +9,6 @@ ROOT = Path(__file__).resolve().parent
 PARENT = ROOT.parent
 if str(PARENT) not in sys.path:
     sys.path.insert(0, str(PARENT))
-
-from tests import test_complex_rule_combo_integration as combo
-from tests.generated_cleanup import delete_rule, delete_rule_element
 
 RUN_MATRIX = [
     {
@@ -421,3 +419,7 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+combo = import_module("tests.test_complex_rule_combo_integration")
+cleanup = import_module("tests.generated_cleanup")
+delete_rule = cleanup.delete_rule
+delete_rule_element = cleanup.delete_rule_element
