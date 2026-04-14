@@ -14,8 +14,8 @@ os.chdir(app_dir)
 # Provide dummy values for secrets that are normally injected at runtime
 # (e.g. from /var/run/secrets in Kubernetes) so that Settings() validation
 # passes during schema generation.
-os.environ.setdefault("DB-PASSWORD", "dummy")
-os.environ.setdefault("S3-SECRET-KEY", "dummy")
+os.environ.setdefault("POSTGRES_PASSWORD", "dummy")
+os.environ.setdefault("S3_SECRET_ACCESS_KEY", "dummy")
 
 from app.main import app  # noqa: E402  # Import the FastAPI app instance (path setup required first)
 
