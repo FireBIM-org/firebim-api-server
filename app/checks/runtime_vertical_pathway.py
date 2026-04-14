@@ -425,7 +425,9 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
             "graph_index": self._active_execution_context.graph_index if self._active_execution_context else None,
             "execution_context": self._active_execution_context,
         }
-        if isinstance(self.evaluator, HybridAtomicEvaluator) and self.evaluator.direct_evaluator.supports(decision):
+        if isinstance(
+            self.evaluator, HybridAtomicEvaluator
+        ) and self.evaluator.direct_evaluator.supports(decision):
             increment_counter(metrics, "vertical_column_direct_batches")
             targets = [state.target_node for state in states]
             row_ctx = EvalContext(
@@ -435,7 +437,10 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
                 inference=options.inference,
                 advanced=options.advanced,
                 debug=options.debug,
-                current_step_index=min((state.depth for state in states), default=0),
+                current_step_index=min(
+                    (state.depth for state in states),
+                    default=0,
+                ),
                 visited_node_ids=[],
                 extra=row_extra,
             )
@@ -446,7 +451,9 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
                 ctx=row_ctx,
             )
             counters = row_ctx.extra.setdefault("metrics", {}).setdefault("counters", {})
-            counters["direct_evaluator_attempts"] = int(counters.get("direct_evaluator_attempts", 0)) + len(targets)
+            counters["direct_evaluator_attempts"] = (
+                int(counters.get("direct_evaluator_attempts", 0)) + len(targets)
+            )
             total_seconds = perf_counter() - started
             total_ms = round(total_seconds * 1000.0, 3)
             accumulate_timing(metrics, "evaluate_atomic_total", total_seconds)
@@ -547,7 +554,10 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
                     steps=[],
                     visited_node_ids=[],
                     depth=0,
-                    binding_frame=self._make_initial_binding(terminal_decision.node_id, target.target_node),
+                    binding_frame=self._make_initial_binding(
+                        terminal_decision.node_id,
+                        target.target_node,
+                    ),
                 )
                 for target in terminal_targets
             ],
