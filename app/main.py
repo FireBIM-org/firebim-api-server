@@ -6,6 +6,7 @@ import uuid
 
 import boto3
 import httpx
+from botocore.exceptions import ClientError
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -67,11 +68,20 @@ async def startup_event():
     init_db()
     print("Database tables created successfully")
 
-    # Ensure S3 bucket exists
     try:
         s3_client.head_bucket(Bucket=BUCKET_NAME)
-    except s3_client.exceptions.NoSuchBucket:
-        s3_client.create_bucket(Bucket=BUCKET_NAME)
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "404":
+            if settings.S3_ENDPOINT_URL:
+                # Only auto-create buckets for S3-compatible services (MinIO)
+                s3_client.create_bucket(Bucket=BUCKET_NAME)
+            else:
+                raise RuntimeError(
+                    f"S3 bucket '{BUCKET_NAME}' does not exist. "
+                    "When using external S3, buckets must be pre-provisioned."
+                ) from e
+        else:
+            raise
 
 
 # S3 Configuration

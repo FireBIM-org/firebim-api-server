@@ -1,4 +1,4 @@
-.PHONY: help install dev test lint format openapi docker-up docker-down docker-build logs migrate
+.PHONY: help install dev test lint format openapi dev-up up-build docker-down docker-build logs migrate
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -22,7 +22,10 @@ format: ## Format and auto-fix code with ruff
 openapi: ## Generate openapi.json from the app
 	uv run python scripts/generate_openai.py
 
-docker-up: ## Start all services with docker compose
+up-build: ## Start all services with build
+	docker compose up -d --build
+
+dev-up: ## Start all services with docker compose
 	docker compose up -d
 
 docker-down: ## Stop all services
