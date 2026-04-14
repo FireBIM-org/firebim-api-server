@@ -1,20 +1,24 @@
-FROM python:3.12-slim
+# Stage 1: Build
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# Install curl for healthchecks
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
-
-ENV UV_LINK_MODE=copy \
-    UV_COMPILE_BYTECODE=1 \
-    PYTHONPATH=/ \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
-# Install production dependencies including worker-specific packages
+# Copy dependency files
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --group worker --no-install-project
+
+# Install dependencies
+RUN uv sync --package firebim-api-server --group worker --no-dev
+
+# Stage 2: Runtime
+FROM python:3.12-slim-bookworm AS runtime
+
+WORKDIR /app
+
+# Copy the virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
 
 # Copy application code
 COPY app/ /app/app/
