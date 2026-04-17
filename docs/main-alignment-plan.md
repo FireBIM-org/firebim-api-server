@@ -38,7 +38,6 @@ These files implement the rules, graphs, and checks functionality and should be 
 
 ## Keep as `main` for now
 
-- `app/api/graph.py`
 
 This file is intentionally kept as `main` unless a later rules/graphs/checks integration requires a focused change there.
 

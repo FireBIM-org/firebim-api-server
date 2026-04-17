@@ -21,7 +21,6 @@ problem proves otherwise:
 - `Makefile`
 - `README.md`
 - `docker-compose.yml`
-- `app/api/graph.py`
 
 ## Main Files That Need Narrow Changes
 
@@ -34,7 +33,6 @@ Why changed:
 
 Scope of change:
 - Add `checks`, `graphs`, and `rules` routers only.
-- Keep `app/api/graph.py` mounted exactly as `main`.
 
 ### `app/core/config.py`
 
@@ -91,8 +89,6 @@ Purpose:
 - Seed MinIO and Fuseki with the local graph fixtures needed by the feature APIs
   and integration tests.
 
-### `tests/generated_cleanup.py`
-### `tests/cleanup_generated_rulebook.py`
 
 Purpose:
 - Clean generated rule and rule-element data after integration/sanity runs.
