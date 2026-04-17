@@ -56,14 +56,14 @@ def main() -> int:
         return exit_code
     finally:
         if purge_enabled and exit_code == 0:
-            print("\nPurging generated Fuseki rule data ...")
+            print("\nPurging generated rule data ...")
             cleanup_result = subprocess.run(
                 [sys.executable, str(GENERATED_DATA_SCRIPT)],
                 cwd=str(ROOT),
                 env=os.environ.copy(),
             )
             if cleanup_result.returncode != 0:
-                print("Generated Fuseki rule data purge reported failures.")
+                print("Generated rule data purge reported failures.")
 
 
 if __name__ == "__main__":

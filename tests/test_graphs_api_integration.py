@@ -113,7 +113,8 @@ def ensured_graphs(api_health):
 def test_graphs_health(api_health):
     assert api_health["status"] in {"ok", "degraded"}
     assert api_health["dataset"] == "buildings"
-    assert "fuseki_connected" in api_health
+    assert api_health["storage_connected"] is True
+    assert api_health["storage_backend"] == "s3"
 
 
 @pytest.mark.parametrize("graph_id", list(GRAPH_FIXTURES.keys()))

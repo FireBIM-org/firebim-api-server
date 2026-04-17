@@ -22,7 +22,7 @@ from app.storage.building_repository import (
     BuildingRepository,
     default_building_graph_uri,
 )
-from app.storage.fuseki_client import FusekiError, FusekiNotFoundError
+from app.storage.graph_store import GraphStoreError, GraphStoreNotFoundError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/graphs", tags=["graphs"])
@@ -35,9 +35,10 @@ def graphs_health() -> GraphsHealthResponse:
     connected = repo.health()
     return GraphsHealthResponse(
         status="ok" if connected else "degraded",
-        fuseki_connected=connected,
+        storage_connected=connected,
         dataset=BUILDINGS_DATASET,
-        fuseki_host=settings.FUSEKI_HOST,
+        storage_backend="s3",
+        storage_host=settings.S3_ENDPOINT_URL,
     )
 
 
@@ -51,7 +52,7 @@ def list_graphs() -> GraphListResponse:
             graph_uris=[item.graph_uri for item in graph_items],
             graphs=graph_items,
         )
-    except FusekiError as exc:
+    except GraphStoreError as exc:
         logger.exception("Failed to list building graphs", exc_info=exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -79,7 +80,7 @@ def publish_graph(payload: GraphPublishRequest) -> GraphPublishResponse:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
-    except FusekiError as exc:
+    except GraphStoreError as exc:
         logger.exception("Failed to publish building graph", exc_info=exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -103,12 +104,12 @@ def delete_graph(graph_id: str) -> GraphDeleteResponse:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
-    except FusekiNotFoundError as exc:
+    except GraphStoreNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
-    except FusekiError as exc:
+    except GraphStoreError as exc:
         logger.exception("Failed to delete building graph", exc_info=exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -131,12 +132,12 @@ def fetch_graph(graph_id: str) -> GraphFetchResponse:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
-    except FusekiNotFoundError as exc:
+    except GraphStoreNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
-    except FusekiError as exc:
+    except GraphStoreError as exc:
         logger.exception("Failed to fetch building graph", exc_info=exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -173,12 +174,12 @@ def extract_graph_schema(payload: GraphSchemaExtractRequest) -> GraphSchemaExtra
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
-    except FusekiNotFoundError as exc:
+    except GraphStoreNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(exc),
         ) from exc
-    except FusekiError as exc:
+    except GraphStoreError as exc:
         logger.exception("Failed to extract graph schema", exc_info=exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

@@ -5,14 +5,14 @@ from time import monotonic
 from rdflib import RDF, Graph, Namespace
 from rdflib.namespace import SH
 
-from app.storage.fuseki_client import FusekiClient
+from app.storage.graph_store import GraphStoreClient
 
 RULEBOOK_DATASET = "rulebook"
 RULE_GRAPH_BASE_URI = "https://firebim.org/graphs/rulebook/"
 RULE_ELEMENT_GRAPH_BASE_URI = "https://firebim.org/graphs/rule-elements/"
 EX = Namespace("http://example.org/firebim/")
 
-_client = FusekiClient()
+_client = GraphStoreClient()
 
 _RULE_ELEMENT_ENTRIES_CACHE: list[dict] | None = None
 _RULE_ELEMENT_ENTRIES_CACHE_AT: float = 0.0
@@ -43,15 +43,15 @@ def default_rule_element_graph_uri(element_id: str) -> str:
     return f"{RULE_ELEMENT_GRAPH_BASE_URI}{element_id}"
 
 
-def publish_ttl_to_fuseki(ttl_text: str, dataset: str, graph_uri: str) -> None:
+def publish_graph_ttl(ttl_text: str, dataset: str, graph_uri: str) -> None:
     _client.put_graph_ttl(dataset=dataset, graph_uri=graph_uri, ttl=ttl_text)
 
 
-def fetch_ttl_from_fuseki(dataset: str, graph_uri: str) -> str:
+def fetch_graph_ttl(dataset: str, graph_uri: str) -> str:
     return _client.get_graph_ttl(dataset=dataset, graph_uri=graph_uri)
 
 
-def delete_graph_from_fuseki(dataset: str, graph_uri: str) -> None:
+def delete_graph_ttl(dataset: str, graph_uri: str) -> None:
     _client.delete_graph(dataset=dataset, graph_uri=graph_uri)
 
 
@@ -163,7 +163,7 @@ def list_rule_graphs() -> list[dict]:
     items = []
     for graph_entry in _client.list_named_graphs(dataset=RULEBOOK_DATASET, base_uri=RULE_GRAPH_BASE_URI):
         graph_uri = graph_entry["graph_uri"]
-        ttl = fetch_ttl_from_fuseki(dataset=RULEBOOK_DATASET, graph_uri=graph_uri)
+        ttl = fetch_graph_ttl(dataset=RULEBOOK_DATASET, graph_uri=graph_uri)
         metadata = _parse_rule_graph_metadata(ttl, graph_uri)
         metadata["graph_uri"] = graph_uri
         items.append(metadata)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from rdflib import Graph
 
-from app.storage.fuseki_client import FusekiClient, FusekiNotFoundError
+from app.storage.graph_store import GraphStoreClient, GraphStoreNotFoundError
 
 BUILDINGS_DATASET = "buildings"
 BUILDING_GRAPH_BASE_URI = "https://firebim.org/graphs/buildings/"
@@ -16,8 +16,8 @@ def default_building_graph_uri(graph_id: str) -> str:
 
 
 class BuildingRepository:
-    def __init__(self, client: FusekiClient | None = None) -> None:
-        self.client = client or FusekiClient()
+    def __init__(self, client: GraphStoreClient | None = None) -> None:
+        self.client = client or GraphStoreClient()
         self.dataset = BUILDINGS_DATASET
         self.base_uri = BUILDING_GRAPH_BASE_URI
 
@@ -34,7 +34,7 @@ class BuildingRepository:
         try:
             ttl = self.client.get_graph_ttl(self.dataset, graph_uri)
             return bool(ttl.strip())
-        except FusekiNotFoundError:
+        except GraphStoreNotFoundError:
             return False
 
     def publish_graph(self, graph_id: str, ttl: str) -> tuple[str, bool]:
@@ -66,8 +66,8 @@ class BuildingRepository:
 
     @staticmethod
     def _validate_ttl(ttl: str) -> None:
-        g = Graph()
+        graph = Graph()
         try:
-            g.parse(data=ttl, format="turtle")
+            graph.parse(data=ttl, format="turtle")
         except Exception as exc:
             raise ValueError(f"Invalid Turtle content: {exc}") from exc

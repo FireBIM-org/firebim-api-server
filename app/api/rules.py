@@ -18,12 +18,12 @@ from app.rules.models import fbRuleElement
 from app.rules.publisher import (
     default_rule_element_graph_uri,
     default_rule_graph_uri,
-    delete_graph_from_fuseki,
-    fetch_ttl_from_fuseki,
+    delete_graph_ttl,
+    fetch_graph_ttl,
     forget_graph,
     list_rule_element_entries,
     list_rule_graphs,
-    publish_ttl_to_fuseki,
+    publish_graph_ttl,
     remember_rule_element_graph,
 )
 from app.rules.ruleset import Rule
@@ -67,7 +67,7 @@ from app.schemas.rules import (
     RuleValidateRequest,
     RuleValidateResponse,
 )
-from app.storage.fuseki_client import FusekiNotFoundError
+from app.storage.graph_store import GraphStoreNotFoundError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rules", tags=["rules"])
@@ -182,14 +182,14 @@ def _resolve_rule_element_graph_uri(element_id: str) -> str:
 
 
 def _fetch_rule_element_json_by_graph_uri(graph_uri: str) -> RuleElementJson:
-    ttl = fetch_ttl_from_fuseki(dataset="rulebook", graph_uri=graph_uri)
+    ttl = fetch_graph_ttl(dataset="rulebook", graph_uri=graph_uri)
     element = decompile_rule_element_ttl(ttl)
     return _rule_element_to_json(element, graph_uri=graph_uri)
 
 
 def _fetch_rule_by_id(rule_id: str) -> RuleFetchResponse:
     graph_uri = _resolve_rule_graph_uri(rule_id)
-    ttl = fetch_ttl_from_fuseki(dataset="rulebook", graph_uri=graph_uri)
+    ttl = fetch_graph_ttl(dataset="rulebook", graph_uri=graph_uri)
     rule = None
     try:
         rule = _normalize_rule_dict(decompile_ruleset_ttl(ttl))
@@ -201,7 +201,7 @@ def _fetch_rule_by_id(rule_id: str) -> RuleFetchResponse:
 
 def _fetch_rule_element_by_id(element_id: str) -> RuleElementFetchResponse:
     graph_uri = _resolve_rule_element_graph_uri(element_id)
-    ttl = fetch_ttl_from_fuseki(dataset="rulebook", graph_uri=graph_uri)
+    ttl = fetch_graph_ttl(dataset="rulebook", graph_uri=graph_uri)
     rule_element = None
     try:
         rule_element = decompile_rule_element_ttl(ttl)
@@ -371,7 +371,7 @@ def publish_rule(payload: RulePublishRequest):
         builder = SHACLBuilder()
         builder.add_rule_set(rule)
         ttl = builder.get_graph().serialize(format="turtle")
-        publish_ttl_to_fuseki(ttl_text=str(ttl), dataset="rulebook", graph_uri=graph_uri)
+        publish_graph_ttl(ttl_text=str(ttl), dataset="rulebook", graph_uri=graph_uri)
 
         count = len(rule.elements)
         label = _rule_label(payload.rule)
@@ -389,7 +389,7 @@ def publish_rule(payload: RulePublishRequest):
     except Exception as exc:
         count = len(payload.rule.elements)
         error_bits = _publish_error_payload(
-            "fuseki_error", "Temporary backend storage issue while publishing rule", exc
+            "storage_error", "Temporary backend storage issue while publishing rule", exc
         )
         return RulePublishResponse(
             published=False,
@@ -408,8 +408,8 @@ def list_rules():
         items = [RuleListItem(**item) for item in list_rule_graphs()]
         return RuleListResponse(count=len(items), rules=items)
     except Exception as exc:
-        error_bits = _publish_error_payload("fuseki_error", "Rule list unavailable, returning fallback response", exc)
-        return RuleListResponse(count=0, rules=[], warning="Fuseki temporarily unavailable", **error_bits)
+        error_bits = _publish_error_payload("storage_error", "Rule list unavailable, returning fallback response", exc)
+        return RuleListResponse(count=0, rules=[], warning="Graph storage temporarily unavailable", **error_bits)
 
 
 @router.post("/fetch", response_model=RuleFetchResponse)
@@ -418,11 +418,11 @@ def fetch_rule(payload: RuleFetchRequest):
         return _fetch_rule_by_id(payload.rule_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except FusekiNotFoundError as exc:
+    except GraphStoreNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"Rule not found: {payload.rule_id}") from exc
     except Exception as exc:
         graph_uri = _resolve_rule_graph_uri(payload.rule_id)
-        error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while fetching rule", exc)
+        error_bits = _publish_error_payload("storage_error", "Temporary backend storage issue while fetching rule", exc)
         return RuleFetchResponse(graph_uri=graph_uri, ttl="", rule=None, **error_bits)
 
 
@@ -431,12 +431,12 @@ def delete_rule(payload: RuleDeleteRequest):
     graph_uri = _resolve_rule_graph_uri(payload.rule_id)
 
     try:
-        delete_graph_from_fuseki(dataset="rulebook", graph_uri=graph_uri)
+        delete_graph_ttl(dataset="rulebook", graph_uri=graph_uri)
         return RuleDeleteResponse(deleted=True, graph_uri=graph_uri)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
-        error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while deleting rule", exc)
+        error_bits = _publish_error_payload("storage_error", "Temporary backend storage issue while deleting rule", exc)
         return RuleDeleteResponse(deleted=False, graph_uri=graph_uri, **error_bits)
 
 
@@ -553,7 +553,7 @@ def publish_rule_element(payload: RuleElementPublishRequest):
         builder = SHACLBuilder()
         builder.add_rule_element(element)
         ttl = builder.get_graph().serialize(format="turtle")
-        publish_ttl_to_fuseki(ttl_text=str(ttl), dataset="rulebook", graph_uri=graph_uri)
+        publish_graph_ttl(ttl_text=str(ttl), dataset="rulebook", graph_uri=graph_uri)
         remember_rule_element_graph(
             graph_uri=graph_uri,
             element_id=element.id,
@@ -571,7 +571,7 @@ def publish_rule_element(payload: RuleElementPublishRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         error_bits = _publish_error_payload(
-            "fuseki_error", "Temporary backend storage issue while publishing rule element", exc
+            "storage_error", "Temporary backend storage issue while publishing rule element", exc
         )
         return RuleElementPublishResponse(
             published=False,
@@ -588,12 +588,12 @@ def fetch_rule_element(payload: RuleElementFetchRequest):
         return _fetch_rule_element_by_id(payload.element_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except FusekiNotFoundError as exc:
+    except GraphStoreNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"Rule element not found: {payload.element_id}") from exc
     except Exception as exc:
         graph_uri = _resolve_rule_element_graph_uri(payload.element_id)
         error_bits = _publish_error_payload(
-            "fuseki_error", "Temporary backend storage issue while fetching rule element", exc
+            "storage_error", "Temporary backend storage issue while fetching rule element", exc
         )
         return RuleElementFetchResponse(graph_uri=graph_uri, ttl="", rule_element=None, **error_bits)
 
@@ -603,14 +603,14 @@ def delete_rule_element(payload: RuleElementDeleteRequest):
     graph_uri = _resolve_rule_element_graph_uri(payload.element_id)
 
     try:
-        delete_graph_from_fuseki(dataset="rulebook", graph_uri=graph_uri)
+        delete_graph_ttl(dataset="rulebook", graph_uri=graph_uri)
         forget_graph(graph_uri)
         return RuleElementDeleteResponse(deleted=True, graph_uri=graph_uri)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         error_bits = _publish_error_payload(
-            "fuseki_error", "Temporary backend storage issue while deleting rule element", exc
+            "storage_error", "Temporary backend storage issue while deleting rule element", exc
         )
         return RuleElementDeleteResponse(deleted=False, graph_uri=graph_uri, **error_bits)
 
@@ -623,13 +623,13 @@ def list_rule_elements():
         return RuleElementListResponse(count=len(entries), graph_uris=graph_uris, rule_elements=entries)
     except Exception as exc:
         error_bits = _publish_error_payload(
-            "fuseki_error", "Rule element list unavailable, returning fallback response", exc
+            "storage_error", "Rule element list unavailable, returning fallback response", exc
         )
         return RuleElementListResponse(
             count=0,
             graph_uris=[],
             rule_elements=[],
-            warning="Fuseki temporarily unavailable",
+            warning="Graph storage temporarily unavailable",
             **error_bits,
         )
 
@@ -724,12 +724,12 @@ def get_rule_element(element_id: str):
         return _fetch_rule_element_by_id(element_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except FusekiNotFoundError as exc:
+    except GraphStoreNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"Rule element not found: {element_id}") from exc
     except Exception as exc:
         graph_uri = _resolve_rule_element_graph_uri(element_id)
         error_bits = _publish_error_payload(
-            "fuseki_error", "Temporary backend storage issue while fetching rule element", exc
+            "storage_error", "Temporary backend storage issue while fetching rule element", exc
         )
         return RuleElementFetchResponse(graph_uri=graph_uri, ttl="", rule_element=None, **error_bits)
 
@@ -740,11 +740,11 @@ def get_rule(rule_id: str):
         return _fetch_rule_by_id(rule_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except FusekiNotFoundError as exc:
+    except GraphStoreNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}") from exc
     except Exception as exc:
         graph_uri = _resolve_rule_graph_uri(rule_id)
-        error_bits = _publish_error_payload("fuseki_error", "Temporary backend storage issue while fetching rule", exc)
+        error_bits = _publish_error_payload("storage_error", "Temporary backend storage issue while fetching rule", exc)
         return RuleFetchResponse(graph_uri=graph_uri, ttl="", rule=None, **error_bits)
 
 

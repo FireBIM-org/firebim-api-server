@@ -591,7 +591,7 @@ def test_complex_rule_assemble_compile_returns_ttl(complex_rule_bundle):
     assert body["broken"] is False, body
 
 
-def test_complex_rule_publish_to_fuseki_via_api(complex_rule_bundle):
+def test_complex_rule_publish_to_storage_via_api(complex_rule_bundle):
     res, took_ms = _timed_request(
         "publish assembled rule",
         "POST",

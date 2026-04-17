@@ -24,11 +24,9 @@ def _bootstrap_schema_generation_env() -> None:
     _set_default_env("S3_ACCESS_KEY_ID", "minioadmin")
     _set_default_env("S3_SECRET_ACCESS_KEY", "minioadmin")
     _set_default_env("S3_REGION", "us-east-1")
-    _set_default_env("CELERY_BROKER_URL", "redis://localhost:6379/0")
-    _set_default_env("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
-    _set_default_env("FUSEKI_HOST", "http://localhost:3030")
-    _set_default_env("FUSEKI_APP_USER", "admin")
-    _set_default_env("FUSEKI_APP_PASSWORD", "admin")
+    _set_default_env("CELERY_BROKER_URL", "amqp://firebim:firebim@rabbitmq:5672/firebim")
+    _set_default_env("CELERY_RESULT_BACKEND", "rpc://")
+    _set_default_env("AUTHENTIK_ISSUER_URL", "http://localhost:9080/application/o/firebim/")
 
 
 def main() -> int:

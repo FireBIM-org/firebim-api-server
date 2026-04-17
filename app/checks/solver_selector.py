@@ -17,7 +17,6 @@ CheckSolverMode = Literal[
     "standard",
     "horizontal",
     "vertical",
-    "fuseki_compiled",
 ]
 
 _DEFAULT_SOLVER: CheckSolverMode = "standard"
@@ -54,13 +53,6 @@ class CheckSolverSelector:
             runtime_class_name="VerticalPathwayCheckRuntime",
             evaluator_class_name="HybridAtomicEvaluator",
             implemented=True,
-        ),
-        "fuseki_compiled": CheckSolverDefinition(
-            mode="fuseki_compiled",
-            description="Reserved switch for a future Fuseki-backed solver.",
-            runtime_class_name="CheckRuntime",
-            evaluator_class_name="HybridAtomicEvaluator",
-            implemented=False,
         ),
     }
 
@@ -100,8 +92,6 @@ class CheckSolverSelector:
             "vertical-pathway": "vertical",
             "vertical_column": "vertical",
             "vertical-column": "vertical",
-            "fuseki": "fuseki_compiled",
-            "fuseki_compiled": "fuseki_compiled",
         }
         try:
             return aliases[normalized]

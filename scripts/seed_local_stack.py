@@ -11,18 +11,10 @@ FIXTURES = ROOT / "tests" / "fixtures"
 
 API_BASE_URL = os.getenv("FIREBIM_API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 MINIO_ENDPOINT = os.getenv("FIREBIM_MINIO_ENDPOINT", "http://127.0.0.1:9000").rstrip("/")
-MINIO_REGION = os.getenv("FIREBIM_MINIO_REGION", "eu-central-1")
-MINIO_BUCKET = os.getenv("FIREBIM_MINIO_BUCKET", "firebim-local")
+MINIO_REGION = os.getenv("FIREBIM_MINIO_REGION", "us-east-1")
+MINIO_BUCKET = os.getenv("FIREBIM_MINIO_BUCKET", "firebim")
 MINIO_ACCESS_KEY = os.getenv("FIREBIM_MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("FIREBIM_MINIO_SECRET_KEY", "minioadmin")
-FUSEKI_BASE_URL = os.getenv("FIREBIM_FUSEKI_BASE_URL", "http://127.0.0.1:3030").rstrip("/")
-FUSEKI_ADMIN_USER = os.getenv("FIREBIM_FUSEKI_ADMIN_USER", "admin")
-FUSEKI_ADMIN_PASSWORD = (
-    os.getenv("FIREBIM_FUSEKI_ADMIN_PASSWORD")
-    or os.getenv("FUSEKI_ADMIN_PASSWORD")
-    or os.getenv("FUSEKI_PASSWORD")
-    or "admin"
-)
 
 BUILDING_FIXTURES = {
     "ifc-inspired-small": "building_small_ifc_inspired.ttl",
@@ -52,25 +44,6 @@ def ensure_bucket() -> None:
     print(f"[created] MinIO bucket: {MINIO_BUCKET}")
 
 
-def ensure_fuseki_datasets() -> None:
-    with httpx.Client(auth=(FUSEKI_ADMIN_USER, FUSEKI_ADMIN_PASSWORD), timeout=30) as client:
-        response = client.get(f"{FUSEKI_BASE_URL}/$/datasets")
-        response.raise_for_status()
-        payload = response.json()
-        existing = {item["ds.name"].lstrip("/") for item in payload.get("datasets", []) if "ds.name" in item}
-
-        for dataset in ("buildings", "rulebook"):
-            if dataset in existing:
-                print(f"[ok] Fuseki dataset exists: {dataset}")
-                continue
-            create = client.post(
-                f"{FUSEKI_BASE_URL}/$/datasets",
-                data={"dbName": dataset, "dbType": "tdb2"},
-            )
-            create.raise_for_status()
-            print(f"[created] Fuseki dataset: {dataset}")
-
-
 def publish_building_fixtures() -> None:
     with httpx.Client(timeout=120) as client:
         for graph_id, fixture_name in BUILDING_FIXTURES.items():
@@ -87,7 +60,6 @@ def publish_building_fixtures() -> None:
 
 def main() -> int:
     ensure_bucket()
-    ensure_fuseki_datasets()
     publish_building_fixtures()
     print("[done] local stack seed completed")
     return 0

@@ -31,137 +31,6 @@
         ]
       }
     },
-    "/graph/count_fro/{country_code}": {
-      "get": {
-        "tags": [
-          "graph"
-        ],
-        "summary": "Count Fro",
-        "description": "Count number of entities per FRO class.",
-        "operationId": "count_fro_graph_count_fro__country_code__get",
-        "parameters": [
-          {
-            "name": "country_code",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Country Code"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/graph/get_english/{country_code}": {
-      "get": {
-        "tags": [
-          "graph"
-        ],
-        "summary": "Get English",
-        "description": "Get all entities with English original text.",
-        "operationId": "get_english_graph_get_english__country_code__get",
-        "parameters": [
-          {
-            "name": "country_code",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Country Code"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/graph/select_paragraph/{country_code}/{paragraph_id}": {
-      "get": {
-        "tags": [
-          "graph"
-        ],
-        "summary": "Select Paragraph",
-        "operationId": "select_paragraph_graph_select_paragraph__country_code___paragraph_id__get",
-        "parameters": [
-          {
-            "name": "country_code",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Country Code"
-            }
-          },
-          {
-            "name": "paragraph_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Paragraph Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/graphs/health": {
       "get": {
         "tags": [
@@ -215,12 +84,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/GraphPublishRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/GraphPublishRequest"
               }
             }
           },
@@ -343,12 +207,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/GraphSchemaExtractRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/GraphSchemaExtractRequest"
               }
             }
           },
@@ -408,12 +267,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleValidateRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleValidateRequest"
               }
             }
           },
@@ -454,12 +308,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleCompileRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleCompileRequest"
               }
             }
           },
@@ -500,12 +349,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleDecompileRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleDecompileRequest"
               }
             }
           },
@@ -546,12 +390,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RulePublishRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RulePublishRequest"
               }
             }
           },
@@ -613,12 +452,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleFetchRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleFetchRequest"
               }
             }
           },
@@ -659,12 +493,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleDeleteRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleDeleteRequest"
               }
             }
           },
@@ -705,12 +534,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleAssembleRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleAssembleRequest"
               }
             }
           },
@@ -751,12 +575,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleAssembleRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleAssembleRequest"
               }
             }
           },
@@ -797,12 +616,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleElementDeriveRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleElementDeriveRequest"
               }
             }
           },
@@ -862,12 +676,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleElementPublishRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleElementPublishRequest"
               }
             }
           },
@@ -908,12 +717,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleElementFetchRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleElementFetchRequest"
               }
             }
           },
@@ -954,12 +758,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleElementDeleteRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleElementDeleteRequest"
               }
             }
           },
@@ -1000,12 +799,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleConnectRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleConnectRequest"
               }
             }
           },
@@ -1046,12 +840,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleDisconnectRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleDisconnectRequest"
               }
             }
           },
@@ -1092,12 +881,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleCompletenessRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleCompletenessRequest"
               }
             }
           },
@@ -1138,12 +922,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleForceEndRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleForceEndRequest"
               }
             }
           },
@@ -1374,12 +1153,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/CheckRunRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/CheckRunRequest"
               }
             }
           },
@@ -1420,12 +1194,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/CheckRunRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/CheckRunRequest"
               }
             }
           },
@@ -1466,12 +1235,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/CheckRunRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/CheckRunRequest"
               }
             }
           },
@@ -1512,12 +1276,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/CheckRunRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/CheckRunRequest"
               }
             }
           },
@@ -1558,12 +1317,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/BlindCheckRunRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/BlindCheckRunRequest"
               }
             }
           },
@@ -1604,12 +1358,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/CheckCompatibilityRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/CheckCompatibilityRequest"
               }
             }
           },
@@ -1690,12 +1439,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Body_upload_model_ifc_models_post"
-                  }
-                ],
-                "title": "Body"
+                "$ref": "#/components/schemas/Body_upload_model_ifc_models_post"
               }
             }
           },
@@ -1843,12 +1587,7 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Body_upload_ids_ids_files_post"
-                  }
-                ],
-                "title": "Body"
+                "$ref": "#/components/schemas/Body_upload_ids_ids_files_post"
               }
             }
           },
@@ -3601,15 +3340,15 @@
             "type": "string",
             "title": "Status"
           },
-          "fuseki_connected": {
+          "storage_connected": {
             "type": "boolean",
-            "title": "Fuseki Connected"
+            "title": "Storage Connected"
           },
           "dataset": {
             "type": "string",
             "title": "Dataset"
           },
-          "fuseki_host": {
+          "storage_backend": {
             "anyOf": [
               {
                 "type": "string"
@@ -3618,13 +3357,24 @@
                 "type": "null"
               }
             ],
-            "title": "Fuseki Host"
+            "title": "Storage Backend"
+          },
+          "storage_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Host"
           }
         },
         "type": "object",
         "required": [
           "status",
-          "fuseki_connected",
+          "storage_connected",
           "dataset"
         ],
         "title": "GraphsHealthResponse"

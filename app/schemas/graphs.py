@@ -5,9 +5,10 @@ from pydantic import BaseModel, Field
 
 class GraphsHealthResponse(BaseModel):
     status: str
-    fuseki_connected: bool
+    storage_connected: bool
     dataset: str
-    fuseki_host: str | None = None
+    storage_backend: str | None = None
+    storage_host: str | None = None
 
 
 class GraphPublishRequest(BaseModel):

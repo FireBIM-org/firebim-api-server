@@ -13,14 +13,12 @@ os.environ.setdefault("S3_SECRET_ACCESS_KEY", "minioadmin")
 os.environ.setdefault("S3_REGION", "us-east-1")
 os.environ.setdefault("CELERY_BROKER_URL", "redis://localhost:6379/0")
 os.environ.setdefault("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
-os.environ.setdefault("FUSEKI_HOST", "http://localhost:3030")
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api import checks as checks_api
-from app.api import graph as legacy_graph_api
 from app.api import graphs as graphs_api
 from app.api import rules as rules_api
 
@@ -212,7 +210,6 @@ def client(monkeypatch):
     app.include_router(graphs_api.router)
     app.include_router(rules_api.router)
     app.include_router(checks_api.router)
-    app.include_router(legacy_graph_api.router)
 
     # Graphs API
     monkeypatch.setattr(graphs_api, "repo", DummyRepo())
@@ -220,13 +217,13 @@ def client(monkeypatch):
     # Rules API
     monkeypatch.setattr(rules_api, "_build_rule", lambda payload: DummyRule(rule_id=payload.id, entry=payload.entry))
     monkeypatch.setattr(rules_api, "SHACLBuilder", DummyBuilder)
-    monkeypatch.setattr(rules_api, "publish_ttl_to_fuseki", lambda **kwargs: None)
-    monkeypatch.setattr(rules_api, "delete_graph_from_fuseki", lambda **kwargs: None)
+    monkeypatch.setattr(rules_api, "publish_graph_ttl", lambda **kwargs: None)
+    monkeypatch.setattr(rules_api, "delete_graph_ttl", lambda **kwargs: None)
     monkeypatch.setattr(rules_api, "forget_graph", lambda graph_uri: None)
     monkeypatch.setattr(rules_api, "remember_rule_element_graph", lambda **kwargs: None)
     monkeypatch.setattr(
         rules_api,
-        "fetch_ttl_from_fuseki",
+        "fetch_graph_ttl",
         lambda dataset, graph_uri: '@prefix ex: <http://example.org/> .\nex:A ex:has "x" .',
     )
     monkeypatch.setattr(
@@ -479,6 +476,11 @@ def test_graphs_extract_schema(client):
     assert isinstance(body["property_counts"], dict)
 
 
+def test_legacy_graph_routes_removed(client):
+    response = client.get("/graph/count_fro/dk")
+    assert response.status_code == 404
+
+
 def test_rules_health(client):
     response = client.get("/rules/health")
     assert response.status_code == 200
@@ -698,28 +700,3 @@ def test_checks_compatibility(client):
     assert body["compatibility_score"] == pytest.approx(1.0)
     assert "http://example.org/fbo/1.0/Room" in body["target_classes_required"]
     assert "http://example.org/fbo/1.0/roomArea" in body["properties_required"]
-
-
-def test_legacy_graph_router_placeholders(client):
-    response = client.get("/graph/count_fro/dk")
-    assert response.status_code in {410, 502}
-    if response.status_code == 410:
-        assert "count_fro" in response.json()["detail"]
-    else:
-        assert "SPARQL query failed" in response.json()["detail"]
-
-    response = client.get("/graph/get_english/dk")
-    assert response.status_code in {410, 502}
-    if response.status_code == 410:
-        assert "get_english" in response.json()["detail"]
-    else:
-        assert "SPARQL query failed" in response.json()["detail"]
-
-    response = client.get("/graph/select_paragraph/dk/1.1")
-    assert response.status_code in {400, 410, 502}
-    if response.status_code == 410:
-        assert "select_paragraph" in response.json()["detail"]
-    elif response.status_code == 400:
-        assert "Invalid paragraph_id format" in response.json()["detail"]
-    else:
-        assert "SPARQL query failed" in response.json()["detail"]

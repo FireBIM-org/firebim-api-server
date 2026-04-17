@@ -14,7 +14,6 @@ from sqlalchemy import text
 from sqlmodel import Session
 
 from app.api.checks import router as checks_router
-from app.api.graph import router as graph_router
 from app.api.graphs import router as graphs_router
 from app.api.rules import router as rules_router
 from app.auth.jwt import get_current_active_user
@@ -30,7 +29,6 @@ app = FastAPI(title="FireBIM API")
 
 # Include auth router
 app.include_router(auth_router)
-app.include_router(graph_router)
 app.include_router(graphs_router)
 app.include_router(rules_router)
 app.include_router(checks_router)
