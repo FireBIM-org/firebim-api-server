@@ -67,7 +67,7 @@ services:
       RABBITMQ_DEFAULT_VHOST: firebim
     ports:
       - "5672:5672"
-      - "15672:15672"
+      - "15672:15672" # Management UI
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -105,12 +105,16 @@ services:
       - MINIO_ROOT_PASSWORD=minioadmin
     volumes:
       - minio_data:/data
+      # NOTE: Scripts in /docker-entrypoint-initdb.d run only when postgres_data is initialized the first time.
+      # If you added Authentik DB/user creation here and already have an existing postgres_data volume,
+      # you must either recreate the volume (e.g., `docker compose down -v`) or manually provision the
+      # Authentik database and user before starting the stack.
 
   mailpit:
     image: axllent/mailpit:latest
     ports:
-      - "8025:8025"
-      - "1025:1025"
+      - "8025:8025" # Web UI
+      - "1025:1025" # SMTP
 
   authentik-server:
     image: ghcr.io/goauthentik/server:2025.12
@@ -126,7 +130,7 @@ services:
       AUTHENTIK_POSTGRESQL__USER: authentik
       AUTHENTIK_POSTGRESQL__PASSWORD: authentik-local-dev
       AUTHENTIK_BOOTSTRAP_PASSWORD: "Password123!"
-      AUTHENTIK_BOOTSTRAP_EMAIL: admin@firebim.org
+      AUTHENTIK_BOOTSTRAP_EMAIL: admin@firebim.local
       AUTHENTIK_EMAIL__HOST: mailpit
       AUTHENTIK_EMAIL__PORT: 1025
       AUTHENTIK_EMAIL__USE_TLS: "false"
