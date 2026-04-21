@@ -88,6 +88,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+      # NOTE: Scripts in /docker-entrypoint-initdb.d run only when postgres_data is initialized the first time.
+      # If you added Authentik DB/user creation here and already have an existing postgres_data volume,
+      # you must either recreate the volume (e.g., `docker compose down -v`) or manually provision the
+      # Authentik database and user before starting the stack.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -105,10 +109,6 @@ services:
       - MINIO_ROOT_PASSWORD=minioadmin
     volumes:
       - minio_data:/data
-      # NOTE: Scripts in /docker-entrypoint-initdb.d run only when postgres_data is initialized the first time.
-      # If you added Authentik DB/user creation here and already have an existing postgres_data volume,
-      # you must either recreate the volume (e.g., `docker compose down -v`) or manually provision the
-      # Authentik database and user before starting the stack.
 
   mailpit:
     image: axllent/mailpit:latest
