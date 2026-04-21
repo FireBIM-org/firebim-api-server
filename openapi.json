@@ -84,7 +84,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GraphPublishRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/GraphPublishRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -207,7 +212,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GraphSchemaExtractRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/GraphSchemaExtractRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -267,7 +277,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleValidateRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleValidateRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -308,7 +323,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleCompileRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleCompileRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -349,7 +369,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleDecompileRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleDecompileRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -390,7 +415,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RulePublishRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RulePublishRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -452,7 +482,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleFetchRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleFetchRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -493,7 +528,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleDeleteRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleDeleteRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -534,7 +574,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleAssembleRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleAssembleRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -575,7 +620,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleAssembleRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleAssembleRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -616,7 +666,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleElementDeriveRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleElementDeriveRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -676,7 +731,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleElementPublishRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleElementPublishRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -717,7 +777,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleElementFetchRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleElementFetchRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -758,7 +823,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleElementDeleteRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleElementDeleteRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -799,7 +869,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleConnectRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleConnectRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -840,7 +915,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleDisconnectRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleDisconnectRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -881,7 +961,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleCompletenessRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleCompletenessRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -922,7 +1007,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RuleForceEndRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RuleForceEndRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -1153,7 +1243,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CheckRunRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/CheckRunRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -1194,7 +1289,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CheckRunRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/CheckRunRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -1235,7 +1335,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CheckRunRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/CheckRunRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -1276,7 +1381,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CheckRunRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/CheckRunRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -1317,7 +1427,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BlindCheckRunRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/BlindCheckRunRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -1358,7 +1473,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CheckCompatibilityRequest"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/CheckCompatibilityRequest"
+                  }
+                ],
+                "title": "Payload"
               }
             }
           },
@@ -1439,7 +1559,12 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_upload_model_ifc_models_post"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Body_upload_model_ifc_models_post"
+                  }
+                ],
+                "title": "Body"
               }
             }
           },
@@ -1587,7 +1712,12 @@
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_upload_ids_ids_files_post"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/Body_upload_ids_ids_files_post"
+                  }
+                ],
+                "title": "Body"
               }
             }
           },
