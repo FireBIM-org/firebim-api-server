@@ -130,7 +130,7 @@ class Settings(BaseSettings):
 
         return self
 
-    FUSEKI_HOST: str
+    CHECKS_SOLVER: str = "standard"
 
 
 settings = Settings()
