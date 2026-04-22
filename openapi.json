@@ -247,6 +247,463 @@
         }
       }
     },
+    "/ontologies/health": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Ontologies Health",
+        "operationId": "ontologies_health_ontologies_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologiesHealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ontologies/{ontology_family}/{country}": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Ontology Summary",
+        "operationId": "ontology_summary_ontologies__ontology_family___country__get",
+        "parameters": [
+          {
+            "name": "ontology_family",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Family"
+            }
+          },
+          {
+            "name": "country",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Country"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologySummaryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ontologies/{ontology_family}/{country}/versions": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Ontology Versions",
+        "operationId": "ontology_versions_ontologies__ontology_family___country__versions_get",
+        "parameters": [
+          {
+            "name": "ontology_family",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Family"
+            }
+          },
+          {
+            "name": "country",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Country"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologyVersionListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ontologies/{ontology_family}/{country}/versions/latest": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Ontology Latest Version",
+        "operationId": "ontology_latest_version_ontologies__ontology_family___country__versions_latest_get",
+        "parameters": [
+          {
+            "name": "ontology_family",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Family"
+            }
+          },
+          {
+            "name": "country",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Country"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologyVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ontologies/{ontology_family}/{country}/versions/stable": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Ontology Stable Version",
+        "operationId": "ontology_stable_version_ontologies__ontology_family___country__versions_stable_get",
+        "parameters": [
+          {
+            "name": "ontology_family",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Family"
+            }
+          },
+          {
+            "name": "country",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Country"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologyVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ontologies/{ontology_family}/{country}/versions/{version}": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Ontology Version",
+        "operationId": "ontology_version_ontologies__ontology_family___country__versions__version__get",
+        "parameters": [
+          {
+            "name": "ontology_family",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Family"
+            }
+          },
+          {
+            "name": "country",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Country"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologyVersionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Delete Ontology Version",
+        "operationId": "delete_ontology_version_ontologies__ontology_family___country__versions__version__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ontology_family",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Family"
+            }
+          },
+          {
+            "name": "country",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Country"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologyDeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ontologies/{ontology_family}/{country}/versions/{version}/content": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Ontology Version Content",
+        "operationId": "ontology_version_content_ontologies__ontology_family___country__versions__version__content_get",
+        "parameters": [
+          {
+            "name": "ontology_family",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Family"
+            }
+          },
+          {
+            "name": "country",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Country"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ontologies/publish": {
+      "post": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Publish Ontology Version",
+        "operationId": "publish_ontology_version_ontologies_publish_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/OntologyPublishRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologyPublishResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/rules/health": {
       "get": {
         "tags": [
@@ -3521,6 +3978,554 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "OntologiesHealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "storage_connected": {
+            "type": "boolean",
+            "title": "Storage Connected"
+          },
+          "storage_backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Backend"
+          },
+          "storage_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Host"
+          },
+          "root_prefix": {
+            "type": "string",
+            "title": "Root Prefix"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "storage_connected",
+          "root_prefix"
+        ],
+        "title": "OntologiesHealthResponse"
+      },
+      "OntologyDeleteResponse": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^\\d{4}\\.\\d{2}$",
+            "title": "Version"
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": true
+          },
+          "deleted_content": {
+            "type": "boolean",
+            "title": "Deleted Content",
+            "default": true
+          },
+          "manifest_updated": {
+            "type": "boolean",
+            "title": "Manifest Updated",
+            "default": true
+          },
+          "remaining_versions": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Remaining Versions",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "version"
+        ],
+        "title": "OntologyDeleteResponse"
+      },
+      "OntologyPublishRequest": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^\\d{4}\\.\\d{2}$",
+            "title": "Version"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "candidate",
+              "stable",
+              "deprecated",
+              "withdrawn"
+            ],
+            "title": "Status"
+          },
+          "issued_at": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Issued At",
+            "examples": [
+              "2026-03-01"
+            ]
+          },
+          "ttl": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ttl",
+            "examples": [
+              "@prefix fbo: <https://firebim.org/ontology/fbo/dk#> ."
+            ]
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type",
+            "default": "text/turtle; charset=utf-8"
+          },
+          "default_version": {
+            "type": "boolean",
+            "title": "Default Version",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "version",
+          "status",
+          "issued_at",
+          "ttl"
+        ],
+        "title": "OntologyPublishRequest"
+      },
+      "OntologyPublishResponse": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "canonical_family_uri": {
+            "type": "string",
+            "title": "Canonical Family Uri"
+          },
+          "canonical_country_uri": {
+            "type": "string",
+            "title": "Canonical Country Uri"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^\\d{4}\\.\\d{2}$",
+            "title": "Version"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "candidate",
+              "stable",
+              "deprecated",
+              "withdrawn"
+            ],
+            "title": "Status"
+          },
+          "issued_at": {
+            "type": "string",
+            "title": "Issued At"
+          },
+          "is_latest": {
+            "type": "boolean",
+            "title": "Is Latest"
+          },
+          "is_stable": {
+            "type": "boolean",
+            "title": "Is Stable"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "content_url": {
+            "type": "string",
+            "title": "Content Url"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type",
+            "default": "text/turtle; charset=utf-8"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "checksum_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum Sha256"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created"
+          },
+          "manifest_updated": {
+            "type": "boolean",
+            "title": "Manifest Updated",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "canonical_family_uri",
+          "canonical_country_uri",
+          "version",
+          "status",
+          "issued_at",
+          "is_latest",
+          "is_stable",
+          "url",
+          "content_url",
+          "created"
+        ],
+        "title": "OntologyPublishResponse"
+      },
+      "OntologySummaryResponse": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "canonical_family_uri": {
+            "type": "string",
+            "title": "Canonical Family Uri"
+          },
+          "canonical_country_uri": {
+            "type": "string",
+            "title": "Canonical Country Uri"
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Version"
+          },
+          "latest_stable_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Stable Version"
+          },
+          "default_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Version"
+          },
+          "available_versions_url": {
+            "type": "string",
+            "title": "Available Versions Url"
+          },
+          "latest_url": {
+            "type": "string",
+            "title": "Latest Url"
+          },
+          "stable_url": {
+            "type": "string",
+            "title": "Stable Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "canonical_family_uri",
+          "canonical_country_uri",
+          "available_versions_url",
+          "latest_url",
+          "stable_url"
+        ],
+        "title": "OntologySummaryResponse"
+      },
+      "OntologyVersionListItem": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "issued_at": {
+            "type": "string",
+            "title": "Issued At"
+          },
+          "is_latest": {
+            "type": "boolean",
+            "title": "Is Latest"
+          },
+          "is_stable": {
+            "type": "boolean",
+            "title": "Is Stable"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "content_url": {
+            "type": "string",
+            "title": "Content Url"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type",
+            "default": "text/turtle; charset=utf-8"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "checksum_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "status",
+          "issued_at",
+          "is_latest",
+          "is_stable",
+          "url",
+          "content_url"
+        ],
+        "title": "OntologyVersionListItem"
+      },
+      "OntologyVersionListResponse": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/OntologyVersionListItem"
+            },
+            "type": "array",
+            "title": "Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country"
+        ],
+        "title": "OntologyVersionListResponse"
+      },
+      "OntologyVersionResponse": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "canonical_family_uri": {
+            "type": "string",
+            "title": "Canonical Family Uri"
+          },
+          "canonical_country_uri": {
+            "type": "string",
+            "title": "Canonical Country Uri"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^\\d{4}\\.\\d{2}$",
+            "title": "Version"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "candidate",
+              "stable",
+              "deprecated",
+              "withdrawn"
+            ],
+            "title": "Status"
+          },
+          "issued_at": {
+            "type": "string",
+            "title": "Issued At"
+          },
+          "is_latest": {
+            "type": "boolean",
+            "title": "Is Latest"
+          },
+          "is_stable": {
+            "type": "boolean",
+            "title": "Is Stable"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "content_url": {
+            "type": "string",
+            "title": "Content Url"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type",
+            "default": "text/turtle; charset=utf-8"
+          },
+          "size_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Bytes"
+          },
+          "checksum_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "canonical_family_uri",
+          "canonical_country_uri",
+          "version",
+          "status",
+          "issued_at",
+          "is_latest",
+          "is_stable",
+          "url",
+          "content_url"
+        ],
+        "title": "OntologyVersionResponse"
       },
       "RuleAssembleCompileResponse": {
         "properties": {
