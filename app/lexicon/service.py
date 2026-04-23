@@ -113,7 +113,9 @@ class LexiconService:
                     )
                 elif property_uri not in declared_properties:
                     ontology_warnings.append(
-                        f"Rule node '{item['id']}' uses property_path not declared as property in ontology: {property_uri}"
+                        "Rule node "
+                        f"'{item['id']}' uses property_path not declared as property in ontology: "
+                        f"{property_uri}"
                     )
             if target_class and property_path:
                 bucket = property_requirements_by_target[target_class].setdefault(
