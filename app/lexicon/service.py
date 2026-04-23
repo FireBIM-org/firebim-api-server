@@ -12,19 +12,32 @@ from app.rules.composer import check_ruleset_completeness
 from app.rules.decompiler import decompile_ruleset_ttl
 from app.schemas.lexicon import (
     LexiconBranchReference,
+    LexiconCatalogTermDetail,
+    LexiconCatalogTermResponse,
+    LexiconCatalogTermsResponse,
+    LexiconCatalogTermSummary,
     LexiconConformityCheckResponse,
     LexiconConformityIssue,
     LexiconEntityInput,
     LexiconExecutionProfile,
     LexiconExecutionProfileNode,
     LexiconExecutionTarget,
+    LexiconMappedTermReference,
+    LexiconMappingValidationRequest,
+    LexiconMappingValidationResponse,
     LexiconPropertyRequirement,
     LexiconReconstructionResponse,
+    LexiconSourcePattern,
+    LexiconSourcePatternClause,
+    LexiconSourceTermCondition,
+    LexiconTargetAssertion,
 )
 from app.schemas.rules import RuleDraft
+from app.storage.graph_store import GraphStoreNotFoundError
 from app.storage.ontology_repository import OntologyRepository
 
 LEXICON_GRAPH_BASE_URI = "https://firebim.org/graphs/lexicon/"
+ONTOLOGY_META_HAS_PROPERTY_URI = "https://firebim.org/ontology-meta#hasProperty"
 
 
 @dataclass(frozen=True)
@@ -45,6 +58,146 @@ class LexiconService:
 
     def health(self) -> bool:
         return self.ontology_repo.health()
+
+    def list_catalog_terms(
+        self,
+        *,
+        ontology_family: str,
+        country: str,
+        version: str,
+        kind: str | None = None,
+        search: str | None = None,
+    ) -> LexiconCatalogTermsResponse:
+        ontology, ontology_graph = self._resolve_ontology_graph(
+            ontology_family=ontology_family,
+            country=country,
+            version=version,
+        )
+        catalog = self._build_catalog(ontology_graph)
+        normalized_kind = kind.strip().lower() if kind else None
+        normalized_search = search.strip().lower() if search else None
+
+        terms = [
+            LexiconCatalogTermSummary(
+                term_id=term["term_id"],
+                uri=term["uri"],
+                kind=term["kind"],
+                label=term["label"],
+                definition=term["definition"],
+                description=term["description"],
+                parent_term_ids=term["parent_term_ids"],
+                is_predefined_type=term["is_predefined_type"],
+            )
+            for term in catalog.values()
+            if (normalized_kind is None or term["kind"] == normalized_kind)
+            and (
+                normalized_search is None
+                or normalized_search in term["term_id"].lower()
+                or normalized_search in (term["label"] or "").lower()
+                or normalized_search in (term["definition"] or "").lower()
+                or normalized_search in term["uri"].lower()
+            )
+        ]
+        terms.sort(key=lambda item: ((item.label or item.term_id).lower(), item.term_id.lower()))
+
+        return LexiconCatalogTermsResponse(
+            ontology_family=ontology.ontology_family,
+            country=ontology.country,
+            version=ontology.version,
+            canonical_family_uri=ontology.canonical_family_uri,
+            canonical_country_uri=ontology.canonical_country_uri,
+            count=len(terms),
+            terms=terms,
+        )
+
+    def get_catalog_term(
+        self,
+        *,
+        ontology_family: str,
+        country: str,
+        version: str,
+        term_id: str,
+    ) -> LexiconCatalogTermResponse:
+        ontology, ontology_graph = self._resolve_ontology_graph(
+            ontology_family=ontology_family,
+            country=country,
+            version=version,
+        )
+        catalog = self._build_catalog(ontology_graph)
+        normalized_uri = self._normalize_term_uri(term_id, ontology.canonical_country_uri)
+        term = catalog.get(normalized_uri)
+        if term is None:
+            raise GraphStoreNotFoundError(f"Lexicon term not found: {term_id}")
+
+        return LexiconCatalogTermResponse(
+            ontology_family=ontology.ontology_family,
+            country=ontology.country,
+            version=ontology.version,
+            canonical_family_uri=ontology.canonical_family_uri,
+            canonical_country_uri=ontology.canonical_country_uri,
+            term=LexiconCatalogTermDetail(
+                term_id=term["term_id"],
+                uri=term["uri"],
+                kind=term["kind"],
+                label=term["label"],
+                definition=term["definition"],
+                description=term["description"],
+                parent_term_ids=term["parent_term_ids"],
+                child_term_ids=term["child_term_ids"],
+                property_term_ids=term["property_term_ids"],
+                is_predefined_type=term["is_predefined_type"],
+            ),
+        )
+
+    def validate_mapping(
+        self,
+        *,
+        payload: LexiconMappingValidationRequest,
+    ) -> LexiconMappingValidationResponse:
+        errors: list[str] = []
+        warnings: list[str] = []
+        source_kind: str | None = None
+        target_kind: str | None = None
+
+        if payload.mapping_kind in {"class_to_class", "property_to_property"}:
+            source_kind = self._resolve_mapping_term_kind(payload.source_term)
+            target_kind = self._resolve_mapping_term_kind(payload.target_term)
+
+            expected_kind = "class" if payload.mapping_kind == "class_to_class" else "property"
+            if source_kind != expected_kind:
+                errors.append(
+                    f"Source term must be a {expected_kind} for mapping_kind={payload.mapping_kind}, "
+                    f"but was {source_kind}."
+                )
+            if target_kind != expected_kind:
+                errors.append(
+                    f"Target term must be a {expected_kind} for mapping_kind={payload.mapping_kind}, "
+                    f"but was {target_kind}."
+                )
+
+        elif payload.mapping_kind == "semantic_assertion":
+            pattern_errors, pattern_warnings = self._validate_source_pattern(payload.source_pattern)
+            target_errors, target_warnings = self._validate_target_assertions(payload.target_assertions)
+            errors.extend(pattern_errors)
+            errors.extend(target_errors)
+            warnings.extend(pattern_warnings)
+            warnings.extend(target_warnings)
+
+        compatible = not errors
+        if payload.mapping_kind == "class_to_class":
+            warnings.append("Class-to-class mappings may connect a class to a subclass or predefined type.")
+        if payload.mapping_kind == "semantic_assertion":
+            warnings.append("Semantic assertions support many-are-one and many-can-be-one source patterns.")
+
+        return LexiconMappingValidationResponse(
+            valid=not errors,
+            mapping_kind=payload.mapping_kind,
+            source_kind=source_kind,
+            target_kind=target_kind,
+            compatible=compatible,
+            warnings=warnings,
+            errors=errors,
+        )
 
     def derive_profile(
         self,
@@ -356,6 +509,22 @@ class LexiconService:
             ontology_ttl=fetched.ttl,
         )
 
+    def _resolve_ontology_graph(
+        self,
+        *,
+        ontology_family: str,
+        country: str,
+        version: str,
+    ) -> tuple[LexiconOntologyContext, Graph]:
+        ontology = self.resolve_ontology(
+            ontology_family=ontology_family,
+            country=country,
+            version=version,
+        )
+        ontology_graph = Graph()
+        ontology_graph.parse(data=ontology.ontology_ttl, format="turtle")
+        return ontology, ontology_graph
+
     @staticmethod
     def _load_rule(*, rule_id: str | None, rule: RuleDraft | None) -> dict:
         if rule_id:
@@ -400,6 +569,111 @@ class LexiconService:
             return value
         return f"{canonical_country_uri}{value}"
 
+    def _resolve_mapping_term_kind(self, term: LexiconMappedTermReference) -> str:
+        ontology, ontology_graph = self._resolve_ontology_graph(
+            ontology_family=term.ontology_family,
+            country=term.country,
+            version=term.version,
+        )
+        normalized_uri = term.uri or self._normalize_term_uri(term.term_id, ontology.canonical_country_uri)
+        catalog = self._build_catalog(ontology_graph)
+        resolved = catalog.get(normalized_uri)
+        if resolved is None:
+            raise GraphStoreNotFoundError(f"Lexicon term not found: {term.term_id}")
+        return str(resolved["kind"])
+
+    def _validate_source_pattern(self, pattern: LexiconSourcePattern) -> tuple[list[str], list[str]]:
+        errors: list[str] = []
+        warnings: list[str] = []
+        clauses = pattern.all_of if pattern.all_of else pattern.any_of
+        for clause in clauses:
+            clause_errors, clause_warnings = self._validate_source_clause(clause)
+            errors.extend(clause_errors)
+            warnings.extend(clause_warnings)
+        return errors, warnings
+
+    def _validate_source_clause(self, clause: LexiconSourcePatternClause) -> tuple[list[str], list[str]]:
+        errors: list[str] = []
+        warnings: list[str] = []
+        if clause.term is not None:
+            condition_errors, condition_warnings = self._validate_source_term_condition(clause.term)
+            errors.extend(condition_errors)
+            warnings.extend(condition_warnings)
+        else:
+            nested = clause.all_of if clause.all_of else clause.any_of
+            for item in nested:
+                nested_errors, nested_warnings = self._validate_source_clause(item)
+                errors.extend(nested_errors)
+                warnings.extend(nested_warnings)
+        return errors, warnings
+
+    def _validate_source_term_condition(self, condition: LexiconSourceTermCondition) -> tuple[list[str], list[str]]:
+        errors: list[str] = []
+        warnings: list[str] = []
+        actual_kind = self._resolve_condition_term_kind(condition)
+        if actual_kind != condition.term_kind:
+            errors.append(
+                f"Source term {condition.term_id} was declared as {condition.term_kind} but resolves to {actual_kind}."
+            )
+        return errors, warnings
+
+    def _validate_target_assertions(self, assertions: list[LexiconTargetAssertion]) -> tuple[list[str], list[str]]:
+        errors: list[str] = []
+        warnings: list[str] = []
+        for assertion in assertions:
+            actual_kind = self._resolve_assertion_term_kind(assertion)
+            expected_kind = "class" if assertion.assertion_kind == "class" else "property"
+            if actual_kind != expected_kind:
+                errors.append(
+                    f"Target assertion {assertion.term_id} must resolve to {expected_kind}, but was {actual_kind}."
+                )
+            if assertion.assertion_kind == "property_value":
+                warnings.append(
+                    "Property_value assertion for "
+                    f"{assertion.term_id} is structurally valid; "
+                    "semantic meaning is frontend-defined."
+                )
+        return errors, warnings
+
+    def _resolve_condition_term_kind(self, condition: LexiconSourceTermCondition) -> str:
+        return self._resolve_term_kind(
+            ontology_family=condition.ontology_family,
+            country=condition.country,
+            version=condition.version,
+            term_id=condition.term_id,
+            uri=condition.uri,
+        )
+
+    def _resolve_assertion_term_kind(self, assertion: LexiconTargetAssertion) -> str:
+        return self._resolve_term_kind(
+            ontology_family=assertion.ontology_family,
+            country=assertion.country,
+            version=assertion.version,
+            term_id=assertion.term_id,
+            uri=assertion.uri,
+        )
+
+    def _resolve_term_kind(
+        self,
+        *,
+        ontology_family: str,
+        country: str,
+        version: str,
+        term_id: str,
+        uri: str | None,
+    ) -> str:
+        ontology, ontology_graph = self._resolve_ontology_graph(
+            ontology_family=ontology_family,
+            country=country,
+            version=version,
+        )
+        normalized_uri = uri or self._normalize_term_uri(term_id, ontology.canonical_country_uri)
+        catalog = self._build_catalog(ontology_graph)
+        resolved = catalog.get(normalized_uri)
+        if resolved is None:
+            raise GraphStoreNotFoundError(f"Lexicon term not found: {term_id}")
+        return str(resolved["kind"])
+
     @staticmethod
     def _collect_declared_terms(graph: Graph) -> tuple[set[str], set[str]]:
         declared_classes = {str(subject) for subject in graph.subjects(RDF.type, OWL.Class)} | {
@@ -411,6 +685,58 @@ class LexiconService:
             | {str(subject) for subject in graph.subjects(RDF.type, OWL.DatatypeProperty)}
         )
         return declared_classes, declared_properties
+
+    @staticmethod
+    def _build_catalog(graph: Graph) -> dict[str, dict[str, Any]]:
+        declared_classes, declared_properties = LexiconService._collect_declared_terms(graph)
+        subclass_map: dict[str, set[str]] = defaultdict(set)
+        for child, _, parent in graph.triples((None, RDFS.subClassOf, None)):
+            subclass_map[str(parent)].add(str(child))
+
+        class_property_map: dict[str, set[str]] = defaultdict(set)
+        has_property_predicate = URIRef(ONTOLOGY_META_HAS_PROPERTY_URI)
+        for subject, _, obj in graph.triples((None, has_property_predicate, None)):
+            class_property_map[str(subject)].add(str(obj))
+
+        term_catalog: dict[str, dict[str, Any]] = {}
+        definition_predicate = URIRef("http://www.w3.org/2004/02/skos/core#definition")
+        for uri in sorted(declared_classes | declared_properties):
+            subject = URIRef(uri)
+            kind = "class" if uri in declared_classes else "property"
+            label_value = graph.value(subject, RDFS.label)
+            definition_value = graph.value(subject, definition_predicate)
+            description_value = graph.value(subject, RDFS.comment)
+            parent_term_ids = sorted(
+                {
+                    LexiconService._term_id_from_uri(str(parent))
+                    for parent in graph.objects(subject, RDFS.subClassOf)
+                    if str(parent) in declared_classes
+                }
+            )
+            term_catalog[uri] = {
+                "term_id": LexiconService._term_id_from_uri(uri),
+                "uri": uri,
+                "kind": kind,
+                "label": str(label_value) if label_value is not None else None,
+                "definition": str(definition_value) if definition_value is not None else None,
+                "description": str(description_value) if description_value is not None else None,
+                "parent_term_ids": parent_term_ids,
+                "child_term_ids": sorted(
+                    LexiconService._term_id_from_uri(child) for child in subclass_map.get(uri, set())
+                ),
+                "property_term_ids": sorted(
+                    LexiconService._term_id_from_uri(prop) for prop in class_property_map.get(uri, set())
+                ),
+                "is_predefined_type": "predefined type"
+                in (str(description_value).lower() if description_value else ""),
+            }
+        return term_catalog
+
+    @staticmethod
+    def _term_id_from_uri(uri: str) -> str:
+        if "#" in uri:
+            return uri.rsplit("#", 1)[1]
+        return uri.rstrip("/").rsplit("/", 1)[-1]
 
     @staticmethod
     def _to_literal(value: Any, datatype_uri: str | None, language: str | None) -> Literal:

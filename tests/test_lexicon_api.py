@@ -20,13 +20,34 @@ from app.api import lexicon as lexicon_api
 from app.lexicon import service as lexicon_service
 from app.lexicon.service import LexiconService
 
-ONTOLOGY_TTL = """
+FBO_ONTOLOGY_TTL = """
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix meta: <https://firebim.org/ontology-meta#> .
 @prefix fbo-dk: <https://firebim.org/ontologies/fbo/dk#> .
 <https://firebim.org/ontologies/fbo/dk#> a owl:Ontology .
-fbo-dk:Wall a owl:Class .
+fbo-dk:BuildingElement a owl:Class .
+fbo-dk:Wall a owl:Class ;
+    rdfs:subClassOf fbo-dk:BuildingElement ;
+    meta:hasProperty fbo-dk:Combustible .
 fbo-dk:Combustible a owl:DatatypeProperty .
 fbo-dk:hasPart a owl:ObjectProperty .
+"""
+
+IFC_ONTOLOGY_TTL = """
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix meta: <https://firebim.org/ontology-meta#> .
+@prefix ifc: <https://firebim.org/ontologies/ifc/global#> .
+<https://firebim.org/ontologies/ifc/global#> a owl:Ontology .
+ifc:IfcBuiltElement a owl:Class .
+ifc:IfcWall a owl:Class ;
+    rdfs:subClassOf ifc:IfcBuiltElement .
+ifc:FireRating a owl:DatatypeProperty .
+ifc:MaterialReference a owl:ObjectProperty .
+ifc:IfcWallUSERDEFINED a owl:Class ;
+    rdfs:subClassOf ifc:IfcWall ;
+    rdfs:comment "Technical note: This IFC class is a predefined type represented by its parent class." .
 """
 
 
@@ -36,10 +57,13 @@ class DummyOntologyRepo:
 
     def fetch_version(self, ontology_family: str, country: str, version: str):
         resolved = "2026.04.23" if version == "latest" else version
+        ttl = FBO_ONTOLOGY_TTL
+        if ontology_family == "ifc":
+            ttl = IFC_ONTOLOGY_TTL
         return SimpleNamespace(
             canonical_family_uri=f"https://firebim.org/ontologies/{ontology_family}#",
             canonical_country_uri=f"https://firebim.org/ontologies/{ontology_family}/{country}#",
-            ttl=ONTOLOGY_TTL,
+            ttl=ttl,
             version=SimpleNamespace(
                 version=resolved,
                 ontology_uri=f"https://firebim.org/ontologies/{ontology_family}/{country}#",
@@ -241,3 +265,217 @@ ex:wall-1 a fbo-dk:Wall ;
     assert body["conforms"] is False
     assert body["semantic_ok"] is False
     assert body["unknown_properties"] == ["https://firebim.org/ontologies/fbo/dk#UnknownProperty"]
+
+
+def test_list_catalog_terms(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.get("/lexicon/catalog/fbo/dk/latest/terms?kind=class&search=wall")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert body["terms"][0]["term_id"] == "Wall"
+    assert body["terms"][0]["kind"] == "class"
+    assert body["terms"][0]["parent_term_ids"] == ["BuildingElement"]
+
+
+def test_get_catalog_term(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.get("/lexicon/catalog/fbo/dk/latest/terms/Wall")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["term"]["term_id"] == "Wall"
+    assert body["term"]["parent_term_ids"] == ["BuildingElement"]
+    assert body["term"]["property_term_ids"] == ["Combustible"]
+
+
+def test_validate_mapping_allows_class_to_subclass(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/mappings/validate",
+        json={
+            "mapping_kind": "class_to_class",
+            "source_term": {
+                "ontology_family": "fbo",
+                "country": "dk",
+                "version": "latest",
+                "term_id": "Wall",
+            },
+            "target_term": {
+                "ontology_family": "ifc",
+                "country": "global",
+                "version": "latest",
+                "term_id": "IfcWallUSERDEFINED",
+            },
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is True
+    assert body["source_kind"] == "class"
+    assert body["target_kind"] == "class"
+    assert body["compatible"] is True
+    assert any("subclass or predefined type" in item for item in body["warnings"])
+
+
+def test_validate_mapping_rejects_property_to_class(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/mappings/validate",
+        json={
+            "mapping_kind": "property_to_property",
+            "source_term": {
+                "ontology_family": "fbo",
+                "country": "dk",
+                "version": "latest",
+                "term_id": "Combustible",
+            },
+            "target_term": {
+                "ontology_family": "ifc",
+                "country": "global",
+                "version": "latest",
+                "term_id": "IfcWall",
+            },
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is False
+    assert body["source_kind"] == "property"
+    assert body["target_kind"] == "class"
+    assert any("Target term must be a property" in item for item in body["errors"])
+
+
+def test_validate_semantic_assertion_all_of(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/mappings/validate",
+        json={
+            "mapping_kind": "semantic_assertion",
+            "source_pattern": {
+                "all_of": [
+                    {
+                        "term": {
+                            "term_kind": "class",
+                            "ontology_family": "ifc",
+                            "country": "global",
+                            "version": "latest",
+                            "term_id": "IfcWall",
+                        }
+                    },
+                    {
+                        "term": {
+                            "term_kind": "property",
+                            "ontology_family": "ifc",
+                            "country": "global",
+                            "version": "latest",
+                            "term_id": "FireRating",
+                        }
+                    },
+                ]
+            },
+            "target_assertions": [
+                {
+                    "assertion_kind": "class",
+                    "ontology_family": "fbo",
+                    "country": "dk",
+                    "version": "latest",
+                    "term_id": "Wall",
+                },
+                {
+                    "assertion_kind": "property_value",
+                    "ontology_family": "fbo",
+                    "country": "dk",
+                    "version": "latest",
+                    "term_id": "Combustible",
+                    "value": True,
+                },
+            ],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is True
+    assert body["compatible"] is True
+    assert any("many-are-one" in item or "many-can-be-one" in item for item in body["warnings"])
+
+
+def test_validate_semantic_assertion_any_of(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/mappings/validate",
+        json={
+            "mapping_kind": "semantic_assertion",
+            "source_pattern": {
+                "any_of": [
+                    {
+                        "term": {
+                            "term_kind": "property",
+                            "ontology_family": "ifc",
+                            "country": "global",
+                            "version": "latest",
+                            "term_id": "FireRating",
+                        }
+                    },
+                    {
+                        "term": {
+                            "term_kind": "property",
+                            "ontology_family": "ifc",
+                            "country": "global",
+                            "version": "latest",
+                            "term_id": "MaterialReference",
+                        }
+                    },
+                ]
+            },
+            "target_assertions": [
+                {
+                    "assertion_kind": "property_value",
+                    "ontology_family": "fbo",
+                    "country": "dk",
+                    "version": "latest",
+                    "term_id": "Combustible",
+                    "value": True,
+                }
+            ],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is True
+    assert body["compatible"] is True
+
+
+def test_validate_semantic_assertion_rejects_wrong_source_kind(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/mappings/validate",
+        json={
+            "mapping_kind": "semantic_assertion",
+            "source_pattern": {
+                "all_of": [
+                    {
+                        "term": {
+                            "term_kind": "property",
+                            "ontology_family": "ifc",
+                            "country": "global",
+                            "version": "latest",
+                            "term_id": "IfcWall",
+                        }
+                    }
+                ]
+            },
+            "target_assertions": [
+                {
+                    "assertion_kind": "class",
+                    "ontology_family": "fbo",
+                    "country": "dk",
+                    "version": "latest",
+                    "term_id": "Wall",
+                }
+            ],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is False
+    assert any("was declared as property but resolves to class" in item for item in body["errors"])

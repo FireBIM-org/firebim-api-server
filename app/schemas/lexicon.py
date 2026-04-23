@@ -154,3 +154,150 @@ class LexiconConformityCheckResponse(BaseModel):
     unknown_properties: list[str] = Field(default_factory=list)
     missing_type_subjects: list[str] = Field(default_factory=list)
     issues: list[LexiconConformityIssue] = Field(default_factory=list)
+
+
+class LexiconCatalogTermSummary(BaseModel):
+    term_id: str
+    uri: str
+    kind: str
+    label: str | None = None
+    definition: str | None = None
+    description: str | None = None
+    parent_term_ids: list[str] = Field(default_factory=list)
+    is_predefined_type: bool = False
+
+
+class LexiconCatalogTermDetail(BaseModel):
+    term_id: str
+    uri: str
+    kind: str
+    label: str | None = None
+    definition: str | None = None
+    description: str | None = None
+    parent_term_ids: list[str] = Field(default_factory=list)
+    child_term_ids: list[str] = Field(default_factory=list)
+    property_term_ids: list[str] = Field(default_factory=list)
+    is_predefined_type: bool = False
+
+
+class LexiconCatalogTermsResponse(BaseModel):
+    ontology_family: str
+    country: str
+    version: str
+    canonical_family_uri: str
+    canonical_country_uri: str
+    count: int
+    terms: list[LexiconCatalogTermSummary] = Field(default_factory=list)
+
+
+class LexiconCatalogTermResponse(BaseModel):
+    ontology_family: str
+    country: str
+    version: str
+    canonical_family_uri: str
+    canonical_country_uri: str
+    term: LexiconCatalogTermDetail
+
+
+class LexiconMappedTermReference(BaseModel):
+    ontology_family: str = Field(..., min_length=1)
+    country: str = Field(..., min_length=2)
+    version: str = Field(default="latest", min_length=2)
+    term_id: str = Field(..., min_length=1)
+    uri: str | None = None
+
+
+class LexiconSourceTermCondition(BaseModel):
+    term_kind: str = Field(..., pattern="^(class|property)$")
+    ontology_family: str = Field(..., min_length=1)
+    country: str = Field(..., min_length=2)
+    version: str = Field(default="latest", min_length=2)
+    term_id: str = Field(..., min_length=1)
+    uri: str | None = None
+
+
+class LexiconSourcePatternClause(BaseModel):
+    term: LexiconSourceTermCondition | None = None
+    all_of: list[LexiconSourcePatternClause] = Field(default_factory=list)
+    any_of: list[LexiconSourcePatternClause] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_clause_shape(self) -> LexiconSourcePatternClause:
+        active = int(self.term is not None) + int(bool(self.all_of)) + int(bool(self.any_of))
+        if active != 1:
+            raise ValueError("Each source pattern clause must define exactly one of term, all_of, or any_of")
+        return self
+
+
+class LexiconSourcePattern(BaseModel):
+    all_of: list[LexiconSourcePatternClause] = Field(default_factory=list)
+    any_of: list[LexiconSourcePatternClause] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_pattern_shape(self) -> LexiconSourcePattern:
+        active = int(bool(self.all_of)) + int(bool(self.any_of))
+        if active != 1:
+            raise ValueError("Source pattern must define exactly one of all_of or any_of")
+        return self
+
+
+class LexiconTargetAssertion(BaseModel):
+    assertion_kind: str = Field(..., pattern="^(class|property|property_value)$")
+    ontology_family: str = Field(..., min_length=1)
+    country: str = Field(..., min_length=2)
+    version: str = Field(default="latest", min_length=2)
+    term_id: str = Field(..., min_length=1)
+    uri: str | None = None
+    value: Any | None = None
+    datatype_uri: str | None = None
+    language: str | None = None
+
+    @model_validator(mode="after")
+    def validate_assertion_shape(self) -> LexiconTargetAssertion:
+        if self.assertion_kind == "class" and self.value is not None:
+            raise ValueError("Class assertions must not define a value")
+        if self.assertion_kind == "property" and self.value is not None:
+            raise ValueError("Property assertions must not define a value")
+        if self.assertion_kind == "property_value" and self.value is None:
+            raise ValueError("Property_value assertions must define a value")
+        return self
+
+
+class LexiconMappingValidationRequest(BaseModel):
+    mapping_kind: str = Field(..., pattern="^(class_to_class|property_to_property|semantic_assertion)$")
+    source_term: LexiconMappedTermReference | None = None
+    target_term: LexiconMappedTermReference | None = None
+    source_pattern: LexiconSourcePattern | None = None
+    target_assertions: list[LexiconTargetAssertion] = Field(default_factory=list)
+    relationship: str | None = None
+
+    @model_validator(mode="after")
+    def validate_mapping_shape(self) -> LexiconMappingValidationRequest:
+        uses_simple = self.source_term is not None or self.target_term is not None
+        uses_pattern = self.source_pattern is not None or bool(self.target_assertions)
+
+        if uses_simple and uses_pattern:
+            raise ValueError("Provide either source_term/target_term or source_pattern/target_assertions, not both")
+
+        if self.mapping_kind in {"class_to_class", "property_to_property"} and (
+            self.source_term is None or self.target_term is None
+        ):
+            raise ValueError(f"{self.mapping_kind} requires both source_term and target_term")
+        if self.mapping_kind == "semantic_assertion" and (self.source_pattern is None or not self.target_assertions):
+            raise ValueError("semantic_assertion requires source_pattern and at least one target_assertion")
+
+        return self
+
+
+class LexiconMappingValidationResponse(BaseModel):
+    valid: bool
+    mapping_kind: str
+    source_kind: str | None = None
+    target_kind: str | None = None
+    compatible: bool
+    warnings: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+
+LexiconSourcePatternClause.model_rebuild()
+LexiconSourcePattern.model_rebuild()
