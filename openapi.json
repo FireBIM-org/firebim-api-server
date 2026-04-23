@@ -247,6 +247,165 @@
         }
       }
     },
+    "/lexicon/health": {
+      "get": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Lexicon Health",
+        "operationId": "lexicon_health_lexicon_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconHealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lexicon/profiles/derive": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Derive Execution Profile",
+        "operationId": "derive_execution_profile_lexicon_profiles_derive_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconProfileDeriveRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconProfileDeriveResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lexicon/reconstruction": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Reconstruct Canonical Graph",
+        "operationId": "reconstruct_canonical_graph_lexicon_reconstruction_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconReconstructionRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconReconstructionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lexicon/conformity/check": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Check Lexicon Conformity",
+        "operationId": "check_lexicon_conformity_lexicon_conformity_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconConformityCheckRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconConformityCheckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ontologies/health": {
       "get": {
         "tags": [
@@ -297,6 +456,57 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OntologyPublishResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/ontologies/conversions/dictionary-json-to-ttl": {
+      "post": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Convert Dictionary Json To Ttl",
+        "operationId": "convert_dictionary_json_to_ttl_ontologies_conversions_dictionary_json_to_ttl_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/OntologyDictionaryConversionRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologyDictionaryConversionResponse"
                 }
               }
             }
@@ -4306,6 +4516,781 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "LexiconBranchReference": {
+        "properties": {
+          "branch": {
+            "type": "string",
+            "title": "Branch"
+          },
+          "target_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Node Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "branch"
+        ],
+        "title": "LexiconBranchReference"
+      },
+      "LexiconConformityCheckRequest": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ontology Family",
+            "default": "fbo"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Version",
+            "default": "latest"
+          },
+          "ttl": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ttl"
+          }
+        },
+        "type": "object",
+        "required": [
+          "country",
+          "ttl"
+        ],
+        "title": "LexiconConformityCheckRequest"
+      },
+      "LexiconConformityCheckResponse": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "canonical_country_uri": {
+            "type": "string",
+            "title": "Canonical Country Uri"
+          },
+          "ontology_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ontology Uri"
+          },
+          "version_iri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Iri"
+          },
+          "triple_count": {
+            "type": "integer",
+            "title": "Triple Count"
+          },
+          "structure_ok": {
+            "type": "boolean",
+            "title": "Structure Ok"
+          },
+          "semantic_ok": {
+            "type": "boolean",
+            "title": "Semantic Ok"
+          },
+          "execution_ready": {
+            "type": "boolean",
+            "title": "Execution Ready"
+          },
+          "conforms": {
+            "type": "boolean",
+            "title": "Conforms"
+          },
+          "unknown_classes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown Classes"
+          },
+          "unknown_properties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unknown Properties"
+          },
+          "missing_type_subjects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Type Subjects"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconConformityIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "version",
+          "canonical_country_uri",
+          "triple_count",
+          "structure_ok",
+          "semantic_ok",
+          "execution_ready",
+          "conforms"
+        ],
+        "title": "LexiconConformityCheckResponse"
+      },
+      "LexiconConformityIssue": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "predicate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predicate"
+          },
+          "object": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "LexiconConformityIssue"
+      },
+      "LexiconEntityInput": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id"
+          },
+          "class_uri": {
+            "type": "string",
+            "title": "Class Uri"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconEntityPropertyInput"
+            },
+            "type": "array",
+            "title": "Properties"
+          },
+          "relations": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconEntityRelationInput"
+            },
+            "type": "array",
+            "title": "Relations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_id",
+          "class_uri"
+        ],
+        "title": "LexiconEntityInput"
+      },
+      "LexiconEntityPropertyInput": {
+        "properties": {
+          "property_uri": {
+            "type": "string",
+            "title": "Property Uri"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "datatype_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datatype Uri"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          }
+        },
+        "type": "object",
+        "required": [
+          "property_uri",
+          "value"
+        ],
+        "title": "LexiconEntityPropertyInput"
+      },
+      "LexiconEntityRelationInput": {
+        "properties": {
+          "predicate_uri": {
+            "type": "string",
+            "title": "Predicate Uri"
+          },
+          "target_entity_id": {
+            "type": "string",
+            "title": "Target Entity Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "predicate_uri",
+          "target_entity_id"
+        ],
+        "title": "LexiconEntityRelationInput"
+      },
+      "LexiconExecutionProfile": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "entry_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Node Id"
+          },
+          "node_count": {
+            "type": "integer",
+            "title": "Node Count"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "open": {
+            "type": "boolean",
+            "title": "Open"
+          },
+          "broken": {
+            "type": "boolean",
+            "title": "Broken"
+          },
+          "target_classes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Classes"
+          },
+          "property_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Property Paths"
+          },
+          "relation_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Relation Paths"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconExecutionTarget"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconExecutionProfileNode"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "node_count",
+          "complete",
+          "open",
+          "broken"
+        ],
+        "title": "LexiconExecutionProfile"
+      },
+      "LexiconExecutionProfileNode": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "element_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Element Type"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "target_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Class"
+          },
+          "property_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Property Path"
+          },
+          "operator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator"
+          },
+          "value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "branches": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconBranchReference"
+            },
+            "type": "array",
+            "title": "Branches"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id"
+        ],
+        "title": "LexiconExecutionProfileNode"
+      },
+      "LexiconExecutionTarget": {
+        "properties": {
+          "target_class": {
+            "type": "string",
+            "title": "Target Class"
+          },
+          "node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Node Ids"
+          },
+          "property_requirements": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconPropertyRequirement"
+            },
+            "type": "array",
+            "title": "Property Requirements"
+          },
+          "relation_requirements": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Relation Requirements"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_class"
+        ],
+        "title": "LexiconExecutionTarget"
+      },
+      "LexiconHealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "ontologies_connected": {
+            "type": "boolean",
+            "title": "Ontologies Connected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "ontologies_connected"
+        ],
+        "title": "LexiconHealthResponse"
+      },
+      "LexiconProfileDeriveRequest": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ontology Family",
+            "default": "fbo"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Version",
+            "default": "latest"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "country"
+        ],
+        "title": "LexiconProfileDeriveRequest"
+      },
+      "LexiconProfileDeriveResponse": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "canonical_family_uri": {
+            "type": "string",
+            "title": "Canonical Family Uri"
+          },
+          "canonical_country_uri": {
+            "type": "string",
+            "title": "Canonical Country Uri"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/LexiconExecutionProfile"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "version",
+          "canonical_family_uri",
+          "canonical_country_uri",
+          "profile"
+        ],
+        "title": "LexiconProfileDeriveResponse"
+      },
+      "LexiconPropertyRequirement": {
+        "properties": {
+          "property_path": {
+            "type": "string",
+            "title": "Property Path"
+          },
+          "node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Node Ids"
+          },
+          "operators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Operators"
+          },
+          "sample_values": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sample Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "property_path"
+        ],
+        "title": "LexiconPropertyRequirement"
+      },
+      "LexiconReconstructionRequest": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ontology Family",
+            "default": "fbo"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Version",
+            "default": "latest"
+          },
+          "graph_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Graph Id",
+            "default": "lexicon-reconstruction"
+          },
+          "instance_base_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance Base Uri"
+          },
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconEntityInput"
+            },
+            "type": "array",
+            "title": "Entities"
+          }
+        },
+        "type": "object",
+        "required": [
+          "country"
+        ],
+        "title": "LexiconReconstructionRequest"
+      },
+      "LexiconReconstructionResponse": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "graph_id": {
+            "type": "string",
+            "title": "Graph Id"
+          },
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "canonical_family_uri": {
+            "type": "string",
+            "title": "Canonical Family Uri"
+          },
+          "canonical_country_uri": {
+            "type": "string",
+            "title": "Canonical Country Uri"
+          },
+          "ontology_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ontology Uri"
+          },
+          "version_iri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Iri"
+          },
+          "triple_count": {
+            "type": "integer",
+            "title": "Triple Count"
+          },
+          "ttl": {
+            "type": "string",
+            "title": "Ttl"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "version",
+          "graph_id",
+          "graph_uri",
+          "canonical_family_uri",
+          "canonical_country_uri",
+          "triple_count",
+          "ttl"
+        ],
+        "title": "LexiconReconstructionResponse"
+      },
       "OntologyDeleteResponse": {
         "properties": {
           "success": {
@@ -4370,6 +5355,235 @@
           "graph_uri"
         ],
         "title": "OntologyDeleteResponse"
+      },
+      "OntologyDictionaryConversionRequest": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "maxLength": 10,
+            "minLength": 7,
+            "title": "Version",
+            "description": "Release id in YYYY.MM or YYYY.MM.DD form"
+          },
+          "dictionary_json": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dictionary Json",
+            "description": "Inline bSDD or dictionary JSON payload to convert into ontology TTL"
+          },
+          "source_resource_filename": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Resource Filename",
+            "description": "Optional local JSON resource filename, for example rir-1.0.json or ifc-4.3.json"
+          },
+          "output_resource_filename": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Resource Filename",
+            "description": "Optional local TTL resource filename to save after conversion"
+          },
+          "publish": {
+            "type": "boolean",
+            "title": "Publish",
+            "default": false
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OntologyReleaseStatus"
+              }
+            ],
+            "default": "draft"
+          },
+          "issued_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issued At"
+          },
+          "default_version": {
+            "type": "boolean",
+            "title": "Default Version",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "version"
+        ],
+        "title": "OntologyDictionaryConversionRequest"
+      },
+      "OntologyDictionaryConversionResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "source_dictionary_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Dictionary Name"
+          },
+          "source_dictionary_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Dictionary Code"
+          },
+          "source_dictionary_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Dictionary Version"
+          },
+          "source_resource_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Resource Filename"
+          },
+          "output_resource_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Resource Filename"
+          },
+          "ontology_uri": {
+            "type": "string",
+            "title": "Ontology Uri"
+          },
+          "version_iri": {
+            "type": "string",
+            "title": "Version Iri"
+          },
+          "class_count": {
+            "type": "integer",
+            "title": "Class Count"
+          },
+          "property_count": {
+            "type": "integer",
+            "title": "Property Count"
+          },
+          "datatype_property_count": {
+            "type": "integer",
+            "title": "Datatype Property Count"
+          },
+          "object_property_count": {
+            "type": "integer",
+            "title": "Object Property Count"
+          },
+          "ttl": {
+            "type": "string",
+            "title": "Ttl"
+          },
+          "published": {
+            "type": "boolean",
+            "title": "Published",
+            "default": false
+          },
+          "publish_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OntologyPublishResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "version",
+          "ontology_uri",
+          "version_iri",
+          "class_count",
+          "property_count",
+          "datatype_property_count",
+          "object_property_count",
+          "ttl"
+        ],
+        "title": "OntologyDictionaryConversionResponse"
       },
       "OntologyHealthResponse": {
         "properties": {

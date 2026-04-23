@@ -150,6 +150,24 @@ class DummyOntologyRepo:
     def delete_version(self, ontology_family: str, country: str, version: str) -> str:
         return f"https://api.firebim.org/ontologies/{ontology_family}/{country}/versions/{version}"
 
+    def load_local_resource(self, filename: str) -> str:
+        if filename == "rir-1.0.json":
+            return (
+                '{'
+                '"DictionaryName":"RIR",'
+                '"DictionaryCode":"rir",'
+                '"DictionaryVersion":"1.0",'
+                '"Classes":[{"Code":"FireCompartment","Name":"Fire Compartment","ClassType":"Class"}],'
+                '"Properties":[{"Code":"AreaFireCompartment","Name":"Area","DataType":"Real"}]'
+                '}'
+            )
+        raise ValueError(f"Local ontology resource not found: {filename}")
+
+    def save_local_resource(self, filename: str, content: str) -> str:
+        assert filename.endswith(".ttl")
+        assert "owl:Ontology" in content
+        return f"C:\\dummy\\resources\\{filename}"
+
 
 def _dummy_current_user():
     return {"id": "user-1"}
@@ -228,3 +246,31 @@ def test_publish_and_delete_ontology(monkeypatch):
     delete = client.delete("/ontologies/fbo/dk/versions/2026.04.23")
     assert delete.status_code == 200
     assert delete.json()["deleted"] is True
+
+
+def test_convert_dictionary_json_to_ttl(monkeypatch):
+    client = _build_client(monkeypatch)
+
+    response = client.post(
+        "/ontologies/conversions/dictionary-json-to-ttl",
+        json={
+            "ontology_family": "rir",
+            "country": "global",
+            "version": "2026.03.25",
+            "source_resource_filename": "rir-1.0.json",
+            "output_resource_filename": "rir-global.ttl",
+            "publish": True,
+            "status": "candidate",
+            "issued_at": "2026-03-25",
+            "default_version": True,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source_dictionary_code"] == "rir"
+    assert body["class_count"] == 1
+    assert body["property_count"] == 1
+    assert body["published"] is True
+    assert body["publish_result"]["graph_uri"] == "https://api.firebim.org/ontologies/rir/global/versions/2026.03.25"
+    assert "owl:Ontology" in body["ttl"]

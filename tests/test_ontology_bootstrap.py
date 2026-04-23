@@ -1,6 +1,19 @@
 from __future__ import annotations
 
+import os
 from datetime import date
+
+os.environ.setdefault("POSTGRES_HOST", "localhost")
+os.environ.setdefault("POSTGRES_USER", "postgres")
+os.environ.setdefault("POSTGRES_PASSWORD", "postgres")
+os.environ.setdefault("POSTGRES_DB", "firebim")
+os.environ.setdefault("S3_ENDPOINT_URL", "http://localhost:9000")
+os.environ.setdefault("S3_BUCKET_NAME", "firebim")
+os.environ.setdefault("S3_ACCESS_KEY_ID", "minioadmin")
+os.environ.setdefault("S3_SECRET_ACCESS_KEY", "minioadmin")
+os.environ.setdefault("S3_REGION", "us-east-1")
+os.environ.setdefault("CELERY_BROKER_URL", "redis://localhost:6379/0")
+os.environ.setdefault("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
 
 from app.storage.ontology_bootstrap import (
     DEFAULT_ONTOLOGY_RELEASE_VERSION,
@@ -21,8 +34,25 @@ class DummyBootstrapRepo:
             raise OntologyManifestNotFoundError("missing")
         return self.manifests[key]
 
-    def _load_local_resource(self, filename: str) -> str:
-        country = filename.removeprefix("fbo-").removesuffix(".ttl")
+    def load_local_resource(self, filename: str) -> str:
+        if filename == "ifc-global.ttl":
+            return (
+                "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+                "@prefix ifc: <https://firebim.org/ontologies/ifc/global#> .\n"
+                "<https://firebim.org/ontologies/ifc/global#> a owl:Ontology .\n"
+                "ifc:IfcWall a owl:Class .\n"
+            )
+        if filename == "ifc-4.3.json":
+            return (
+                '{'
+                '"DictionaryName":"IFC 4.3",'
+                '"DictionaryVersion":"4.3",'
+                '"Classes":[{"Code":"IfcWall","Name":"Wall","ClassType":"Class","ParentClassCode":"IfcBuiltElement"}],'
+                '"Properties":[{"Code":"FireRating","Name":"Fire Rating","PropertyValueKind":"Single"}]'
+                '}'
+            )
+        stem = filename.removesuffix(".ttl")
+        _, _, country = stem.partition("-")
         return (
             "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
             f"<https://firebim.org/ontologies/fbo/{country}#> a owl:Ontology .\n"
@@ -49,10 +79,37 @@ def test_bootstrap_publishes_missing_default_ontologies():
 
     results = bootstrap_default_ontologies(repo)
 
-    assert len(results) == 5
+    assert len(results) == 7
     assert all(item["seeded"] is True for item in results)
-    assert [payload.country for payload in repo.published_payloads] == ["dk", "be", "lt", "nl", "pt"]
-    assert all(payload.version == DEFAULT_ONTOLOGY_RELEASE_VERSION for payload in repo.published_payloads)
+    assert [payload.country for payload in repo.published_payloads] == [
+        "dk",
+        "be",
+        "lt",
+        "nl",
+        "pt",
+        "global",
+        "global",
+    ]
+    assert [payload.ontology_family for payload in repo.published_payloads] == [
+        "fbo",
+        "fbo",
+        "fbo",
+        "fbo",
+        "fbo",
+        "rir",
+        "ifc",
+    ]
+    assert [payload.version for payload in repo.published_payloads[:-2]] == [
+        DEFAULT_ONTOLOGY_RELEASE_VERSION,
+        DEFAULT_ONTOLOGY_RELEASE_VERSION,
+        DEFAULT_ONTOLOGY_RELEASE_VERSION,
+        DEFAULT_ONTOLOGY_RELEASE_VERSION,
+        DEFAULT_ONTOLOGY_RELEASE_VERSION,
+    ]
+    assert repo.published_payloads[-2].version == "2026.03.25"
+    assert repo.published_payloads[-1].version == DEFAULT_ONTOLOGY_RELEASE_VERSION
+    assert repo.published_payloads[-1].ttl is not None
+    assert repo.published_payloads[-1].resource_filename == "ifc-global.ttl"
 
 
 def test_bootstrap_skips_current_release():

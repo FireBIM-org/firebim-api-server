@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import date
+from typing import Literal
 
 from app.schemas.ontologies import OntologyPublishRequest, OntologyReleaseStatus
 from app.storage.graph_store import GraphStoreError
@@ -19,6 +20,7 @@ class OntologyBootstrapSpec:
     ontology_family: str
     country: str
     resource_filename: str
+    source_format: Literal["ttl", "dictionary_json"] = "ttl"
     version: str = DEFAULT_ONTOLOGY_RELEASE_VERSION
     status: OntologyReleaseStatus = OntologyReleaseStatus.draft
     issued_at: date = DEFAULT_ONTOLOGY_RELEASE_DATE
@@ -31,6 +33,24 @@ DEFAULT_ONTOLOGY_BOOTSTRAP_SPECS: tuple[OntologyBootstrapSpec, ...] = (
     OntologyBootstrapSpec(ontology_family="fbo", country="lt", resource_filename="fbo-lt.ttl"),
     OntologyBootstrapSpec(ontology_family="fbo", country="nl", resource_filename="fbo-nl.ttl"),
     OntologyBootstrapSpec(ontology_family="fbo", country="pt", resource_filename="fbo-pt.ttl"),
+    OntologyBootstrapSpec(
+        ontology_family="rir",
+        country="global",
+        resource_filename="rir-global.ttl",
+        version="2026.03.25",
+        status=OntologyReleaseStatus.candidate,
+        issued_at=date(2026, 3, 25),
+        default_version=True,
+    ),
+    OntologyBootstrapSpec(
+        ontology_family="ifc",
+        country="global",
+        resource_filename="ifc-global.ttl",
+        version=DEFAULT_ONTOLOGY_RELEASE_VERSION,
+        status=OntologyReleaseStatus.candidate,
+        issued_at=DEFAULT_ONTOLOGY_RELEASE_DATE,
+        default_version=True,
+    ),
 )
 
 
@@ -59,7 +79,7 @@ def _bootstrap_single_ontology(repo: OntologyRepository, spec: OntologyBootstrap
         )
         raise
 
-    ttl = repo._load_local_resource(spec.resource_filename)
+    ttl = _resolve_bootstrap_ttl(repo, spec)
     metadata = repo._extract_ttl_metadata(ttl)
 
     if manifest is not None:
@@ -85,7 +105,8 @@ def _bootstrap_single_ontology(repo: OntologyRepository, spec: OntologyBootstrap
             version=spec.version,
             status=spec.status,
             issued_at=spec.issued_at,
-            resource_filename=spec.resource_filename,
+            ttl=ttl,
+            resource_filename=spec.resource_filename if spec.source_format == "ttl" else None,
             default_version=spec.default_version,
         )
     )
@@ -106,3 +127,14 @@ __all__ = [
     "OntologyBootstrapSpec",
     "bootstrap_default_ontologies",
 ]
+
+
+def _resolve_bootstrap_ttl(repo: OntologyRepository, spec: OntologyBootstrapSpec) -> str:
+    source_text = repo.load_local_resource(spec.resource_filename)
+    if spec.source_format == "ttl":
+        return source_text
+    if spec.source_format == "dictionary_json":
+        raise ValueError(
+            "Dictionary JSON bootstrap sources are no longer supported at startup; generate a TTL resource instead"
+        )
+    raise ValueError(f"Unsupported ontology bootstrap source format: {spec.source_format}")

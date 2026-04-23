@@ -7,8 +7,14 @@ from fastapi.responses import PlainTextResponse
 
 from app.auth.jwt import get_current_active_user
 from app.core.config import settings
+from app.lexicon.dictionary_ontology import (
+    convert_dictionary_json_text,
+    convert_dictionary_payload,
+)
 from app.schemas.ontologies import (
     OntologyDeleteResponse,
+    OntologyDictionaryConversionRequest,
+    OntologyDictionaryConversionResponse,
     OntologyHealthResponse,
     OntologyPublishRequest,
     OntologyPublishResponse,
@@ -50,6 +56,65 @@ def publish_ontology(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except GraphStoreError as exc:
         logger.exception("Failed to publish ontology", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post(
+    "/conversions/dictionary-json-to-ttl",
+    response_model=OntologyDictionaryConversionResponse,
+)
+def convert_dictionary_json_to_ttl(
+    payload: OntologyDictionaryConversionRequest,
+    _current_user=Depends(get_current_active_user),
+) -> OntologyDictionaryConversionResponse:
+    try:
+        conversion = _build_dictionary_conversion(payload)
+        saved_resource_filename = None
+        if payload.output_resource_filename:
+            repo.save_local_resource(payload.output_resource_filename, conversion.ttl)
+            saved_resource_filename = payload.output_resource_filename
+
+        publish_result = None
+        if payload.publish:
+            if payload.issued_at is None:
+                raise ValueError("issued_at is required when publish=true")
+            published = repo.publish_version(
+                OntologyPublishRequest(
+                    ontology_family=payload.ontology_family,
+                    country=payload.country,
+                    version=payload.version,
+                    status=payload.status,
+                    issued_at=payload.issued_at,
+                    ttl=conversion.ttl,
+                    resource_filename=saved_resource_filename,
+                    default_version=payload.default_version,
+                )
+            )
+            publish_result = OntologyPublishResponse(success=True, **published)
+
+        return OntologyDictionaryConversionResponse(
+            ontology_family=conversion.ontology_family,
+            country=conversion.country,
+            version=conversion.version,
+            source_dictionary_name=conversion.source_dictionary_name,
+            source_dictionary_code=conversion.source_dictionary_code,
+            source_dictionary_version=conversion.source_dictionary_version,
+            source_resource_filename=payload.source_resource_filename,
+            output_resource_filename=saved_resource_filename,
+            ontology_uri=conversion.ontology_uri,
+            version_iri=conversion.version_iri,
+            class_count=conversion.class_count,
+            property_count=conversion.property_count,
+            datatype_property_count=conversion.datatype_property_count,
+            object_property_count=conversion.object_property_count,
+            ttl=conversion.ttl,
+            published=publish_result is not None,
+            publish_result=publish_result,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except GraphStoreError as exc:
+        logger.exception("Failed to convert dictionary JSON to ontology TTL", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
@@ -141,3 +206,22 @@ def _fetch_ontology_version(ontology_family: str, country: str, version: str) ->
     except GraphStoreError as exc:
         logger.exception("Failed to fetch ontology version", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+def _build_dictionary_conversion(payload: OntologyDictionaryConversionRequest):
+    if payload.dictionary_json is not None:
+        return convert_dictionary_payload(
+            payload.dictionary_json,
+            ontology_family=payload.ontology_family,
+            country=payload.country,
+            version=payload.version,
+        )
+    if payload.source_resource_filename:
+        source_text = repo.load_local_resource(payload.source_resource_filename)
+        return convert_dictionary_json_text(
+            source_text,
+            ontology_family=payload.ontology_family,
+            country=payload.country,
+            version=payload.version,
+        )
+    raise ValueError("Either dictionary_json or source_resource_filename must be provided")

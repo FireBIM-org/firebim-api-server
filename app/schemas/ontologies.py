@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -114,6 +115,81 @@ class OntologyPublishResponse(BaseModel):
     error: str | None = None
     message: str | None = None
     fallback: bool = False
+
+
+class OntologyDictionaryConversionRequest(BaseModel):
+    ontology_family: str = Field(..., min_length=1)
+    country: str = Field(..., min_length=2)
+    version: str = Field(
+        ...,
+        min_length=7,
+        max_length=10,
+        description="Release id in YYYY.MM or YYYY.MM.DD form",
+    )
+    dictionary_json: dict[str, Any] | None = Field(
+        default=None,
+        description="Inline bSDD or dictionary JSON payload to convert into ontology TTL",
+    )
+    source_resource_filename: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Optional local JSON resource filename, for example rir-1.0.json or ifc-4.3.json",
+    )
+    output_resource_filename: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Optional local TTL resource filename to save after conversion",
+    )
+    publish: bool = False
+    status: OntologyReleaseStatus = OntologyReleaseStatus.draft
+    issued_at: date | None = None
+    default_version: bool = False
+
+    @field_validator("ontology_family", "country")
+    @classmethod
+    def _normalize_conversion_slug(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("value must not be empty")
+        return normalized
+
+    @field_validator("version")
+    @classmethod
+    def _validate_conversion_version(cls, value: str) -> str:
+        return OntologyPublishRequest._validate_version(value)
+
+    @field_validator("source_resource_filename", "output_resource_filename")
+    @classmethod
+    def _validate_plain_filename(cls, value: str | None) -> str | None:
+        return OntologyPublishRequest._validate_resource_filename(value)
+
+    @field_validator("dictionary_json")
+    @classmethod
+    def _normalize_dictionary_json(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        if value is None:
+            return None
+        return value
+
+
+class OntologyDictionaryConversionResponse(BaseModel):
+    success: bool = True
+    ontology_family: str
+    country: str
+    version: str
+    source_dictionary_name: str | None = None
+    source_dictionary_code: str | None = None
+    source_dictionary_version: str | None = None
+    source_resource_filename: str | None = None
+    output_resource_filename: str | None = None
+    ontology_uri: str
+    version_iri: str
+    class_count: int
+    property_count: int
+    datatype_property_count: int
+    object_property_count: int
+    ttl: str
+    published: bool = False
+    publish_result: OntologyPublishResponse | None = None
 
 
 class OntologyDeleteResponse(BaseModel):

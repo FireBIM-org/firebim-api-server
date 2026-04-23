@@ -183,15 +183,22 @@ class OntologyRepository:
         if payload.ttl:
             return payload.ttl, payload.resource_filename
         if payload.resource_filename:
-            return self._load_local_resource(payload.resource_filename), payload.resource_filename
+            return self.load_local_resource(payload.resource_filename), payload.resource_filename
         raise ValueError("Either ttl or resource_filename must be provided")
 
-    def _load_local_resource(self, filename: str) -> str:
+    def load_local_resource(self, filename: str) -> str:
         for directory in LOCAL_RESOURCE_DIRECTORIES:
             candidate = directory / filename
             if candidate.exists():
                 return candidate.read_text(encoding="utf-8")
         raise ValueError(f"Local ontology resource not found: {filename}")
+
+    def save_local_resource(self, filename: str, content: str) -> str:
+        target_directory = LOCAL_RESOURCE_DIRECTORIES[-1]
+        target_directory.mkdir(parents=True, exist_ok=True)
+        target_path = target_directory / filename
+        target_path.write_text(content, encoding="utf-8")
+        return str(target_path)
 
     def _manifest_key(self, ontology_family: str, country: str) -> str:
         return f"{MANIFEST_ROOT_PREFIX}/{ontology_family}/{country}.json"
