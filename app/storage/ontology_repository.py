@@ -1,392 +1,375 @@
 from __future__ import annotations
 
+import hashlib
 import json
-from datetime import date
-from hashlib import sha256
+from datetime import UTC, date, datetime
+from pathlib import Path
 
-import boto3
 from botocore.exceptions import BotoCoreError, ClientError
+from rdflib import Graph
+from rdflib.namespace import OWL, RDF, RDFS
 
-from app.core.config import settings
 from app.schemas.ontologies import (
-    OntologyDeleteResponse,
-    OntologyManifest,
     OntologyPublishRequest,
-    OntologyPublishResponse,
-    OntologySummaryResponse,
-    OntologyVersionListItem,
+    OntologyReleaseStatus,
+    OntologyVersionFetchResponse,
     OntologyVersionListResponse,
-    OntologyVersionManifestEntry,
-    OntologyVersionResponse,
+    OntologyVersionMetadata,
+)
+from app.storage.graph_store import GraphStoreClient, GraphStoreError, GraphStoreNotFoundError
+
+ONTOLOGIES_DATASET = "ontologies"
+ONTOLOGY_DISTRIBUTION_BASE_URI = "https://api.firebim.org/ontologies/"
+CANONICAL_ONTOLOGY_BASE_URI = "https://firebim.org/ontologies/"
+MANIFEST_ROOT_PREFIX = "ontologies/manifests"
+LOCAL_RESOURCE_DIRECTORIES = (
+    Path(__file__).resolve().parents[1] / "ontologies" / "resources",
+    Path(__file__).resolve().parents[1] / "lexicon" / "resources",
 )
 
 
-class OntologyRepositoryError(Exception):
-    pass
-
-
-class OntologyRepositoryNotFoundError(OntologyRepositoryError):
+class OntologyManifestNotFoundError(GraphStoreNotFoundError):
     pass
 
 
 class OntologyRepository:
-    ROOT_PREFIX = "ontologies"
-    DISTRIBUTION_ROOT = "/ontologies"
-    CANONICAL_ROOT = "https://firebim.org/ontology"
-
-    def __init__(
-        self,
-        *,
-        bucket_name: str | None = None,
-        endpoint_url: str | None = None,
-        access_key_id: str | None = None,
-        secret_access_key: str | None = None,
-        region_name: str | None = None,
-        s3_client=None,
-    ) -> None:
-        self.bucket_name = bucket_name or settings.S3_BUCKET_NAME
-        self.client = s3_client or boto3.client(
-            "s3",
-            endpoint_url=endpoint_url or settings.S3_ENDPOINT_URL,
-            aws_access_key_id=access_key_id or settings.S3_ACCESS_KEY_ID,
-            aws_secret_access_key=(secret_access_key or settings.S3_SECRET_ACCESS_KEY.get_secret_value()),
-            region_name=region_name or settings.S3_REGION,
-        )
-
-    def _country_prefix(self, ontology_family: str, country: str) -> str:
-        family = self._normalize_path_segment(ontology_family, "ontology_family")
-        code = self._normalize_path_segment(country, "country")
-        return f"{self.ROOT_PREFIX}/{family}/{code}"
-
-    def _manifest_key(self, ontology_family: str, country: str) -> str:
-        return f"{self._country_prefix(ontology_family, country)}/manifest.json"
-
-    def _default_content_key(self, ontology_family: str, country: str, version: str) -> str:
-        family = self._normalize_path_segment(ontology_family, "ontology_family")
-        code = self._normalize_path_segment(country, "country")
-        cleaned_version = self._normalize_version(version)
-        return f"{self.ROOT_PREFIX}/{family}/{code}/{cleaned_version}/ontology.ttl"
-
-    @staticmethod
-    def _normalize_path_segment(value: str, name: str) -> str:
-        normalized = str(value).strip().strip("/").lower()
-        if not normalized:
-            raise ValueError(f"{name} must not be empty")
-        return normalized
-
-    @staticmethod
-    def _normalize_version(value: str) -> str:
-        normalized = str(value).strip()
-        if not normalized:
-            raise ValueError("version must not be empty")
-        parts = normalized.split(".")
-        if len(parts) != 2 or len(parts[0]) != 4 or len(parts[1]) != 2:
-            raise ValueError("version must follow the release id format YYYY.MM")
-        if not parts[0].isdigit() or not parts[1].isdigit():
-            raise ValueError("version must follow the release id format YYYY.MM")
-        return normalized
-
-    @classmethod
-    def canonical_family_uri(cls, ontology_family: str) -> str:
-        family = cls._normalize_path_segment(ontology_family, "ontology_family")
-        return f"{cls.CANONICAL_ROOT}/{family}#"
-
-    @classmethod
-    def canonical_country_uri(cls, ontology_family: str, country: str) -> str:
-        family = cls._normalize_path_segment(ontology_family, "ontology_family")
-        code = cls._normalize_path_segment(country, "country")
-        return f"{cls.CANONICAL_ROOT}/{family}/{code}#"
-
-    @staticmethod
-    def _parse_issued_at(raw: str) -> tuple[date, str]:
-        return date.fromisoformat(raw), raw
-
-    def _read_json_object(self, key: str) -> dict:
-        try:
-            response = self.client.get_object(Bucket=self.bucket_name, Key=key)
-        except ClientError as exc:
-            code = str(exc.response.get("Error", {}).get("Code", ""))
-            if code in {"404", "NoSuchKey", "NotFound"}:
-                raise OntologyRepositoryNotFoundError(f"Ontology manifest not found: {key}") from exc
-            raise OntologyRepositoryError(f"Ontology manifest fetch failed: {exc}") from exc
-        except BotoCoreError as exc:
-            raise OntologyRepositoryError(f"Ontology manifest fetch failed: {exc}") from exc
-
-        try:
-            payload = response["Body"].read().decode("utf-8")
-            return json.loads(payload)
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise OntologyRepositoryError(f"Ontology manifest is invalid JSON: {exc}") from exc
-
-    def _load_manifest(self, ontology_family: str, country: str) -> OntologyManifest:
-        key = self._manifest_key(ontology_family, country)
-        data = self._read_json_object(key)
-        if "ontology_family" not in data:
-            data["ontology_family"] = self._normalize_path_segment(ontology_family, "ontology_family")
-        if "country" not in data:
-            data["country"] = self._normalize_path_segment(country, "country")
-        try:
-            return OntologyManifest.model_validate(data)
-        except Exception as exc:
-            raise OntologyRepositoryError(f"Ontology manifest is invalid: {exc}") from exc
-
-    def _load_manifest_or_empty(self, ontology_family: str, country: str) -> OntologyManifest:
-        try:
-            return self._load_manifest(ontology_family, country)
-        except OntologyRepositoryNotFoundError:
-            return OntologyManifest(
-                ontology_family=self._normalize_path_segment(ontology_family, "ontology_family"),
-                country=self._normalize_path_segment(country, "country"),
-                versions=[],
-            )
-
-    def _write_manifest(self, manifest: OntologyManifest) -> None:
-        key = self._manifest_key(manifest.ontology_family, manifest.country)
-        try:
-            self.client.put_object(
-                Bucket=self.bucket_name,
-                Key=key,
-                Body=manifest.model_dump_json(indent=2).encode("utf-8"),
-                ContentType="application/json",
-            )
-        except (BotoCoreError, ClientError) as exc:
-            raise OntologyRepositoryError(f"Ontology manifest write failed: {exc}") from exc
+    def __init__(self, client: GraphStoreClient | None = None) -> None:
+        self.client = client or GraphStoreClient()
+        self.dataset = ONTOLOGIES_DATASET
+        self.distribution_base_uri = ONTOLOGY_DISTRIBUTION_BASE_URI
+        self.canonical_base_uri = CANONICAL_ONTOLOGY_BASE_URI
 
     def health(self) -> bool:
-        try:
-            self.client.head_bucket(Bucket=self.bucket_name)
-            self.client.list_objects_v2(
-                Bucket=self.bucket_name,
-                Prefix=f"{self.ROOT_PREFIX}/",
-                MaxKeys=1,
-            )
-            return True
-        except (BotoCoreError, ClientError):
-            return False
+        return self.client.ping_dataset(self.dataset)
 
-    def _build_item(
-        self,
-        manifest: OntologyManifest,
-        entry: OntologyVersionManifestEntry,
-        *,
-        latest_version: str | None,
-        stable_version: str | None,
-        default_version: str | None,
-    ) -> OntologyVersionListItem:
-        family = manifest.ontology_family
-        country = manifest.country
-        url = f"{self.DISTRIBUTION_ROOT}/{family}/{country}/versions/{entry.version}"
-        content_url = f"{url}/content"
-        return OntologyVersionListItem(
-            version=entry.version,
-            status=entry.status,
-            issued_at=entry.issued_at,
-            is_latest=entry.version == latest_version,
-            is_stable=entry.version == stable_version,
-            is_default=entry.version == default_version,
-            url=url,
-            content_url=content_url,
-            content_type=entry.content_type,
-            size_bytes=entry.size_bytes,
-            checksum_sha256=entry.checksum_sha256,
-        )
+    def resource_directories(self) -> list[str]:
+        return [str(path) for path in LOCAL_RESOURCE_DIRECTORIES if path.exists()]
+
+    def canonical_family_uri(self, ontology_family: str) -> str:
+        return f"{self.canonical_base_uri}{ontology_family}#"
+
+    def canonical_country_uri(self, ontology_family: str, country: str) -> str:
+        return f"{self.canonical_base_uri}{ontology_family}/{country}#"
+
+    def distribution_graph_uri(self, ontology_family: str, country: str, version: str) -> str:
+        return f"{self.distribution_base_uri}{ontology_family}/{country}/versions/{version}"
 
     def list_versions(self, ontology_family: str, country: str) -> OntologyVersionListResponse:
         manifest = self._load_manifest(ontology_family, country)
-        entries = list(manifest.versions)
-        entries.sort(key=lambda item: (self._parse_issued_at(item.issued_at), item.version), reverse=True)
-        latest_version = entries[0].version if entries else None
-        stable_entries = [item for item in entries if item.status.lower() == "stable"]
-        stable_version = stable_entries[0].version if stable_entries else None
-        default_version = manifest.default_version or stable_version or latest_version
-
+        versions = self._version_models_from_manifest(manifest, ontology_family, country)
         return OntologyVersionListResponse(
-            ontology_family=manifest.ontology_family,
-            country=manifest.country,
-            versions=[
-                self._build_item(
-                    manifest,
-                    entry,
-                    latest_version=latest_version,
-                    stable_version=stable_version,
-                    default_version=default_version,
-                )
-                for entry in entries
-            ],
+            ontology_family=ontology_family,
+            country=country,
+            canonical_family_uri=self.canonical_family_uri(ontology_family),
+            canonical_country_uri=self.canonical_country_uri(ontology_family, country),
+            versions=versions,
         )
 
-    def get_summary(self, ontology_family: str, country: str) -> OntologySummaryResponse:
-        listing = self.list_versions(ontology_family, country)
-        latest = next((item.version for item in listing.versions if item.is_latest), None)
-        stable = next((item.version for item in listing.versions if item.is_stable), None)
-        default = next((item.version for item in listing.versions if item.is_default), None)
-        family = listing.ontology_family
-        code = listing.country
-        return OntologySummaryResponse(
-            ontology_family=family,
-            country=code,
-            canonical_family_uri=self.canonical_family_uri(family),
-            canonical_country_uri=self.canonical_country_uri(family, code),
-            latest_version=latest,
-            latest_stable_version=stable,
-            default_version=default,
-            available_versions_url=f"{self.DISTRIBUTION_ROOT}/{family}/{code}/versions",
-            latest_url=f"{self.DISTRIBUTION_ROOT}/{family}/{code}/versions/latest",
-            stable_url=f"{self.DISTRIBUTION_ROOT}/{family}/{code}/versions/stable",
-        )
-
-    def get_version(self, ontology_family: str, country: str, version: str) -> OntologyVersionResponse:
-        version = self._normalize_version(version)
-        listing = self.list_versions(ontology_family, country)
-        item = next((entry for entry in listing.versions if entry.version == version), None)
-        if item is None:
-            raise OntologyRepositoryNotFoundError(
-                f"Ontology version not found: {listing.ontology_family}/{listing.country}/{version}"
-            )
-        return OntologyVersionResponse(
-            ontology_family=listing.ontology_family,
-            country=listing.country,
-            canonical_family_uri=self.canonical_family_uri(listing.ontology_family),
-            canonical_country_uri=self.canonical_country_uri(listing.ontology_family, listing.country),
-            version=item.version,
-            status=item.status,
-            issued_at=item.issued_at,
-            is_latest=item.is_latest,
-            is_stable=item.is_stable,
-            is_default=item.is_default,
-            url=item.url,
-            content_url=item.content_url,
-            content_type=item.content_type,
-            size_bytes=item.size_bytes,
-            checksum_sha256=item.checksum_sha256,
-        )
-
-    def get_latest_version(self, ontology_family: str, country: str) -> OntologyVersionResponse:
-        listing = self.list_versions(ontology_family, country)
-        item = next((entry for entry in listing.versions if entry.is_latest), None)
-        if item is None:
-            raise OntologyRepositoryNotFoundError(
-                f"No ontology versions found for: {listing.ontology_family}/{listing.country}"
-            )
-        return self.get_version(listing.ontology_family, listing.country, item.version)
-
-    def get_latest_stable_version(self, ontology_family: str, country: str) -> OntologyVersionResponse:
-        listing = self.list_versions(ontology_family, country)
-        item = next((entry for entry in listing.versions if entry.is_stable), None)
-        if item is None:
-            raise OntologyRepositoryNotFoundError(
-                f"No stable ontology version found for: {listing.ontology_family}/{listing.country}"
-            )
-        return self.get_version(listing.ontology_family, listing.country, item.version)
-
-    def get_version_content(self, ontology_family: str, country: str, version: str) -> tuple[bytes, str]:
-        version = self._normalize_version(version)
+    def get_summary(self, ontology_family: str, country: str) -> dict:
         manifest = self._load_manifest(ontology_family, country)
-        entry = next((item for item in manifest.versions if item.version == version), None)
-        if entry is None:
-            raise OntologyRepositoryNotFoundError(
-                f"Ontology version not found: {manifest.ontology_family}/{manifest.country}/{version}"
-            )
+        versions = manifest.get("versions", [])
+        latest_version = self._latest_version(versions)
+        stable_version = self._latest_stable_version(versions)
+        default_version = manifest.get("default_version") or stable_version or latest_version
+        base_path = f"/ontologies/{ontology_family}/{country}"
+        return {
+            "ontology_family": ontology_family,
+            "country": country,
+            "canonical_family_uri": self.canonical_family_uri(ontology_family),
+            "canonical_country_uri": self.canonical_country_uri(ontology_family, country),
+            "latest_version": latest_version,
+            "latest_stable_version": stable_version,
+            "default_version": default_version,
+            "available_versions_url": f"{base_path}/versions",
+            "latest_url": f"{base_path}/versions/latest",
+            "stable_url": f"{base_path}/versions/stable",
+        }
 
-        key = entry.object_key or self._default_content_key(manifest.ontology_family, manifest.country, entry.version)
+    def fetch_version(self, ontology_family: str, country: str, version: str) -> OntologyVersionFetchResponse:
+        manifest = self._load_manifest(ontology_family, country)
+        resolved_version = self._resolve_version_token(version, manifest.get("versions", []))
+        entry = self._find_version_entry(manifest.get("versions", []), resolved_version)
+        if entry is None:
+            raise GraphStoreNotFoundError(f"Ontology version not found: {ontology_family}/{country}/{resolved_version}")
+        ttl = self.client.get_graph_ttl(self.dataset, entry["graph_uri"])
+        versions = self._version_models_from_manifest(manifest, ontology_family, country)
+        current = next(item for item in versions if item.version == resolved_version)
+        return OntologyVersionFetchResponse(
+            ontology_family=ontology_family,
+            country=country,
+            canonical_family_uri=self.canonical_family_uri(ontology_family),
+            canonical_country_uri=self.canonical_country_uri(ontology_family, country),
+            version=current,
+            ttl=ttl,
+        )
+
+    def publish_version(self, payload: OntologyPublishRequest) -> dict:
+        ttl, resource_filename = self._resolve_ttl_payload(payload)
+        metadata = self._extract_ttl_metadata(ttl)
+        graph_uri = self.distribution_graph_uri(payload.ontology_family, payload.country, payload.version)
+        overwritten = self.exists(graph_uri)
+
+        manifest = self._load_manifest_or_default(payload.ontology_family, payload.country)
+        version_entry = {
+            "version": payload.version,
+            "status": payload.status.value,
+            "issued_at": payload.issued_at.isoformat(),
+            "graph_uri": graph_uri,
+            "ontology_uri": metadata["ontology_uri"],
+            "version_iri": metadata["version_iri"],
+            "label": metadata["label"],
+            "description": metadata["description"],
+            "triple_count": metadata["triple_count"],
+            "byte_size": metadata["byte_size"],
+            "sha256": metadata["sha256"],
+            "imports": metadata["imports"],
+            "resource_filename": resource_filename,
+            "published_at": datetime.now(UTC).isoformat(),
+        }
+        manifest["versions"] = [item for item in manifest.get("versions", []) if item.get("version") != payload.version]
+        manifest["versions"].append(version_entry)
+        manifest["versions"] = self._sorted_version_entries(manifest["versions"])
+
+        latest_stable_version = self._latest_stable_version(manifest["versions"])
+        latest_version = self._latest_version(manifest["versions"])
+        if payload.default_version:
+            manifest["default_version"] = payload.version
+        else:
+            manifest["default_version"] = manifest.get("default_version") or latest_stable_version or latest_version
+
+        self.client.put_graph_ttl(self.dataset, graph_uri, ttl)
+        self._save_manifest(payload.ontology_family, payload.country, manifest)
+
+        return {
+            "published": True,
+            "ontology_family": payload.ontology_family,
+            "country": payload.country,
+            "version": payload.version,
+            "status": payload.status,
+            "graph_uri": graph_uri,
+            "ontology_uri": metadata["ontology_uri"],
+            "canonical_family_uri": self.canonical_family_uri(payload.ontology_family),
+            "canonical_country_uri": self.canonical_country_uri(payload.ontology_family, payload.country),
+            "default_version": manifest["default_version"],
+            "overwritten": overwritten,
+            "triple_count": metadata["triple_count"],
+            "byte_size": metadata["byte_size"],
+            "resource_filename": resource_filename,
+        }
+
+    def delete_version(self, ontology_family: str, country: str, version: str) -> str:
+        manifest = self._load_manifest(ontology_family, country)
+        entry = self._find_version_entry(manifest.get("versions", []), version)
+        if entry is None:
+            raise GraphStoreNotFoundError(f"Ontology version not found: {ontology_family}/{country}/{version}")
+
+        self.client.delete_graph(self.dataset, entry["graph_uri"])
+        remaining_versions = [item for item in manifest.get("versions", []) if item.get("version") != version]
+        manifest["versions"] = remaining_versions
+        latest_stable_version = self._latest_stable_version(remaining_versions)
+        latest_version = self._latest_version(remaining_versions)
+        manifest["default_version"] = latest_stable_version or latest_version
+        self._save_manifest(ontology_family, country, manifest)
+        return entry["graph_uri"]
+
+    def exists(self, graph_uri: str) -> bool:
         try:
-            response = self.client.get_object(Bucket=self.bucket_name, Key=key)
+            ttl = self.client.get_graph_ttl(self.dataset, graph_uri)
+            return bool(ttl.strip())
+        except GraphStoreNotFoundError:
+            return False
+
+    def _resolve_ttl_payload(self, payload: OntologyPublishRequest) -> tuple[str, str | None]:
+        if payload.ttl:
+            return payload.ttl, payload.resource_filename
+        if payload.resource_filename:
+            return self._load_local_resource(payload.resource_filename), payload.resource_filename
+        raise ValueError("Either ttl or resource_filename must be provided")
+
+    def _load_local_resource(self, filename: str) -> str:
+        for directory in LOCAL_RESOURCE_DIRECTORIES:
+            candidate = directory / filename
+            if candidate.exists():
+                return candidate.read_text(encoding="utf-8")
+        raise ValueError(f"Local ontology resource not found: {filename}")
+
+    def _manifest_key(self, ontology_family: str, country: str) -> str:
+        return f"{MANIFEST_ROOT_PREFIX}/{ontology_family}/{country}.json"
+
+    def _load_manifest_or_default(self, ontology_family: str, country: str) -> dict:
+        try:
+            return self._load_manifest(ontology_family, country)
+        except OntologyManifestNotFoundError:
+            return {
+                "ontology_family": ontology_family,
+                "country": country,
+                "default_version": None,
+                "versions": [],
+            }
+
+    def _load_manifest(self, ontology_family: str, country: str) -> dict:
+        key = self._manifest_key(ontology_family, country)
+        try:
+            response = self.client.client.get_object(Bucket=self.client.bucket_name, Key=key)
         except ClientError as exc:
             code = str(exc.response.get("Error", {}).get("Code", ""))
             if code in {"404", "NoSuchKey", "NotFound"}:
-                raise OntologyRepositoryNotFoundError(
-                    f"Ontology content not found: {manifest.ontology_family}/{manifest.country}/{version}"
+                raise OntologyManifestNotFoundError(
+                    f"Ontology manifest not found: {ontology_family}/{country}"
                 ) from exc
-            raise OntologyRepositoryError(f"Ontology content fetch failed: {exc}") from exc
+            raise GraphStoreError(f"Ontology manifest fetch failed: {exc}") from exc
         except BotoCoreError as exc:
-            raise OntologyRepositoryError(f"Ontology content fetch failed: {exc}") from exc
+            raise GraphStoreError(f"Ontology manifest fetch failed: {exc}") from exc
 
-        return response["Body"].read(), entry.content_type
+        body = response["Body"].read().decode("utf-8")
+        manifest = json.loads(body)
+        manifest.setdefault("versions", [])
+        manifest.setdefault("default_version", None)
+        return manifest
 
-    def publish_version(self, payload: OntologyPublishRequest) -> OntologyPublishResponse:
-        family = self._normalize_path_segment(payload.ontology_family, "ontology_family")
-        country = self._normalize_path_segment(payload.country, "country")
-        version = self._normalize_version(payload.version)
-        self._parse_issued_at(payload.issued_at)
-
-        manifest = self._load_manifest_or_empty(family, country)
-        content_key = self._default_content_key(family, country, version)
-        content_bytes = payload.ttl.encode("utf-8")
-        checksum = sha256(content_bytes).hexdigest()
-
-        created = True
-        existing_entry = next((item for item in manifest.versions if item.version == version), None)
-        if existing_entry is not None:
-            created = False
-            manifest.versions = [item for item in manifest.versions if item.version != version]
-
+    def _save_manifest(self, ontology_family: str, country: str, manifest: dict) -> None:
+        key = self._manifest_key(ontology_family, country)
+        payload = json.dumps(manifest, ensure_ascii=True, indent=2, sort_keys=True).encode("utf-8")
         try:
-            self.client.put_object(
-                Bucket=self.bucket_name,
-                Key=content_key,
-                Body=content_bytes,
-                ContentType=payload.content_type,
+            self.client.client.put_object(
+                Bucket=self.client.bucket_name,
+                Key=key,
+                Body=payload,
+                ContentType="application/json",
             )
         except (BotoCoreError, ClientError) as exc:
-            raise OntologyRepositoryError(f"Ontology content publish failed: {exc}") from exc
+            raise GraphStoreError(f"Ontology manifest save failed: {exc}") from exc
 
-        manifest.versions.append(
-            OntologyVersionManifestEntry(
-                version=version,
-                status=payload.status,
-                issued_at=payload.issued_at,
-                object_key=content_key,
-                content_type=payload.content_type,
-                size_bytes=len(content_bytes),
-                checksum_sha256=checksum,
-            )
-        )
-
-        if (
-            payload.default_version
-            or manifest.default_version == version
-            or (manifest.default_version is None and payload.status == "stable")
-        ):
-            manifest.default_version = version
-
-        self._write_manifest(manifest)
-        response = self.get_version(family, country, version)
-        return OntologyPublishResponse(**response.model_dump(), created=created, manifest_updated=True)
-
-    def delete_version(self, ontology_family: str, country: str, version: str) -> OntologyDeleteResponse:
-        family = self._normalize_path_segment(ontology_family, "ontology_family")
-        code = self._normalize_path_segment(country, "country")
-        release_id = self._normalize_version(version)
-        manifest = self._load_manifest(family, code)
-        entry = next((item for item in manifest.versions if item.version == release_id), None)
-        if entry is None:
-            raise OntologyRepositoryNotFoundError(f"Ontology version not found: {family}/{code}/{release_id}")
-
-        content_key = entry.object_key or self._default_content_key(family, code, release_id)
+    def _extract_ttl_metadata(self, ttl: str) -> dict:
+        graph = Graph()
         try:
-            self.client.delete_object(Bucket=self.bucket_name, Key=content_key)
-        except (BotoCoreError, ClientError) as exc:
-            raise OntologyRepositoryError(f"Ontology content delete failed: {exc}") from exc
+            graph.parse(data=ttl, format="turtle")
+        except Exception as exc:
+            raise ValueError(f"Invalid Turtle content: {exc}") from exc
 
-        manifest.versions = [item for item in manifest.versions if item.version != release_id]
-        if manifest.default_version == release_id:
-            stable_versions = [item for item in manifest.versions if item.status == "stable"]
-            if stable_versions:
-                stable_versions.sort(
-                    key=lambda item: (self._parse_issued_at(item.issued_at), item.version),
-                    reverse=True,
+        ontology_uri = None
+        version_iri = None
+        label = None
+        description = None
+        imports: list[str] = []
+
+        ontology_subjects = list(graph.subjects(RDF.type, OWL.Ontology))
+        if ontology_subjects:
+            subject = ontology_subjects[0]
+            ontology_uri = str(subject)
+            version_value = graph.value(subject, OWL.versionIRI)
+            if version_value is not None:
+                version_iri = str(version_value)
+            label_value = graph.value(subject, RDFS.label)
+            if label_value is not None:
+                label = str(label_value)
+            description_value = graph.value(subject, RDFS.comment)
+            if description_value is not None:
+                description = str(description_value)
+            imports = sorted({str(item) for item in graph.objects(subject, OWL.imports)})
+
+        encoded = ttl.encode("utf-8")
+        return {
+            "ontology_uri": ontology_uri,
+            "version_iri": version_iri,
+            "label": label,
+            "description": description,
+            "imports": imports,
+            "triple_count": len(graph),
+            "byte_size": len(encoded),
+            "sha256": hashlib.sha256(encoded).hexdigest(),
+        }
+
+    def _version_models_from_manifest(
+        self,
+        manifest: dict,
+        ontology_family: str,
+        country: str,
+    ) -> list[OntologyVersionMetadata]:
+        latest_version = self._latest_version(manifest.get("versions", []))
+        stable_version = self._latest_stable_version(manifest.get("versions", []))
+        default_version = manifest.get("default_version") or stable_version or latest_version
+        items: list[OntologyVersionMetadata] = []
+        for entry in self._sorted_version_entries(manifest.get("versions", [])):
+            version = str(entry["version"])
+            items.append(
+                OntologyVersionMetadata(
+                    version=version,
+                    status=OntologyReleaseStatus(str(entry["status"])),
+                    issued_at=date.fromisoformat(str(entry["issued_at"])),
+                    is_latest=version == latest_version,
+                    is_stable=version == stable_version,
+                    is_default=version == default_version,
+                    url=f"/ontologies/{ontology_family}/{country}/versions/{version}",
+                    ttl_url=f"/ontologies/{ontology_family}/{country}/versions/{version}/ttl",
+                    graph_uri=str(entry["graph_uri"]),
+                    ontology_uri=entry.get("ontology_uri"),
+                    version_iri=entry.get("version_iri"),
+                    label=entry.get("label"),
+                    description=entry.get("description"),
+                    triple_count=int(entry.get("triple_count", 0)),
+                    byte_size=int(entry.get("byte_size", 0)),
+                    sha256=str(entry.get("sha256", "")),
+                    imports=[str(item) for item in entry.get("imports", [])],
+                    resource_filename=entry.get("resource_filename"),
+                    published_at=datetime.fromisoformat(str(entry["published_at"])),
                 )
-                manifest.default_version = stable_versions[0].version
-            else:
-                manifest.default_version = manifest.versions[0].version if manifest.versions else None
+            )
+        return items
 
-        self._write_manifest(manifest)
-        return OntologyDeleteResponse(
-            ontology_family=family,
-            country=code,
-            version=release_id,
-            deleted=True,
-            deleted_content=True,
-            manifest_updated=True,
-            remaining_versions=len(manifest.versions),
-        )
+    def _resolve_version_token(self, version: str, versions: list[dict]) -> str:
+        if version == "latest":
+            latest = self._latest_version(versions)
+            if latest is None:
+                raise GraphStoreNotFoundError("No ontology versions available")
+            return latest
+        if version == "stable":
+            stable = self._latest_stable_version(versions)
+            if stable is None:
+                raise GraphStoreNotFoundError("No stable ontology version available")
+            return stable
+        return version
+
+    def _find_version_entry(self, versions: list[dict], version: str) -> dict | None:
+        for item in versions:
+            if item.get("version") == version:
+                return item
+        return None
+
+    def _latest_version(self, versions: list[dict]) -> str | None:
+        sorted_versions = self._sorted_version_entries(versions)
+        if not sorted_versions:
+            return None
+        return str(sorted_versions[0]["version"])
+
+    def _latest_stable_version(self, versions: list[dict]) -> str | None:
+        stable_versions = [item for item in versions if item.get("status") == OntologyReleaseStatus.stable.value]
+        sorted_versions = self._sorted_version_entries(stable_versions)
+        if not sorted_versions:
+            return None
+        return str(sorted_versions[0]["version"])
+
+    def _sorted_version_entries(self, versions: list[dict]) -> list[dict]:
+        def _version_key(item: dict) -> tuple[int, int, int]:
+            raw = str(item.get("version", "0000.00"))
+            parts = raw.split(".")
+            if len(parts) == 2:
+                year, month = parts
+                day = "00"
+            elif len(parts) == 3:
+                year, month, day = parts
+            else:
+                return (0, 0, 0)
+            return int(year), int(month), int(day)
+
+        return sorted(versions, key=_version_key, reverse=True)
+
+
+__all__ = [
+    "CANONICAL_ONTOLOGY_BASE_URI",
+    "LOCAL_RESOURCE_DIRECTORIES",
+    "ONTOLOGIES_DATASET",
+    "ONTOLOGY_DISTRIBUTION_BASE_URI",
+    "OntologyManifestNotFoundError",
+    "OntologyRepository",
+]

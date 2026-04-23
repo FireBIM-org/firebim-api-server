@@ -15,13 +15,16 @@ from sqlmodel import Session
 
 from app.api.checks import router as checks_router
 from app.api.graphs import router as graphs_router
+from app.api.ontologies import repo as ontologies_repo
 from app.api.ontologies import router as ontologies_router
+from app.api.rulebuilder import router as rulebuilder_router
 from app.api.rules import router as rules_router
 from app.auth.jwt import get_current_active_user
 from app.auth.router import router as auth_router
 from app.core.config import settings
 from app.models.database import engine, get_db, init_db
 from app.models.models import CheckResult, IdsFile, IfcModel, User
+from app.storage.ontology_bootstrap import bootstrap_default_ontologies
 from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -32,6 +35,7 @@ app = FastAPI(title="FireBIM API")
 app.include_router(auth_router)
 app.include_router(graphs_router)
 app.include_router(ontologies_router)
+app.include_router(rulebuilder_router)
 app.include_router(rules_router)
 app.include_router(checks_router)
 
@@ -81,6 +85,9 @@ async def startup_event():
                 ) from e
         else:
             raise
+
+    seeded_ontologies = bootstrap_default_ontologies(ontologies_repo)
+    logger.info("Ontology bootstrap completed", extra={"seeded_ontologies": seeded_ontologies})
 
 
 # S3 Configuration

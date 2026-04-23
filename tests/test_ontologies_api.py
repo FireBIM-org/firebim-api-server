@@ -1,11 +1,7 @@
-from __future__ import annotations
-
 import os
+from datetime import UTC, date, datetime
 
-import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
+# Minimal settings needed before importing the API modules.
 os.environ.setdefault("POSTGRES_HOST", "localhost")
 os.environ.setdefault("POSTGRES_USER", "postgres")
 os.environ.setdefault("POSTGRES_PASSWORD", "postgres")
@@ -18,259 +14,217 @@ os.environ.setdefault("S3_REGION", "us-east-1")
 os.environ.setdefault("CELERY_BROKER_URL", "redis://localhost:6379/0")
 os.environ.setdefault("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
 
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
 from app.api import ontologies as ontologies_api
-from app.schemas.ontologies import (
-    OntologyDeleteResponse,
-    OntologyPublishResponse,
-    OntologySummaryResponse,
-    OntologyVersionListResponse,
-    OntologyVersionResponse,
-)
+from app.schemas.ontologies import OntologyReleaseStatus, OntologyVersionFetchResponse, OntologyVersionListResponse
 
 
 class DummyOntologyRepo:
-    ROOT_PREFIX = "ontologies"
-
-    def __init__(self):
-        self.published_payload = None
-        self.deleted_key = None
-
-    def health(self):
+    def health(self) -> bool:
         return True
 
-    def get_summary(self, ontology_family: str, country: str):
-        assert ontology_family == "fbo"
-        assert country == "dk"
-        return OntologySummaryResponse(
-            ontology_family="fbo",
-            country="dk",
-            canonical_family_uri="https://firebim.org/ontology/fbo#",
-            canonical_country_uri="https://firebim.org/ontology/fbo/dk#",
-            latest_version="2026.04",
-            latest_stable_version="2026.03",
-            default_version="2026.03",
-            available_versions_url="/ontologies/fbo/dk/versions",
-            latest_url="/ontologies/fbo/dk/versions/latest",
-            stable_url="/ontologies/fbo/dk/versions/stable",
-        )
+    def resource_directories(self) -> list[str]:
+        return ["C:\\dummy\\resources"]
+
+    def get_summary(self, ontology_family: str, country: str) -> dict:
+        return {
+            "ontology_family": ontology_family,
+            "country": country,
+            "canonical_family_uri": f"https://firebim.org/ontologies/{ontology_family}#",
+            "canonical_country_uri": f"https://firebim.org/ontologies/{ontology_family}/{country}#",
+            "latest_version": "2026.04.23",
+            "latest_stable_version": "2026.03",
+            "default_version": "2026.04.23",
+            "available_versions_url": f"/ontologies/{ontology_family}/{country}/versions",
+            "latest_url": f"/ontologies/{ontology_family}/{country}/versions/latest",
+            "stable_url": f"/ontologies/{ontology_family}/{country}/versions/stable",
+        }
 
     def list_versions(self, ontology_family: str, country: str):
-        assert ontology_family == "fbo"
-        assert country == "dk"
         return OntologyVersionListResponse(
-            ontology_family="fbo",
-            country="dk",
+            ontology_family=ontology_family,
+            country=country,
+            canonical_family_uri=f"https://firebim.org/ontologies/{ontology_family}#",
+            canonical_country_uri=f"https://firebim.org/ontologies/{ontology_family}/{country}#",
             versions=[
                 {
-                    "version": "2026.04",
-                    "status": "draft",
-                    "issued_at": "2026-04-10",
+                    "version": "2026.04.23",
+                    "status": OntologyReleaseStatus.draft,
+                    "issued_at": date(2026, 4, 23),
                     "is_latest": True,
                     "is_stable": False,
-                    "is_default": False,
-                    "url": "/ontologies/fbo/dk/versions/2026.04",
-                    "content_url": "/ontologies/fbo/dk/versions/2026.04/content",
-                    "content_type": "text/turtle; charset=utf-8",
+                    "is_default": True,
+                    "url": f"/ontologies/{ontology_family}/{country}/versions/2026.04.23",
+                    "ttl_url": f"/ontologies/{ontology_family}/{country}/versions/2026.04.23/ttl",
+                    "graph_uri": f"https://api.firebim.org/ontologies/{ontology_family}/{country}/versions/2026.04.23",
+                    "ontology_uri": f"https://firebim.org/ontologies/{ontology_family}/{country}#",
+                    "version_iri": f"https://firebim.org/ontologies/{ontology_family}/{country}/2026.04.23#",
+                    "label": "FireBIM DK Ontology",
+                    "description": "Draft ontology",
+                    "triple_count": 12,
+                    "byte_size": 345,
+                    "sha256": "abc123",
+                    "imports": [],
+                    "resource_filename": "fbo-dk.ttl",
+                    "published_at": datetime(2026, 4, 23, tzinfo=UTC),
                 },
                 {
                     "version": "2026.03",
-                    "status": "stable",
-                    "issued_at": "2026-03-01",
+                    "status": OntologyReleaseStatus.stable,
+                    "issued_at": date(2026, 3, 1),
                     "is_latest": False,
                     "is_stable": True,
-                    "is_default": True,
-                    "url": "/ontologies/fbo/dk/versions/2026.03",
-                    "content_url": "/ontologies/fbo/dk/versions/2026.03/content",
-                    "content_type": "text/turtle; charset=utf-8",
+                    "is_default": False,
+                    "url": f"/ontologies/{ontology_family}/{country}/versions/2026.03",
+                    "ttl_url": f"/ontologies/{ontology_family}/{country}/versions/2026.03/ttl",
+                    "graph_uri": f"https://api.firebim.org/ontologies/{ontology_family}/{country}/versions/2026.03",
+                    "ontology_uri": f"https://firebim.org/ontologies/{ontology_family}/{country}#",
+                    "version_iri": f"https://firebim.org/ontologies/{ontology_family}/{country}/2026.03#",
+                    "label": "FireBIM DK Ontology",
+                    "description": "Stable ontology",
+                    "triple_count": 11,
+                    "byte_size": 320,
+                    "sha256": "def456",
+                    "imports": [],
+                    "resource_filename": "fbo-dk.ttl",
+                    "published_at": datetime(2026, 4, 23, tzinfo=UTC),
                 },
             ],
         )
 
-    def get_latest_version(self, ontology_family: str, country: str):
-        return self.get_version(ontology_family, country, "2026.04")
-
-    def get_latest_stable_version(self, ontology_family: str, country: str):
-        return self.get_version(ontology_family, country, "2026.03")
-
-    def get_version(self, ontology_family: str, country: str, version: str):
-        assert ontology_family == "fbo"
-        assert country == "dk"
-        if version == "2026.04":
-            return OntologyVersionResponse(
-                ontology_family="fbo",
-                country="dk",
-                canonical_family_uri="https://firebim.org/ontology/fbo#",
-                canonical_country_uri="https://firebim.org/ontology/fbo/dk#",
-                version="2026.04",
-                status="draft",
-                issued_at="2026-04-10",
-                is_latest=True,
-                is_stable=False,
-                is_default=False,
-                url="/ontologies/fbo/dk/versions/2026.04",
-                content_url="/ontologies/fbo/dk/versions/2026.04/content",
-                content_type="text/turtle; charset=utf-8",
-            )
-        return OntologyVersionResponse(
-            ontology_family="fbo",
-            country="dk",
-            canonical_family_uri="https://firebim.org/ontology/fbo#",
-            canonical_country_uri="https://firebim.org/ontology/fbo/dk#",
-            version="2026.03",
-            status="stable",
-            issued_at="2026-03-01",
-            is_latest=False,
-            is_stable=True,
-            is_default=True,
-            url="/ontologies/fbo/dk/versions/2026.03",
-            content_url="/ontologies/fbo/dk/versions/2026.03/content",
-            content_type="text/turtle; charset=utf-8",
-        )
-
-    def get_version_content(self, ontology_family: str, country: str, version: str):
-        assert ontology_family == "fbo"
-        assert country == "dk"
-        assert version == "2026.03"
-        return (b"@prefix fbo: <https://example.org/fbo/> .\n", "text/turtle; charset=utf-8")
-
-    def publish_version(self, payload):
-        self.published_payload = payload
-        return OntologyPublishResponse(
-            ontology_family="fbo",
-            country="dk",
-            canonical_family_uri="https://firebim.org/ontology/fbo#",
-            canonical_country_uri="https://firebim.org/ontology/fbo/dk#",
-            version=payload.version,
-            status=payload.status,
-            issued_at=payload.issued_at,
-            is_latest=True,
-            is_stable=payload.status == "stable",
-            is_default=payload.default_version,
-            url=f"/ontologies/fbo/dk/versions/{payload.version}",
-            content_url=f"/ontologies/fbo/dk/versions/{payload.version}/content",
-            content_type=payload.content_type,
-            size_bytes=len(payload.ttl.encode("utf-8")),
-            checksum_sha256="dummy-checksum",
-            created=True,
-            manifest_updated=True,
-        )
-
-    def delete_version(self, ontology_family: str, country: str, version: str):
-        self.deleted_key = (ontology_family, country, version)
-        return OntologyDeleteResponse(
+    def fetch_version(self, ontology_family: str, country: str, version: str):
+        resolved = "2026.04.23" if version == "latest" else "2026.03" if version == "stable" else version
+        return OntologyVersionFetchResponse(
             ontology_family=ontology_family,
             country=country,
-            version=version,
-            deleted=True,
-            deleted_content=True,
-            manifest_updated=True,
-            remaining_versions=1,
+            canonical_family_uri=f"https://firebim.org/ontologies/{ontology_family}#",
+            canonical_country_uri=f"https://firebim.org/ontologies/{ontology_family}/{country}#",
+            version={
+                "version": resolved,
+                "status": OntologyReleaseStatus.stable if resolved == "2026.03" else OntologyReleaseStatus.draft,
+                "issued_at": date(2026, 3, 1) if resolved == "2026.03" else date(2026, 4, 23),
+                "is_latest": resolved == "2026.04.23",
+                "is_stable": resolved == "2026.03",
+                "is_default": resolved == "2026.04.23",
+                "url": f"/ontologies/{ontology_family}/{country}/versions/{resolved}",
+                "ttl_url": f"/ontologies/{ontology_family}/{country}/versions/{resolved}/ttl",
+                "graph_uri": f"https://api.firebim.org/ontologies/{ontology_family}/{country}/versions/{resolved}",
+                "ontology_uri": f"https://firebim.org/ontologies/{ontology_family}/{country}#",
+                "version_iri": f"https://firebim.org/ontologies/{ontology_family}/{country}/{resolved}#",
+                "label": "FireBIM DK Ontology",
+                "description": "Ontology release",
+                "triple_count": 12,
+                "byte_size": 345,
+                "sha256": "abc123",
+                "imports": [],
+                "resource_filename": "fbo-dk.ttl",
+                "published_at": datetime(2026, 4, 23, tzinfo=UTC),
+            },
+            ttl=(
+                "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
+                "@prefix fbo-dk: <https://firebim.org/ontologies/fbo/dk#> .\n"
+                "<https://firebim.org/ontologies/fbo/dk#> a owl:Ontology .\n"
+            ),
         )
 
+    def publish_version(self, payload):
+        return {
+            "published": True,
+            "ontology_family": payload.ontology_family,
+            "country": payload.country,
+            "version": payload.version,
+            "status": payload.status,
+            "graph_uri": f"https://api.firebim.org/ontologies/{payload.ontology_family}/{payload.country}/versions/{payload.version}",
+            "ontology_uri": f"https://firebim.org/ontologies/{payload.ontology_family}/{payload.country}#",
+            "canonical_family_uri": f"https://firebim.org/ontologies/{payload.ontology_family}#",
+            "canonical_country_uri": f"https://firebim.org/ontologies/{payload.ontology_family}/{payload.country}#",
+            "default_version": payload.version,
+            "overwritten": False,
+            "triple_count": 12,
+            "byte_size": 345,
+            "resource_filename": payload.resource_filename,
+        }
 
-@pytest.fixture()
-def client(monkeypatch):
+    def delete_version(self, ontology_family: str, country: str, version: str) -> str:
+        return f"https://api.firebim.org/ontologies/{ontology_family}/{country}/versions/{version}"
+
+
+def _dummy_current_user():
+    return {"id": "user-1"}
+
+
+def _build_client(monkeypatch) -> TestClient:
     app = FastAPI()
     app.include_router(ontologies_api.router)
-    dummy_repo = DummyOntologyRepo()
-    monkeypatch.setattr(ontologies_api, "repo", dummy_repo)
-    app.dependency_overrides[ontologies_api.get_current_active_user] = lambda: object()
+    monkeypatch.setattr(ontologies_api, "repo", DummyOntologyRepo())
+    app.dependency_overrides[ontologies_api.get_current_active_user] = _dummy_current_user
     return TestClient(app)
 
 
-def test_ontology_health(client: TestClient):
+def test_ontologies_health(monkeypatch):
+    client = _build_client(monkeypatch)
     response = client.get("/ontologies/health")
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert body["storage_connected"] is True
-    assert body["storage_backend"] == "s3"
+    assert body["dataset"] == "ontologies"
+    assert body["resource_directories"] == ["C:\\dummy\\resources"]
 
 
-def test_ontology_summary(client: TestClient):
-    response = client.get("/ontologies/fbo/dk")
-    assert response.status_code == 200
-    assert response.json() == {
-        "ontology_family": "fbo",
-        "country": "dk",
-        "canonical_family_uri": "https://firebim.org/ontology/fbo#",
-        "canonical_country_uri": "https://firebim.org/ontology/fbo/dk#",
-        "latest_version": "2026.04",
-        "latest_stable_version": "2026.03",
-        "default_version": "2026.03",
-        "available_versions_url": "/ontologies/fbo/dk/versions",
-        "latest_url": "/ontologies/fbo/dk/versions/latest",
-        "stable_url": "/ontologies/fbo/dk/versions/stable",
-    }
+def test_ontology_summary_and_versions(monkeypatch):
+    client = _build_client(monkeypatch)
+
+    summary = client.get("/ontologies/fbo/dk")
+    assert summary.status_code == 200
+    assert summary.json()["default_version"] == "2026.04.23"
+
+    versions = client.get("/ontologies/fbo/dk/versions")
+    assert versions.status_code == 200
+    body = versions.json()
+    assert len(body["versions"]) == 2
+    assert body["versions"][0]["version"] == "2026.04.23"
+    assert body["versions"][0]["is_default"] is True
 
 
-def test_ontology_versions(client: TestClient):
-    response = client.get("/ontologies/fbo/dk/versions")
-    assert response.status_code == 200
-    body = response.json()
-    assert body["ontology_family"] == "fbo"
-    assert body["country"] == "dk"
-    assert [item["version"] for item in body["versions"]] == ["2026.04", "2026.03"]
-    assert body["versions"][1]["is_stable"] is True
-    assert body["versions"][1]["is_default"] is True
+def test_fetch_latest_stable_and_ttl(monkeypatch):
+    client = _build_client(monkeypatch)
+
+    latest = client.get("/ontologies/fbo/dk/versions/latest")
+    assert latest.status_code == 200
+    assert latest.json()["version"]["version"] == "2026.04.23"
+
+    stable = client.get("/ontologies/fbo/dk/versions/stable")
+    assert stable.status_code == 200
+    assert stable.json()["version"]["version"] == "2026.03"
+
+    ttl = client.get("/ontologies/fbo/dk/versions/2026.03/ttl")
+    assert ttl.status_code == 200
+    assert "text/turtle" in ttl.headers["content-type"]
+    assert "owl:Ontology" in ttl.text
 
 
-def test_ontology_latest_and_stable(client: TestClient):
-    latest_response = client.get("/ontologies/fbo/dk/versions/latest")
-    stable_response = client.get("/ontologies/fbo/dk/versions/stable")
+def test_publish_and_delete_ontology(monkeypatch):
+    client = _build_client(monkeypatch)
 
-    assert latest_response.status_code == 200
-    assert latest_response.json()["version"] == "2026.04"
-    assert latest_response.json()["is_latest"] is True
-
-    assert stable_response.status_code == 200
-    assert stable_response.json()["version"] == "2026.03"
-    assert stable_response.json()["is_stable"] is True
-
-
-def test_ontology_content(client: TestClient):
-    response = client.get("/ontologies/fbo/dk/versions/2026.03/content")
-    assert response.status_code == 200
-    assert response.headers["content-type"].startswith("text/turtle")
-    assert "@prefix fbo:" in response.text
-
-
-def test_legacy_api_prefix_still_works(client: TestClient):
-    response = client.get("/api/ontologies/fbo/dk")
-    assert response.status_code == 200
-    assert response.json()["canonical_country_uri"] == "https://firebim.org/ontology/fbo/dk#"
-
-
-def test_publish_ontology_example(client: TestClient):
-    response = client.post(
+    publish = client.post(
         "/ontologies/publish",
         json={
             "ontology_family": "fbo",
             "country": "dk",
-            "version": "2026.05",
-            "status": "candidate",
-            "issued_at": "2026-05-15",
-            "ttl": (
-                "@prefix fbo: <https://firebim.org/ontology/fbo/dk#> .\n"
-                "<https://firebim.org/ontology/fbo/dk#Wall> a "
-                "<https://www.w3.org/2002/07/owl#Class> .\n"
-            ),
-            "default_version": False,
+            "version": "2026.04.23",
+            "status": "draft",
+            "issued_at": "2026-04-23",
+            "resource_filename": "fbo-dk.ttl",
+            "default_version": True,
         },
     )
-    assert response.status_code == 201
-    body = response.json()
-    assert body["version"] == "2026.05"
-    assert body["status"] == "candidate"
-    assert body["url"] == "/ontologies/fbo/dk/versions/2026.05"
-    assert body["created"] is True
+    assert publish.status_code == 200
+    publish_body = publish.json()
+    assert publish_body["published"] is True
+    assert publish_body["resource_filename"] == "fbo-dk.ttl"
 
-
-def test_delete_ontology_version(client: TestClient):
-    response = client.delete("/ontologies/fbo/dk/versions/2026.03")
-    assert response.status_code == 200
-    body = response.json()
-    assert body["ontology_family"] == "fbo"
-    assert body["country"] == "dk"
-    assert body["version"] == "2026.03"
-    assert body["deleted"] is True
+    delete = client.delete("/ontologies/fbo/dk/versions/2026.04.23")
+    assert delete.status_code == 200
+    assert delete.json()["deleted"] is True
