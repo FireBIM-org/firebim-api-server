@@ -45,6 +45,11 @@ def list_catalog_terms(
     version: str,
     kind: str | None = Query(default=None),
     search: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    cursor: str | None = Query(default=None),
+    parent_term_id: str | None = Query(default=None),
+    property_of: str | None = Query(default=None),
+    is_predefined_type: bool | None = Query(default=None),
 ) -> LexiconCatalogTermsResponse:
     try:
         return service.list_catalog_terms(
@@ -53,6 +58,11 @@ def list_catalog_terms(
             version=version,
             kind=kind,
             search=search,
+            limit=limit,
+            cursor=cursor,
+            parent_term_id=parent_term_id,
+            property_of=property_of,
+            is_predefined_type=is_predefined_type,
         )
     except (GraphStoreError, GraphStoreNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

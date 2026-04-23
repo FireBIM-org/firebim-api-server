@@ -187,6 +187,8 @@ class LexiconCatalogTermsResponse(BaseModel):
     canonical_family_uri: str
     canonical_country_uri: str
     count: int
+    total_count: int
+    next_cursor: str | None = None
     terms: list[LexiconCatalogTermSummary] = Field(default_factory=list)
 
 

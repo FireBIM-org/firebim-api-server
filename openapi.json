@@ -334,6 +334,82 @@
               ],
               "title": "Search"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "parent_term_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Parent Term Id"
+            }
+          },
+          {
+            "name": "property_of",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Property Of"
+            }
+          },
+          {
+            "name": "is_predefined_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Predefined Type"
+            }
           }
         ],
         "responses": {
@@ -4960,6 +5036,21 @@
             "type": "integer",
             "title": "Count"
           },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
           "terms": {
             "items": {
               "$ref": "#/components/schemas/LexiconCatalogTermSummary"
@@ -4975,7 +5066,8 @@
           "version",
           "canonical_family_uri",
           "canonical_country_uri",
-          "count"
+          "count",
+          "total_count"
         ],
         "title": "LexiconCatalogTermsResponse"
       },

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
+from threading import RLock
+from time import monotonic
 from typing import Any
 
 from rdflib import RDF, RDFS, Graph, Literal, URIRef
@@ -52,9 +54,29 @@ class LexiconOntologyContext:
     ontology_ttl: str
 
 
+@dataclass(frozen=True)
+class LexiconOntologyBundle:
+    ontology: LexiconOntologyContext
+    graph: Graph
+    catalog: dict[str, dict[str, Any]]
+    declared_classes: set[str]
+    declared_properties: set[str]
+
+
+@dataclass(frozen=True)
+class LexiconOntologyCacheEntry:
+    bundle: LexiconOntologyBundle
+    created_at: float
+
+
 class LexiconService:
+    CACHE_MAX_ENTRIES = 16
+    CACHE_TTL_SECONDS = 300.0
+
     def __init__(self, ontology_repo: OntologyRepository | None = None) -> None:
         self.ontology_repo = ontology_repo or OntologyRepository()
+        self._ontology_cache: OrderedDict[tuple[str, str, str], LexiconOntologyCacheEntry] = OrderedDict()
+        self._cache_lock = RLock()
 
     def health(self) -> bool:
         return self.ontology_repo.health()
@@ -67,17 +89,29 @@ class LexiconService:
         version: str,
         kind: str | None = None,
         search: str | None = None,
+        limit: int = 50,
+        cursor: str | None = None,
+        parent_term_id: str | None = None,
+        property_of: str | None = None,
+        is_predefined_type: bool | None = None,
     ) -> LexiconCatalogTermsResponse:
-        ontology, ontology_graph = self._resolve_ontology_graph(
+        bundle = self._resolve_ontology_bundle(
             ontology_family=ontology_family,
             country=country,
             version=version,
         )
-        catalog = self._build_catalog(ontology_graph)
         normalized_kind = kind.strip().lower() if kind else None
         normalized_search = search.strip().lower() if search else None
+        normalized_parent_uri = (
+            self._normalize_term_uri(parent_term_id, bundle.ontology.canonical_country_uri) if parent_term_id else None
+        )
+        normalized_property_of_uri = (
+            self._normalize_term_uri(property_of, bundle.ontology.canonical_country_uri) if property_of else None
+        )
+        if limit < 1:
+            raise ValueError("limit must be at least 1")
 
-        terms = [
+        filtered_terms = [
             LexiconCatalogTermSummary(
                 term_id=term["term_id"],
                 uri=term["uri"],
@@ -88,8 +122,25 @@ class LexiconService:
                 parent_term_ids=term["parent_term_ids"],
                 is_predefined_type=term["is_predefined_type"],
             )
-            for term in catalog.values()
+            for term in bundle.catalog.values()
             if (normalized_kind is None or term["kind"] == normalized_kind)
+            and (
+                normalized_parent_uri is None
+                or normalized_parent_uri
+                in {
+                    self._normalize_term_uri(parent_id, bundle.ontology.canonical_country_uri)
+                    for parent_id in term["parent_term_ids"]
+                }
+            )
+            and (
+                normalized_property_of_uri is None
+                or (
+                    term["kind"] == "property"
+                    and term["term_id"]
+                    in bundle.catalog.get(normalized_property_of_uri, {}).get("property_term_ids", [])
+                )
+            )
+            and (is_predefined_type is None or term["is_predefined_type"] is is_predefined_type)
             and (
                 normalized_search is None
                 or normalized_search in term["term_id"].lower()
@@ -98,15 +149,27 @@ class LexiconService:
                 or normalized_search in term["uri"].lower()
             )
         ]
-        terms.sort(key=lambda item: ((item.label or item.term_id).lower(), item.term_id.lower()))
+        filtered_terms.sort(key=lambda item: ((item.label or item.term_id).lower(), item.term_id.lower()))
+
+        start_index = 0
+        if cursor:
+            cursor_index = next((i for i, item in enumerate(filtered_terms) if item.term_id == cursor), None)
+            if cursor_index is None:
+                raise ValueError(f"Unknown cursor: {cursor}")
+            start_index = cursor_index + 1
+
+        terms = filtered_terms[start_index : start_index + limit]
+        next_cursor = terms[-1].term_id if start_index + limit < len(filtered_terms) and terms else None
 
         return LexiconCatalogTermsResponse(
-            ontology_family=ontology.ontology_family,
-            country=ontology.country,
-            version=ontology.version,
-            canonical_family_uri=ontology.canonical_family_uri,
-            canonical_country_uri=ontology.canonical_country_uri,
+            ontology_family=bundle.ontology.ontology_family,
+            country=bundle.ontology.country,
+            version=bundle.ontology.version,
+            canonical_family_uri=bundle.ontology.canonical_family_uri,
+            canonical_country_uri=bundle.ontology.canonical_country_uri,
             count=len(terms),
+            total_count=len(filtered_terms),
+            next_cursor=next_cursor,
             terms=terms,
         )
 
@@ -118,23 +181,22 @@ class LexiconService:
         version: str,
         term_id: str,
     ) -> LexiconCatalogTermResponse:
-        ontology, ontology_graph = self._resolve_ontology_graph(
+        bundle = self._resolve_ontology_bundle(
             ontology_family=ontology_family,
             country=country,
             version=version,
         )
-        catalog = self._build_catalog(ontology_graph)
-        normalized_uri = self._normalize_term_uri(term_id, ontology.canonical_country_uri)
-        term = catalog.get(normalized_uri)
+        normalized_uri = self._normalize_term_uri(term_id, bundle.ontology.canonical_country_uri)
+        term = bundle.catalog.get(normalized_uri)
         if term is None:
             raise GraphStoreNotFoundError(f"Lexicon term not found: {term_id}")
 
         return LexiconCatalogTermResponse(
-            ontology_family=ontology.ontology_family,
-            country=ontology.country,
-            version=ontology.version,
-            canonical_family_uri=ontology.canonical_family_uri,
-            canonical_country_uri=ontology.canonical_country_uri,
+            ontology_family=bundle.ontology.ontology_family,
+            country=bundle.ontology.country,
+            version=bundle.ontology.version,
+            canonical_family_uri=bundle.ontology.canonical_family_uri,
+            canonical_country_uri=bundle.ontology.canonical_country_uri,
             term=LexiconCatalogTermDetail(
                 term_id=term["term_id"],
                 uri=term["uri"],
@@ -208,14 +270,11 @@ class LexiconService:
         rule_id: str | None = None,
         rule: RuleDraft | None = None,
     ) -> tuple[LexiconOntologyContext, LexiconExecutionProfile]:
-        ontology = self.resolve_ontology(
+        bundle = self._resolve_ontology_bundle(
             ontology_family=ontology_family,
             country=country,
             version=version,
         )
-        ontology_graph = Graph()
-        ontology_graph.parse(data=ontology.ontology_ttl, format="turtle")
-        declared_classes, declared_properties = self._collect_declared_terms(ontology_graph)
         normalized_rule = self._load_rule(rule_id=rule_id, rule=rule)
         completeness = check_ruleset_completeness(self._to_composer_rule(normalized_rule))
 
@@ -249,22 +308,22 @@ class LexiconService:
             target_class = item.get("target_class")
             property_path = item.get("property_path")
             if target_class:
-                target_uri = self._normalize_term_uri(target_class, ontology.canonical_country_uri)
-                if target_uri in declared_properties:
+                target_uri = self._normalize_term_uri(target_class, bundle.ontology.canonical_country_uri)
+                if target_uri in bundle.declared_properties:
                     ontology_warnings.append(
                         f"Rule node '{item['id']}' uses property URI as target_class: {target_uri}"
                     )
-                elif target_uri not in declared_classes:
+                elif target_uri not in bundle.declared_classes:
                     ontology_warnings.append(
                         f"Rule node '{item['id']}' uses target_class not declared as class in ontology: {target_uri}"
                     )
             if property_path:
-                property_uri = self._normalize_term_uri(property_path, ontology.canonical_country_uri)
-                if property_uri in declared_classes:
+                property_uri = self._normalize_term_uri(property_path, bundle.ontology.canonical_country_uri)
+                if property_uri in bundle.declared_classes:
                     ontology_warnings.append(
                         f"Rule node '{item['id']}' uses class URI as property_path: {property_uri}"
                     )
-                elif property_uri not in declared_properties:
+                elif property_uri not in bundle.declared_properties:
                     ontology_warnings.append(
                         "Rule node "
                         f"'{item['id']}' uses property_path not declared as property in ontology: "
@@ -330,7 +389,7 @@ class LexiconService:
             ]
             + sorted(set(ontology_warnings)),
         )
-        return ontology, profile
+        return bundle.ontology, profile
 
     def reconstruct_graph(
         self,
@@ -396,24 +455,13 @@ class LexiconService:
         version: str,
         ttl: str,
     ) -> LexiconConformityCheckResponse:
-        ontology = self.resolve_ontology(
+        bundle = self._resolve_ontology_bundle(
             ontology_family=ontology_family,
             country=country,
             version=version,
         )
         data_graph = Graph()
         data_graph.parse(data=ttl, format="turtle")
-        ontology_graph = Graph()
-        ontology_graph.parse(data=ontology.ontology_ttl, format="turtle")
-
-        declared_classes = {str(subject) for subject in ontology_graph.subjects(RDF.type, OWL.Class)} | {
-            str(subject) for subject in ontology_graph.subjects(RDF.type, RDFS.Class)
-        }
-        declared_properties = (
-            {str(subject) for subject in ontology_graph.subjects(RDF.type, RDF.Property)}
-            | {str(subject) for subject in ontology_graph.subjects(RDF.type, OWL.ObjectProperty)}
-            | {str(subject) for subject in ontology_graph.subjects(RDF.type, OWL.DatatypeProperty)}
-        )
 
         unknown_classes: set[str] = set()
         unknown_properties: set[str] = set()
@@ -436,7 +484,7 @@ class LexiconService:
             text = str(object_value)
             if text.startswith(str(RDF)) or text.startswith(str(RDFS)) or text.startswith(str(OWL)):
                 continue
-            if text not in declared_classes:
+            if text not in bundle.declared_classes:
                 unknown_classes.add(text)
                 issues.append(
                     LexiconConformityIssue(
@@ -457,7 +505,7 @@ class LexiconService:
                 or predicate_text.startswith(str(OWL))
             ):
                 continue
-            if predicate_text not in declared_properties:
+            if predicate_text not in bundle.declared_properties:
                 unknown_properties.add(predicate_text)
                 issues.append(
                     LexiconConformityIssue(
@@ -475,10 +523,10 @@ class LexiconService:
         return LexiconConformityCheckResponse(
             ontology_family=ontology_family,
             country=country,
-            version=ontology.version,
-            canonical_country_uri=ontology.canonical_country_uri,
-            ontology_uri=ontology.ontology_uri,
-            version_iri=ontology.version_iri,
+            version=bundle.ontology.version,
+            canonical_country_uri=bundle.ontology.canonical_country_uri,
+            ontology_uri=bundle.ontology.ontology_uri,
+            version_iri=bundle.ontology.version_iri,
             triple_count=len(data_graph),
             structure_ok=structure_ok,
             semantic_ok=semantic_ok,
@@ -516,14 +564,42 @@ class LexiconService:
         country: str,
         version: str,
     ) -> tuple[LexiconOntologyContext, Graph]:
+        bundle = self._resolve_ontology_bundle(
+            ontology_family=ontology_family,
+            country=country,
+            version=version,
+        )
+        return bundle.ontology, bundle.graph
+
+    def _resolve_ontology_bundle(
+        self,
+        *,
+        ontology_family: str,
+        country: str,
+        version: str,
+    ) -> LexiconOntologyBundle:
+        cache_key = (ontology_family, country, version)
+        cached = self._get_cached_bundle(cache_key)
+        if cached is not None:
+            return cached
+
         ontology = self.resolve_ontology(
             ontology_family=ontology_family,
             country=country,
             version=version,
         )
-        ontology_graph = Graph()
-        ontology_graph.parse(data=ontology.ontology_ttl, format="turtle")
-        return ontology, ontology_graph
+        graph = Graph()
+        graph.parse(data=ontology.ontology_ttl, format="turtle")
+        declared_classes, declared_properties = self._collect_declared_terms(graph)
+        bundle = LexiconOntologyBundle(
+            ontology=ontology,
+            graph=graph,
+            catalog=self._build_catalog(graph),
+            declared_classes=declared_classes,
+            declared_properties=declared_properties,
+        )
+        self._store_cached_bundle(cache_key, bundle)
+        return bundle
 
     @staticmethod
     def _load_rule(*, rule_id: str | None, rule: RuleDraft | None) -> dict:
@@ -570,14 +646,13 @@ class LexiconService:
         return f"{canonical_country_uri}{value}"
 
     def _resolve_mapping_term_kind(self, term: LexiconMappedTermReference) -> str:
-        ontology, ontology_graph = self._resolve_ontology_graph(
+        bundle = self._resolve_ontology_bundle(
             ontology_family=term.ontology_family,
             country=term.country,
             version=term.version,
         )
-        normalized_uri = term.uri or self._normalize_term_uri(term.term_id, ontology.canonical_country_uri)
-        catalog = self._build_catalog(ontology_graph)
-        resolved = catalog.get(normalized_uri)
+        normalized_uri = term.uri or self._normalize_term_uri(term.term_id, bundle.ontology.canonical_country_uri)
+        resolved = bundle.catalog.get(normalized_uri)
         if resolved is None:
             raise GraphStoreNotFoundError(f"Lexicon term not found: {term.term_id}")
         return str(resolved["kind"])
@@ -662,17 +737,44 @@ class LexiconService:
         term_id: str,
         uri: str | None,
     ) -> str:
-        ontology, ontology_graph = self._resolve_ontology_graph(
+        bundle = self._resolve_ontology_bundle(
             ontology_family=ontology_family,
             country=country,
             version=version,
         )
-        normalized_uri = uri or self._normalize_term_uri(term_id, ontology.canonical_country_uri)
-        catalog = self._build_catalog(ontology_graph)
-        resolved = catalog.get(normalized_uri)
+        normalized_uri = uri or self._normalize_term_uri(term_id, bundle.ontology.canonical_country_uri)
+        resolved = bundle.catalog.get(normalized_uri)
         if resolved is None:
             raise GraphStoreNotFoundError(f"Lexicon term not found: {term_id}")
         return str(resolved["kind"])
+
+    def _get_cached_bundle(
+        self,
+        cache_key: tuple[str, str, str],
+    ) -> LexiconOntologyBundle | None:
+        with self._cache_lock:
+            entry = self._ontology_cache.get(cache_key)
+            if entry is None:
+                return None
+            if monotonic() - entry.created_at > self.CACHE_TTL_SECONDS:
+                del self._ontology_cache[cache_key]
+                return None
+            self._ontology_cache.move_to_end(cache_key)
+            return entry.bundle
+
+    def _store_cached_bundle(
+        self,
+        cache_key: tuple[str, str, str],
+        bundle: LexiconOntologyBundle,
+    ) -> None:
+        with self._cache_lock:
+            self._ontology_cache[cache_key] = LexiconOntologyCacheEntry(
+                bundle=bundle,
+                created_at=monotonic(),
+            )
+            self._ontology_cache.move_to_end(cache_key)
+            while len(self._ontology_cache) > self.CACHE_MAX_ENTRIES:
+                self._ontology_cache.popitem(last=False)
 
     @staticmethod
     def _collect_declared_terms(graph: Graph) -> tuple[set[str], set[str]]:

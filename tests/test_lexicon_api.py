@@ -52,10 +52,14 @@ ifc:IfcWallUSERDEFINED a owl:Class ;
 
 
 class DummyOntologyRepo:
+    def __init__(self) -> None:
+        self.fetch_calls = 0
+
     def health(self) -> bool:
         return True
 
     def fetch_version(self, ontology_family: str, country: str, version: str):
+        self.fetch_calls += 1
         resolved = "2026.04.23" if version == "latest" else version
         ttl = FBO_ONTOLOGY_TTL
         if ontology_family == "ifc":
@@ -77,6 +81,14 @@ def _build_client(monkeypatch) -> TestClient:
     app.include_router(lexicon_api.router)
     monkeypatch.setattr(lexicon_api, "service", LexiconService(DummyOntologyRepo()))
     return TestClient(app)
+
+
+def _build_client_with_repo(monkeypatch) -> tuple[TestClient, DummyOntologyRepo]:
+    app = FastAPI()
+    app.include_router(lexicon_api.router)
+    repo = DummyOntologyRepo()
+    monkeypatch.setattr(lexicon_api, "service", LexiconService(repo))
+    return TestClient(app), repo
 
 
 def test_lexicon_health(monkeypatch):
@@ -269,13 +281,55 @@ ex:wall-1 a fbo-dk:Wall ;
 
 def test_list_catalog_terms(monkeypatch):
     client = _build_client(monkeypatch)
-    response = client.get("/lexicon/catalog/fbo/dk/latest/terms?kind=class&search=wall")
+    response = client.get("/lexicon/catalog/fbo/dk/latest/terms?kind=class&search=wall&limit=10")
     assert response.status_code == 200
     body = response.json()
     assert body["count"] == 1
+    assert body["total_count"] == 1
+    assert body["next_cursor"] is None
     assert body["terms"][0]["term_id"] == "Wall"
     assert body["terms"][0]["kind"] == "class"
     assert body["terms"][0]["parent_term_ids"] == ["BuildingElement"]
+
+
+def test_list_catalog_terms_supports_cursor_and_filters(monkeypatch):
+    client = _build_client(monkeypatch)
+
+    first_page = client.get("/lexicon/catalog/fbo/dk/latest/terms?limit=1")
+    assert first_page.status_code == 200
+    first_body = first_page.json()
+    assert first_body["count"] == 1
+    assert first_body["total_count"] == 4
+    assert first_body["next_cursor"] == first_body["terms"][0]["term_id"]
+
+    second_page = client.get(f"/lexicon/catalog/fbo/dk/latest/terms?limit=1&cursor={first_body['next_cursor']}")
+    assert second_page.status_code == 200
+    second_body = second_page.json()
+    assert second_body["count"] == 1
+    assert second_body["terms"][0]["term_id"] != first_body["terms"][0]["term_id"]
+
+    property_filter = client.get("/lexicon/catalog/fbo/dk/latest/terms?kind=property&property_of=Wall")
+    assert property_filter.status_code == 200
+    property_body = property_filter.json()
+    assert property_body["count"] == 1
+    assert property_body["terms"][0]["term_id"] == "Combustible"
+
+    predefined_filter = client.get("/lexicon/catalog/ifc/global/latest/terms?is_predefined_type=true")
+    assert predefined_filter.status_code == 200
+    predefined_body = predefined_filter.json()
+    assert predefined_body["count"] == 1
+    assert predefined_body["terms"][0]["term_id"] == "IfcWallUSERDEFINED"
+
+
+def test_catalog_uses_cached_ontology_bundle(monkeypatch):
+    client, repo = _build_client_with_repo(monkeypatch)
+
+    first_response = client.get("/lexicon/catalog/fbo/dk/latest/terms?kind=class")
+    assert first_response.status_code == 200
+    second_response = client.get("/lexicon/catalog/fbo/dk/latest/terms/Wall")
+    assert second_response.status_code == 200
+
+    assert repo.fetch_calls == 1
 
 
 def test_get_catalog_term(monkeypatch):
