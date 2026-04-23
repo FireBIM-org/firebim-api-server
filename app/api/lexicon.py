@@ -2,15 +2,21 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.auth.jwt import get_current_active_user
 from app.lexicon.service import LexiconService
+from app.models.models import User
 from app.schemas.lexicon import (
     LexiconCatalogTermResponse,
     LexiconCatalogTermsResponse,
     LexiconConformityCheckRequest,
     LexiconConformityCheckResponse,
     LexiconHealthResponse,
+    LexiconMappingCreateRequest,
+    LexiconMappingDeleteResponse,
+    LexiconMappingListResponse,
+    LexiconMappingResponse,
     LexiconMappingValidationRequest,
     LexiconMappingValidationResponse,
     LexiconProfileDeriveRequest,
@@ -19,11 +25,17 @@ from app.schemas.lexicon import (
     LexiconReconstructionResponse,
 )
 from app.storage.graph_store import GraphStoreError, GraphStoreNotFoundError
+from app.storage.lexicon_mapping_repository import (
+    LexiconMappingNotFoundError,
+    LexiconMappingRepository,
+    LexiconMappingRepositoryError,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/lexicon", tags=["lexicon"])
 
 service = LexiconService()
+mapping_repo = LexiconMappingRepository()
 
 
 @router.get("/health", response_model=LexiconHealthResponse)
@@ -119,6 +131,76 @@ def validate_mapping(payload: LexiconMappingValidationRequest) -> LexiconMapping
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to validate lexicon mapping",
         ) from exc
+
+
+@router.post("/mappings", response_model=LexiconMappingResponse, status_code=status.HTTP_201_CREATED)
+def create_mapping(
+    payload: LexiconMappingCreateRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconMappingResponse:
+    try:
+        validation = service.validate_mapping(payload=payload)
+        if not validation.valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": "Lexicon mapping is not valid",
+                    "errors": validation.errors,
+                    "warnings": validation.warnings,
+                },
+            )
+        mapping = mapping_repo.create_mapping(payload, current_user)
+        return LexiconMappingResponse(mapping=mapping)
+    except HTTPException:
+        raise
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except LexiconMappingRepositoryError as exc:
+        logger.exception("Failed to create lexicon mapping", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.get("/mappings", response_model=LexiconMappingListResponse)
+def list_mappings(current_user: User = Depends(get_current_active_user)) -> LexiconMappingListResponse:
+    try:
+        mappings = mapping_repo.list_mappings(current_user)
+        return LexiconMappingListResponse(count=len(mappings), mappings=mappings)
+    except LexiconMappingRepositoryError as exc:
+        logger.exception("Failed to list lexicon mappings", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.get("/mappings/{mapping_id}", response_model=LexiconMappingResponse)
+def get_mapping(mapping_id: str, current_user: User = Depends(get_current_active_user)) -> LexiconMappingResponse:
+    try:
+        mapping = mapping_repo.get_mapping(mapping_id, current_user)
+        return LexiconMappingResponse(mapping=mapping)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except LexiconMappingNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LexiconMappingRepositoryError as exc:
+        logger.exception("Failed to fetch lexicon mapping", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.delete("/mappings/{mapping_id}", response_model=LexiconMappingDeleteResponse)
+def delete_mapping(
+    mapping_id: str,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconMappingDeleteResponse:
+    try:
+        mapping_repo.delete_mapping(mapping_id, current_user)
+        return LexiconMappingDeleteResponse(deleted=True, mapping_id=mapping_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except LexiconMappingNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LexiconMappingRepositoryError as exc:
+        logger.exception("Failed to delete lexicon mapping", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
 @router.post("/profiles/derive", response_model=LexiconProfileDeriveResponse)

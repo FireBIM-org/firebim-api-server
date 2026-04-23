@@ -301,5 +301,42 @@ class LexiconMappingValidationResponse(BaseModel):
     errors: list[str] = Field(default_factory=list)
 
 
+class LexiconMappingCreateRequest(LexiconMappingValidationRequest):
+    name: str | None = None
+    notes: str | None = None
+
+
+class LexiconMapping(LexiconMappingCreateRequest):
+    id: str
+    name: str
+    created_at: str
+    updated_at: str
+
+
+class LexiconMappingSummary(BaseModel):
+    id: str
+    name: str
+    mapping_kind: str
+    relationship: str | None = None
+    created_at: str
+    updated_at: str
+    source_term_count: int
+    target_assertion_count: int
+
+
+class LexiconMappingResponse(BaseModel):
+    mapping: LexiconMapping
+
+
+class LexiconMappingListResponse(BaseModel):
+    count: int
+    mappings: list[LexiconMappingSummary] = Field(default_factory=list)
+
+
+class LexiconMappingDeleteResponse(BaseModel):
+    deleted: bool
+    mapping_id: str
+
+
 LexiconSourcePatternClause.model_rebuild()
 LexiconSourcePattern.model_rebuild()

@@ -551,6 +551,173 @@
         }
       }
     },
+    "/lexicon/mappings": {
+      "get": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "List Mappings",
+        "operationId": "list_mappings_lexicon_mappings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconMappingListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Create Mapping",
+        "operationId": "create_mapping_lexicon_mappings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconMappingCreateRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconMappingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/lexicon/mappings/{mapping_id}": {
+      "get": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Get Mapping",
+        "operationId": "get_mapping_lexicon_mappings__mapping_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Mapping Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconMappingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Delete Mapping",
+        "operationId": "delete_mapping_lexicon_mappings__mapping_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mapping_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Mapping Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconMappingDeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/lexicon/profiles/derive": {
       "post": {
         "tags": [
@@ -5622,6 +5789,287 @@
         ],
         "title": "LexiconMappedTermReference"
       },
+      "LexiconMapping": {
+        "properties": {
+          "mapping_kind": {
+            "type": "string",
+            "pattern": "^(class_to_class|property_to_property|semantic_assertion)$",
+            "title": "Mapping Kind"
+          },
+          "source_term": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconMappedTermReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_term": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconMappedTermReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_pattern": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconSourcePattern-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_assertions": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconTargetAssertion"
+            },
+            "type": "array",
+            "title": "Target Assertions"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mapping_kind",
+          "name",
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "LexiconMapping"
+      },
+      "LexiconMappingCreateRequest": {
+        "properties": {
+          "mapping_kind": {
+            "type": "string",
+            "pattern": "^(class_to_class|property_to_property|semantic_assertion)$",
+            "title": "Mapping Kind"
+          },
+          "source_term": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconMappedTermReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_term": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconMappedTermReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_pattern": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconSourcePattern-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_assertions": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconTargetAssertion"
+            },
+            "type": "array",
+            "title": "Target Assertions"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mapping_kind"
+        ],
+        "title": "LexiconMappingCreateRequest"
+      },
+      "LexiconMappingDeleteResponse": {
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted"
+          },
+          "mapping_id": {
+            "type": "string",
+            "title": "Mapping Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted",
+          "mapping_id"
+        ],
+        "title": "LexiconMappingDeleteResponse"
+      },
+      "LexiconMappingListResponse": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "mappings": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconMappingSummary"
+            },
+            "type": "array",
+            "title": "Mappings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count"
+        ],
+        "title": "LexiconMappingListResponse"
+      },
+      "LexiconMappingResponse": {
+        "properties": {
+          "mapping": {
+            "$ref": "#/components/schemas/LexiconMapping"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mapping"
+        ],
+        "title": "LexiconMappingResponse"
+      },
+      "LexiconMappingSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "mapping_kind": {
+            "type": "string",
+            "title": "Mapping Kind"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relationship"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "source_term_count": {
+            "type": "integer",
+            "title": "Source Term Count"
+          },
+          "target_assertion_count": {
+            "type": "integer",
+            "title": "Target Assertion Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "mapping_kind",
+          "created_at",
+          "updated_at",
+          "source_term_count",
+          "target_assertion_count"
+        ],
+        "title": "LexiconMappingSummary"
+      },
       "LexiconMappingValidationRequest": {
         "properties": {
           "mapping_kind": {
@@ -5652,7 +6100,7 @@
           "source_pattern": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/LexiconSourcePattern"
+                "$ref": "#/components/schemas/LexiconSourcePattern-Input"
               },
               {
                 "type": "null"
@@ -5986,18 +6434,18 @@
         ],
         "title": "LexiconReconstructionResponse"
       },
-      "LexiconSourcePattern": {
+      "LexiconSourcePattern-Input": {
         "properties": {
           "all_of": {
             "items": {
-              "$ref": "#/components/schemas/LexiconSourcePatternClause"
+              "$ref": "#/components/schemas/LexiconSourcePatternClause-Input"
             },
             "type": "array",
             "title": "All Of"
           },
           "any_of": {
             "items": {
-              "$ref": "#/components/schemas/LexiconSourcePatternClause"
+              "$ref": "#/components/schemas/LexiconSourcePatternClause-Input"
             },
             "type": "array",
             "title": "Any Of"
@@ -6006,7 +6454,27 @@
         "type": "object",
         "title": "LexiconSourcePattern"
       },
-      "LexiconSourcePatternClause": {
+      "LexiconSourcePattern-Output": {
+        "properties": {
+          "all_of": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSourcePatternClause-Output"
+            },
+            "type": "array",
+            "title": "All Of"
+          },
+          "any_of": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSourcePatternClause-Output"
+            },
+            "type": "array",
+            "title": "Any Of"
+          }
+        },
+        "type": "object",
+        "title": "LexiconSourcePattern"
+      },
+      "LexiconSourcePatternClause-Input": {
         "properties": {
           "term": {
             "anyOf": [
@@ -6020,14 +6488,44 @@
           },
           "all_of": {
             "items": {
-              "$ref": "#/components/schemas/LexiconSourcePatternClause"
+              "$ref": "#/components/schemas/LexiconSourcePatternClause-Input"
             },
             "type": "array",
             "title": "All Of"
           },
           "any_of": {
             "items": {
-              "$ref": "#/components/schemas/LexiconSourcePatternClause"
+              "$ref": "#/components/schemas/LexiconSourcePatternClause-Input"
+            },
+            "type": "array",
+            "title": "Any Of"
+          }
+        },
+        "type": "object",
+        "title": "LexiconSourcePatternClause"
+      },
+      "LexiconSourcePatternClause-Output": {
+        "properties": {
+          "term": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconSourceTermCondition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "all_of": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSourcePatternClause-Output"
+            },
+            "type": "array",
+            "title": "All Of"
+          },
+          "any_of": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSourcePatternClause-Output"
             },
             "type": "array",
             "title": "Any Of"

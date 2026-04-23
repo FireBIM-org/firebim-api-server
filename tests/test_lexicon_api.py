@@ -1,5 +1,6 @@
 import os
 from types import SimpleNamespace
+from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -19,6 +20,7 @@ os.environ.setdefault("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
 from app.api import lexicon as lexicon_api
 from app.lexicon import service as lexicon_service
 from app.lexicon.service import LexiconService
+from app.schemas.lexicon import LexiconMapping, LexiconMappingSummary
 
 FBO_ONTOLOGY_TTL = """
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
@@ -80,6 +82,10 @@ def _build_client(monkeypatch) -> TestClient:
     app = FastAPI()
     app.include_router(lexicon_api.router)
     monkeypatch.setattr(lexicon_api, "service", LexiconService(DummyOntologyRepo()))
+    app.dependency_overrides[lexicon_api.get_current_active_user] = lambda: SimpleNamespace(
+        id="user-1",
+        is_active=True,
+    )
     return TestClient(app)
 
 
@@ -88,7 +94,83 @@ def _build_client_with_repo(monkeypatch) -> tuple[TestClient, DummyOntologyRepo]
     app.include_router(lexicon_api.router)
     repo = DummyOntologyRepo()
     monkeypatch.setattr(lexicon_api, "service", LexiconService(repo))
+    app.dependency_overrides[lexicon_api.get_current_active_user] = lambda: SimpleNamespace(
+        id="user-1",
+        is_active=True,
+    )
     return TestClient(app), repo
+
+
+class DummyMappingRepo:
+    def __init__(self) -> None:
+        self.created_payload = None
+        self.deleted_id = None
+        self.mapping = LexiconMapping(
+            id="map_123",
+            name="IfcWall to Wall",
+            mapping_kind="class_to_class",
+            source_term={
+                "ontology_family": "ifc",
+                "country": "global",
+                "version": "latest",
+                "term_id": "IfcWall",
+                "uri": None,
+            },
+            target_term={
+                "ontology_family": "fbo",
+                "country": "dk",
+                "version": "latest",
+                "term_id": "Wall",
+                "uri": None,
+            },
+            source_pattern=None,
+            target_assertions=[],
+            relationship="equivalent",
+            notes="Chosen by frontend",
+            created_at="2026-04-23T10:00:00+00:00",
+            updated_at="2026-04-23T10:00:00+00:00",
+        )
+
+    def create_mapping(self, payload, user):
+        _ = user
+        self.created_payload = payload
+        return self.mapping
+
+    def list_mappings(self, user):
+        _ = user
+        return [
+            LexiconMappingSummary(
+                id="map_123",
+                name="IfcWall to Wall",
+                mapping_kind="class_to_class",
+                relationship="equivalent",
+                created_at="2026-04-23T10:00:00+00:00",
+                updated_at="2026-04-23T10:00:00+00:00",
+                source_term_count=1,
+                target_assertion_count=1,
+            )
+        ]
+
+    def get_mapping(self, mapping_id, user):
+        _ = user
+        return self.mapping.model_copy(update={"id": mapping_id})
+
+    def delete_mapping(self, mapping_id, user):
+        _ = user
+        self.deleted_id = mapping_id
+
+
+def _build_client_with_mapping_repo(monkeypatch) -> tuple[TestClient, DummyMappingRepo]:
+    app = FastAPI()
+    app.include_router(lexicon_api.router)
+    mapping_repo = DummyMappingRepo()
+    monkeypatch.setattr(lexicon_api, "service", LexiconService(DummyOntologyRepo()))
+    monkeypatch.setattr(lexicon_api, "mapping_repo", mapping_repo)
+    app.dependency_overrides[lexicon_api.get_current_active_user] = lambda: SimpleNamespace(
+        id=f"user-{uuid4()}",
+        is_active=True,
+    )
+    return TestClient(app), mapping_repo
 
 
 def test_lexicon_health(monkeypatch):
@@ -533,3 +615,84 @@ def test_validate_semantic_assertion_rejects_wrong_source_kind(monkeypatch):
     body = response.json()
     assert body["valid"] is False
     assert any("was declared as property but resolves to class" in item for item in body["errors"])
+
+
+def test_create_mapping(monkeypatch):
+    client, mapping_repo = _build_client_with_mapping_repo(monkeypatch)
+    response = client.post(
+        "/lexicon/mappings",
+        json={
+            "name": "IfcWall to Wall",
+            "mapping_kind": "class_to_class",
+            "source_term": {
+                "ontology_family": "ifc",
+                "country": "global",
+                "version": "latest",
+                "term_id": "IfcWall",
+            },
+            "target_term": {
+                "ontology_family": "fbo",
+                "country": "dk",
+                "version": "latest",
+                "term_id": "Wall",
+            },
+            "relationship": "equivalent",
+            "notes": "Chosen by frontend",
+        },
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["mapping"]["id"] == "map_123"
+    assert mapping_repo.created_payload.name == "IfcWall to Wall"
+
+
+def test_create_mapping_rejects_invalid_payload(monkeypatch):
+    client, _mapping_repo = _build_client_with_mapping_repo(monkeypatch)
+    response = client.post(
+        "/lexicon/mappings",
+        json={
+            "mapping_kind": "property_to_property",
+            "source_term": {
+                "ontology_family": "fbo",
+                "country": "dk",
+                "version": "latest",
+                "term_id": "Combustible",
+            },
+            "target_term": {
+                "ontology_family": "ifc",
+                "country": "global",
+                "version": "latest",
+                "term_id": "IfcWall",
+            },
+        },
+    )
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail["message"] == "Lexicon mapping is not valid"
+    assert any("Target term must be a property" in item for item in detail["errors"])
+
+
+def test_list_mappings(monkeypatch):
+    client, _mapping_repo = _build_client_with_mapping_repo(monkeypatch)
+    response = client.get("/lexicon/mappings")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert body["mappings"][0]["id"] == "map_123"
+
+
+def test_get_mapping(monkeypatch):
+    client, _mapping_repo = _build_client_with_mapping_repo(monkeypatch)
+    response = client.get("/lexicon/mappings/map_123")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mapping"]["id"] == "map_123"
+    assert body["mapping"]["name"] == "IfcWall to Wall"
+
+
+def test_delete_mapping(monkeypatch):
+    client, mapping_repo = _build_client_with_mapping_repo(monkeypatch)
+    response = client.delete("/lexicon/mappings/map_123")
+    assert response.status_code == 200
+    assert response.json() == {"deleted": True, "mapping_id": "map_123"}
+    assert mapping_repo.deleted_id == "map_123"
