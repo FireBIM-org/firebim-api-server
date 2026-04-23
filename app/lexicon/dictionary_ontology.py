@@ -218,4 +218,3 @@ def _property_rdf_type(item: dict) -> URIRef:
 def _add_literal(graph: Graph, subject: URIRef, predicate: URIRef, value: str | None) -> None:
     if value:
         graph.add((subject, predicate, Literal(value)))
-

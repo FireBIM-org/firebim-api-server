@@ -153,13 +153,13 @@ class DummyOntologyRepo:
     def load_local_resource(self, filename: str) -> str:
         if filename == "rir-1.0.json":
             return (
-                '{'
+                "{"
                 '"DictionaryName":"RIR",'
                 '"DictionaryCode":"rir",'
                 '"DictionaryVersion":"1.0",'
                 '"Classes":[{"Code":"FireCompartment","Name":"Fire Compartment","ClassType":"Class"}],'
                 '"Properties":[{"Code":"AreaFireCompartment","Name":"Area","DataType":"Real"}]'
-                '}'
+                "}"
             )
         raise ValueError(f"Local ontology resource not found: {filename}")
 

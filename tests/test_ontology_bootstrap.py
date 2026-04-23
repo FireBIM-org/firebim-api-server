@@ -44,12 +44,12 @@ class DummyBootstrapRepo:
             )
         if filename == "ifc-4.3.json":
             return (
-                '{'
+                "{"
                 '"DictionaryName":"IFC 4.3",'
                 '"DictionaryVersion":"4.3",'
                 '"Classes":[{"Code":"IfcWall","Name":"Wall","ClassType":"Class","ParentClassCode":"IfcBuiltElement"}],'
                 '"Properties":[{"Code":"FireRating","Name":"Fire Rating","PropertyValueKind":"Single"}]'
-                '}'
+                "}"
             )
         stem = filename.removesuffix(".ttl")
         _, _, country = stem.partition("-")
