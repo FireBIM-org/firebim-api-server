@@ -14,6 +14,7 @@ from app.rules.composer import check_ruleset_completeness
 from app.rules.decompiler import decompile_ruleset_ttl
 from app.schemas.lexicon import (
     LexiconBranchReference,
+    LexiconCatalogRelatedTermsResponse,
     LexiconCatalogTermDetail,
     LexiconCatalogTermResponse,
     LexiconCatalogTermsResponse,
@@ -33,6 +34,8 @@ from app.schemas.lexicon import (
     LexiconNextNeededResponse,
     LexiconPropertyRequirement,
     LexiconReconstructionResponse,
+    LexiconSelectedOntology,
+    LexiconSourceEntityPattern,
     LexiconSourcePattern,
     LexiconSourcePatternClause,
     LexiconSourceTermCondition,
@@ -44,6 +47,10 @@ from app.storage.ontology_repository import OntologyRepository
 
 LEXICON_GRAPH_BASE_URI = "https://firebim.org/graphs/lexicon/"
 ONTOLOGY_META_HAS_PROPERTY_URI = "https://firebim.org/ontology-meta#hasProperty"
+ONTOLOGY_META_BELONGS_TO_CLASS_URI = "https://firebim.org/ontology-meta#belongsToClass"
+ONTOLOGY_META_GROUP_OF_PROPERTIES_URI = "https://firebim.org/ontology-meta#groupOfProperties"
+ONTOLOGY_META_UNIT_URI = "https://firebim.org/ontology-meta#unit"
+ONTOLOGY_META_RELATED_PROPERTY_URI = "https://firebim.org/ontology-meta#relatedProperty"
 
 
 @dataclass(frozen=True)
@@ -211,8 +218,61 @@ class LexiconService:
                 parent_term_ids=term["parent_term_ids"],
                 child_term_ids=term["child_term_ids"],
                 property_term_ids=term["property_term_ids"],
+                property_set_term_ids=term["property_set_term_ids"],
+                belongs_to_class_term_ids=term["belongs_to_class_term_ids"],
+                related_property_term_ids=term["related_property_term_ids"],
+                unit=term["unit"],
+                is_property_set=term["is_property_set"],
                 is_predefined_type=term["is_predefined_type"],
             ),
+        )
+
+    def list_related_catalog_terms(
+        self,
+        *,
+        ontology_family: str,
+        country: str,
+        version: str,
+        term_id: str,
+        relation: str,
+    ) -> LexiconCatalogRelatedTermsResponse:
+        bundle = self._resolve_ontology_bundle(
+            ontology_family=ontology_family,
+            country=country,
+            version=version,
+        )
+        normalized_uri = self._normalize_term_uri(term_id, bundle.ontology.canonical_country_uri)
+        term = bundle.catalog.get(normalized_uri)
+        if term is None:
+            raise GraphStoreNotFoundError(f"Lexicon term not found: {term_id}")
+
+        relation_key_map = {
+            "properties": "property_term_ids",
+            "property_sets": "property_set_term_ids",
+            "classes": "belongs_to_class_term_ids",
+            "related_properties": "related_property_term_ids",
+            "children": "child_term_ids",
+            "parents": "parent_term_ids",
+        }
+        relation_key = relation_key_map.get(relation)
+        if relation_key is None:
+            raise ValueError(f"Unsupported catalog relation: {relation}")
+
+        related_terms = [
+            self._summary_from_catalog_term(
+                bundle.catalog[self._normalize_term_uri(related_term_id, bundle.ontology.canonical_country_uri)]
+            )
+            for related_term_id in term.get(relation_key, [])
+            if self._normalize_term_uri(related_term_id, bundle.ontology.canonical_country_uri) in bundle.catalog
+        ]
+        return LexiconCatalogRelatedTermsResponse(
+            ontology_family=bundle.ontology.ontology_family,
+            country=bundle.ontology.country,
+            version=bundle.ontology.version,
+            canonical_family_uri=bundle.ontology.canonical_family_uri,
+            canonical_country_uri=bundle.ontology.canonical_country_uri,
+            count=len(related_terms),
+            terms=related_terms,
         )
 
     def validate_mapping(
@@ -298,19 +358,96 @@ class LexiconService:
             remaining_properties=remaining_properties,
         )
 
+    def resolve_selected_ontologies(
+        self,
+        *,
+        ontology_family: str,
+        country: str,
+        version: str,
+        selected_ontologies: list[LexiconSelectedOntology] | None = None,
+        canonical_target_ontology: LexiconSelectedOntology | None = None,
+    ) -> dict[str, Any]:
+        requested = list(selected_ontologies or [])
+        if not requested:
+            requested = [
+                LexiconSelectedOntology(
+                    ontology_family=ontology_family,
+                    country=country,
+                    version=version,
+                )
+            ]
+        if canonical_target_ontology is None:
+            canonical_target_ontology = LexiconSelectedOntology(
+                ontology_family=ontology_family,
+                country=country,
+                version=version,
+            )
+
+        requested.append(canonical_target_ontology)
+        resolved: list[LexiconSelectedOntology] = []
+        seen: set[tuple[str, str, str]] = set()
+        for selection in requested:
+            ontology = self.resolve_ontology(
+                ontology_family=selection.ontology_family,
+                country=selection.country,
+                version=selection.version,
+            )
+            key = (ontology.ontology_family, ontology.country, ontology.version)
+            if key in seen:
+                continue
+            seen.add(key)
+            resolved.append(
+                LexiconSelectedOntology(
+                    ontology_family=ontology.ontology_family,
+                    country=ontology.country,
+                    version=ontology.version,
+                    canonical_family_uri=ontology.canonical_family_uri,
+                    canonical_country_uri=ontology.canonical_country_uri,
+                )
+            )
+
+        resolved_canonical = next(
+            item
+            for item in resolved
+            if item.ontology_family == canonical_target_ontology.ontology_family
+            and item.country == canonical_target_ontology.country
+        )
+        return {
+            "selected_ontologies": resolved,
+            "canonical_target_ontology": resolved_canonical,
+        }
+
     def derive_profile(
         self,
         *,
         ontology_family: str,
         country: str,
         version: str,
+        selected_ontologies: list[LexiconSelectedOntology] | None = None,
+        canonical_target_ontology: LexiconSelectedOntology | None = None,
         rule_id: str | None = None,
         rule: RuleDraft | None = None,
     ) -> tuple[LexiconOntologyContext, LexiconExecutionProfile]:
-        bundle = self._resolve_ontology_bundle(
+        resolved_selection = self.resolve_selected_ontologies(
             ontology_family=ontology_family,
             country=country,
             version=version,
+            selected_ontologies=selected_ontologies,
+            canonical_target_ontology=canonical_target_ontology,
+        )
+        selected_bundles = [
+            self._resolve_ontology_bundle(
+                ontology_family=selection.ontology_family,
+                country=selection.country,
+                version=selection.version,
+            )
+            for selection in resolved_selection["selected_ontologies"]
+        ]
+        canonical_selection = resolved_selection["canonical_target_ontology"]
+        bundle = self._resolve_ontology_bundle(
+            ontology_family=canonical_selection.ontology_family,
+            country=canonical_selection.country,
+            version=canonical_selection.version,
         )
         normalized_rule = self._load_rule(rule_id=rule_id, rule=rule)
         completeness = check_ruleset_completeness(self._to_composer_rule(normalized_rule))
@@ -345,26 +482,42 @@ class LexiconService:
             target_class = item.get("target_class")
             property_path = item.get("property_path")
             if target_class:
-                target_uri = self._normalize_term_uri(target_class, bundle.ontology.canonical_country_uri)
-                if target_uri in bundle.declared_properties:
-                    ontology_warnings.append(
-                        f"Rule node '{item['id']}' uses property URI as target_class: {target_uri}"
-                    )
-                elif target_uri not in bundle.declared_classes:
-                    ontology_warnings.append(
-                        f"Rule node '{item['id']}' uses target_class not declared as class in ontology: {target_uri}"
-                    )
-            if property_path:
-                property_uri = self._normalize_term_uri(property_path, bundle.ontology.canonical_country_uri)
-                if property_uri in bundle.declared_classes:
-                    ontology_warnings.append(
-                        f"Rule node '{item['id']}' uses class URI as property_path: {property_uri}"
-                    )
-                elif property_uri not in bundle.declared_properties:
+                target_matches = self._resolve_profile_term_matches(target_class, selected_bundles)
+                if not target_matches["class_matches"] and target_matches["property_matches"]:
                     ontology_warnings.append(
                         "Rule node "
-                        f"'{item['id']}' uses property_path not declared as property in ontology: "
-                        f"{property_uri}"
+                        f"'{item['id']}' uses property URI as target_class: {target_matches['normalized_uri']}"
+                    )
+                elif not target_matches["class_matches"]:
+                    ontology_warnings.append(
+                        "Rule node "
+                        f"'{item['id']}' uses target_class not declared as class in selected ontologies: "
+                        f"{target_matches['normalized_uri']}"
+                    )
+                elif len(target_matches["class_matches"]) > 1:
+                    ontology_warnings.append(
+                        "Rule node "
+                        f"'{item['id']}' target_class matches multiple selected ontologies: "
+                        f"{', '.join(sorted(target_matches['class_matches']))}"
+                    )
+            if property_path:
+                property_matches = self._resolve_profile_term_matches(property_path, selected_bundles)
+                if not property_matches["property_matches"] and property_matches["class_matches"]:
+                    ontology_warnings.append(
+                        "Rule node "
+                        f"'{item['id']}' uses class URI as property_path: {property_matches['normalized_uri']}"
+                    )
+                elif not property_matches["property_matches"]:
+                    ontology_warnings.append(
+                        "Rule node "
+                        f"'{item['id']}' uses property_path not declared as property in selected ontologies: "
+                        f"{property_matches['normalized_uri']}"
+                    )
+                elif len(property_matches["property_matches"]) > 1:
+                    ontology_warnings.append(
+                        "Rule node "
+                        f"'{item['id']}' property_path matches multiple selected ontologies: "
+                        f"{', '.join(sorted(property_matches['property_matches']))}"
                     )
             if target_class and property_path:
                 bucket = property_requirements_by_target[target_class].setdefault(
@@ -427,6 +580,38 @@ class LexiconService:
             + sorted(set(ontology_warnings)),
         )
         return bundle.ontology, profile
+
+    def _resolve_profile_term_matches(
+        self,
+        value: str,
+        bundles: list[LexiconOntologyBundle],
+    ) -> dict[str, Any]:
+        if value.startswith("http://") or value.startswith("https://"):
+            candidate_uris = [value]
+            normalized_uri = value
+        else:
+            candidate_uris = [
+                self._normalize_term_uri(value, bundle.ontology.canonical_country_uri) for bundle in bundles
+            ]
+            normalized_uri = candidate_uris[0]
+
+        class_matches = {
+            candidate_uri
+            for bundle in bundles
+            for candidate_uri in candidate_uris
+            if candidate_uri in bundle.declared_classes
+        }
+        property_matches = {
+            candidate_uri
+            for bundle in bundles
+            for candidate_uri in candidate_uris
+            if candidate_uri in bundle.declared_properties
+        }
+        return {
+            "normalized_uri": normalized_uri,
+            "class_matches": class_matches,
+            "property_matches": property_matches,
+        }
 
     def reconstruct_graph(
         self,
@@ -839,6 +1024,10 @@ class LexiconService:
             condition_errors, condition_warnings = self._validate_source_term_condition(clause.term)
             errors.extend(condition_errors)
             warnings.extend(condition_warnings)
+        elif clause.entity is not None:
+            entity_errors, entity_warnings = self._validate_source_entity_pattern(clause.entity)
+            errors.extend(entity_errors)
+            warnings.extend(entity_warnings)
         else:
             nested = clause.all_of if clause.all_of else clause.any_of
             for item in nested:
@@ -855,6 +1044,19 @@ class LexiconService:
             errors.append(
                 f"Source term {condition.term_id} was declared as {condition.term_kind} but resolves to {actual_kind}."
             )
+        return errors, warnings
+
+    def _validate_source_entity_pattern(self, entity: LexiconSourceEntityPattern) -> tuple[list[str], list[str]]:
+        errors: list[str] = []
+        warnings: list[str] = []
+        conditions = entity.all_of if entity.all_of else entity.any_of
+        for condition in conditions:
+            condition_errors, condition_warnings = self._validate_source_term_condition(condition)
+            errors.extend(condition_errors)
+            warnings.extend(condition_warnings)
+        warnings.append(
+            "Entity-scoped source pattern keeps the matched terms on the same source object ('with' semantics)."
+        )
         return errors, warnings
 
     def _validate_target_assertions(self, assertions: list[LexiconTargetAssertion]) -> tuple[list[str], list[str]]:
@@ -1052,6 +1254,31 @@ class LexiconService:
         for subject, _, obj in graph.triples((None, has_property_predicate, None)):
             class_property_map[str(subject)].add(str(obj))
 
+        property_class_map: dict[str, set[str]] = defaultdict(set)
+        belongs_to_class_predicate = URIRef(ONTOLOGY_META_BELONGS_TO_CLASS_URI)
+        for subject, _, obj in graph.triples((None, belongs_to_class_predicate, None)):
+            property_class_map[str(subject)].add(str(obj))
+
+        is_property_set_by_uri: dict[str, bool] = {}
+        group_of_properties_predicate = URIRef(ONTOLOGY_META_GROUP_OF_PROPERTIES_URI)
+        for uri in declared_classes:
+            value = graph.value(URIRef(uri), group_of_properties_predicate)
+            is_property_set_by_uri[uri] = bool(isinstance(value, Literal) and str(value).strip().lower() == "true")
+
+        property_set_membership_map: dict[str, set[str]] = defaultdict(set)
+        for class_uri, property_uris in class_property_map.items():
+            if not is_property_set_by_uri.get(class_uri, False):
+                continue
+            for property_uri in property_uris:
+                property_set_membership_map[property_uri].add(class_uri)
+
+        related_property_map: dict[str, set[str]] = defaultdict(set)
+        related_property_predicate = URIRef(ONTOLOGY_META_RELATED_PROPERTY_URI)
+        for subject, _, obj in graph.triples((None, related_property_predicate, None)):
+            related_property_map[str(subject)].add(str(obj))
+
+        unit_predicate = URIRef(ONTOLOGY_META_UNIT_URI)
+
         term_catalog: dict[str, dict[str, Any]] = {}
         definition_predicate = URIRef("http://www.w3.org/2004/02/skos/core#definition")
         for uri in sorted(declared_classes | declared_properties):
@@ -1060,6 +1287,21 @@ class LexiconService:
             label_value = graph.value(subject, RDFS.label)
             definition_value = graph.value(subject, definition_predicate)
             description_value = graph.value(subject, RDFS.comment)
+            unit_value = graph.value(subject, unit_predicate)
+            property_set_term_ids = sorted(
+                {
+                    LexiconService._term_id_from_uri(property_set_uri)
+                    for property_set_uri in (
+                        property_set_membership_map.get(uri, set())
+                        if kind == "property"
+                        else {
+                            property_set_uri
+                            for property_uri in class_property_map.get(uri, set())
+                            for property_set_uri in property_set_membership_map.get(property_uri, set())
+                        }
+                    )
+                }
+            )
             parent_term_ids = sorted(
                 {
                     LexiconService._term_id_from_uri(str(parent))
@@ -1081,10 +1323,32 @@ class LexiconService:
                 "property_term_ids": sorted(
                     LexiconService._term_id_from_uri(prop) for prop in class_property_map.get(uri, set())
                 ),
+                "property_set_term_ids": property_set_term_ids,
+                "belongs_to_class_term_ids": sorted(
+                    LexiconService._term_id_from_uri(class_uri) for class_uri in property_class_map.get(uri, set())
+                ),
+                "related_property_term_ids": sorted(
+                    LexiconService._term_id_from_uri(prop) for prop in related_property_map.get(uri, set())
+                ),
+                "unit": str(unit_value) if unit_value is not None else None,
+                "is_property_set": is_property_set_by_uri.get(uri, False),
                 "is_predefined_type": "predefined type"
                 in (str(description_value).lower() if description_value else ""),
             }
         return term_catalog
+
+    @staticmethod
+    def _summary_from_catalog_term(term: dict[str, Any]) -> LexiconCatalogTermSummary:
+        return LexiconCatalogTermSummary(
+            term_id=term["term_id"],
+            uri=term["uri"],
+            kind=term["kind"],
+            label=term["label"],
+            definition=term["definition"],
+            description=term["description"],
+            parent_term_ids=term["parent_term_ids"],
+            is_predefined_type=term["is_predefined_type"],
+        )
 
     @staticmethod
     def _term_id_from_uri(uri: str) -> str:

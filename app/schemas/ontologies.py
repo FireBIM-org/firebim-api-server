@@ -4,7 +4,7 @@ from datetime import date, datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class OntologyReleaseStatus(StrEnum):
@@ -187,9 +187,141 @@ class OntologyDictionaryConversionResponse(BaseModel):
     property_count: int
     datatype_property_count: int
     object_property_count: int
+    subclass_count: int = 0
+    class_property_link_count: int = 0
     ttl: str
+    validation_report: OntologyDictionaryValidationReport | None = None
     published: bool = False
     publish_result: OntologyPublishResponse | None = None
+
+
+class OntologyDictionaryFieldIssue(BaseModel):
+    item_code: str
+    missing_fields: list[str] = Field(default_factory=list)
+
+
+class OntologyDictionaryLinkIssue(BaseModel):
+    class_code: str
+    class_property_code: str | None = None
+    owned_uri: str | None = None
+    reason: str
+    candidate_property_codes: list[str] = Field(default_factory=list)
+
+
+class OntologyDictionaryValidationReport(BaseModel):
+    valid: bool
+    shape_ok: bool
+    completeness_ok: bool
+    ttl_form_ok: bool
+    source_dictionary_name: str | None = None
+    source_dictionary_code: str | None = None
+    source_dictionary_version: str | None = None
+    class_count: int
+    subclass_count: int
+    property_count: int
+    datatype_property_count: int
+    object_property_count: int
+    class_property_link_count: int
+    resolved_links_by_owned_uri: int
+    resolved_links_by_code: int
+    resolved_links_by_name: int
+    unresolved_link_count: int
+    ambiguous_link_count: int
+    classes_missing_required_fields: list[OntologyDictionaryFieldIssue] = Field(default_factory=list)
+    properties_missing_required_fields: list[OntologyDictionaryFieldIssue] = Field(default_factory=list)
+    unresolved_class_property_links: list[OntologyDictionaryLinkIssue] = Field(default_factory=list)
+    ambiguous_class_property_links: list[OntologyDictionaryLinkIssue] = Field(default_factory=list)
+    ttl_has_ontology: bool
+    ttl_has_classes: bool
+    ttl_has_properties: bool
+    ttl_has_class_property_links: bool
+    issues: list[str] = Field(default_factory=list)
+
+
+class OntologyDictionaryCandidateCreateRequest(BaseModel):
+    ontology_family: str = Field(..., min_length=1)
+    country: str = Field(..., min_length=2)
+    version: str = Field(
+        ...,
+        min_length=7,
+        max_length=10,
+        description="Release id in YYYY.MM or YYYY.MM.DD form",
+    )
+    name: str | None = None
+    dictionary_json: dict[str, Any] | None = Field(
+        default=None,
+        description="Inline candidate JSON payload to store before validation and conversion",
+    )
+    source_resource_filename: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Optional local JSON resource filename to load into the candidate",
+    )
+
+    @field_validator("ontology_family", "country")
+    @classmethod
+    def _normalize_candidate_slug(cls, value: str) -> str:
+        return OntologyPublishRequest._normalize_slug(value)
+
+    @field_validator("version")
+    @classmethod
+    def _validate_candidate_version(cls, value: str) -> str:
+        return OntologyPublishRequest._validate_version(value)
+
+    @field_validator("source_resource_filename")
+    @classmethod
+    def _validate_candidate_filename(cls, value: str | None) -> str | None:
+        return OntologyPublishRequest._validate_resource_filename(value)
+
+    @model_validator(mode="after")
+    def _validate_source(self) -> OntologyDictionaryCandidateCreateRequest:
+        if bool(self.dictionary_json) == bool(self.source_resource_filename):
+            raise ValueError("Provide exactly one of dictionary_json or source_resource_filename")
+        return self
+
+
+class OntologyDictionaryCandidatePublishRequest(BaseModel):
+    status: OntologyReleaseStatus = OntologyReleaseStatus.draft
+    issued_at: date
+    default_version: bool = False
+    output_resource_filename: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Optional TTL resource filename to save before publish",
+    )
+
+    @field_validator("output_resource_filename")
+    @classmethod
+    def _validate_publish_candidate_filename(cls, value: str | None) -> str | None:
+        return OntologyPublishRequest._validate_resource_filename(value)
+
+
+class OntologyDictionaryCandidateSummary(BaseModel):
+    id: str
+    name: str
+    ontology_family: str
+    country: str
+    version: str
+    source_resource_filename: str | None = None
+    source_dictionary_name: str | None = None
+    source_dictionary_code: str | None = None
+    source_dictionary_version: str | None = None
+    created_at: str
+    updated_at: str
+    last_validation_report: OntologyDictionaryValidationReport | None = None
+
+
+class OntologyDictionaryCandidate(OntologyDictionaryCandidateSummary):
+    dictionary_json: dict[str, Any]
+
+
+class OntologyDictionaryCandidateResponse(BaseModel):
+    candidate: OntologyDictionaryCandidate
+
+
+class OntologyDictionaryCandidateListResponse(BaseModel):
+    count: int
+    candidates: list[OntologyDictionaryCandidateSummary] = Field(default_factory=list)
 
 
 class OntologyDeleteResponse(BaseModel):

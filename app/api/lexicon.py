@@ -8,6 +8,7 @@ from app.auth.jwt import get_current_active_user
 from app.lexicon.service import LexiconService
 from app.models.models import User
 from app.schemas.lexicon import (
+    LexiconCatalogRelatedTermsResponse,
     LexiconCatalogTermResponse,
     LexiconCatalogTermsResponse,
     LexiconConformityCheckRequest,
@@ -129,6 +130,110 @@ def get_catalog_term(
         ) from exc
 
 
+@router.get(
+    "/catalog/{ontology_family}/{country}/{version}/classes/{term_id}/properties",
+    response_model=LexiconCatalogRelatedTermsResponse,
+)
+def list_class_properties(
+    ontology_family: str,
+    country: str,
+    version: str,
+    term_id: str,
+) -> LexiconCatalogRelatedTermsResponse:
+    return _list_related_catalog_terms(ontology_family, country, version, term_id, "properties")
+
+
+@router.get(
+    "/catalog/{ontology_family}/{country}/{version}/classes/{term_id}/property-sets",
+    response_model=LexiconCatalogRelatedTermsResponse,
+)
+def list_class_property_sets(
+    ontology_family: str,
+    country: str,
+    version: str,
+    term_id: str,
+) -> LexiconCatalogRelatedTermsResponse:
+    return _list_related_catalog_terms(ontology_family, country, version, term_id, "property_sets")
+
+
+@router.get(
+    "/catalog/{ontology_family}/{country}/{version}/classes/{term_id}/children",
+    response_model=LexiconCatalogRelatedTermsResponse,
+)
+def list_class_children(
+    ontology_family: str,
+    country: str,
+    version: str,
+    term_id: str,
+) -> LexiconCatalogRelatedTermsResponse:
+    return _list_related_catalog_terms(ontology_family, country, version, term_id, "children")
+
+
+@router.get(
+    "/catalog/{ontology_family}/{country}/{version}/classes/{term_id}/parents",
+    response_model=LexiconCatalogRelatedTermsResponse,
+)
+def list_class_parents(
+    ontology_family: str,
+    country: str,
+    version: str,
+    term_id: str,
+) -> LexiconCatalogRelatedTermsResponse:
+    return _list_related_catalog_terms(ontology_family, country, version, term_id, "parents")
+
+
+@router.get(
+    "/catalog/{ontology_family}/{country}/{version}/property-sets/{term_id}/properties",
+    response_model=LexiconCatalogRelatedTermsResponse,
+)
+def list_property_set_properties(
+    ontology_family: str,
+    country: str,
+    version: str,
+    term_id: str,
+) -> LexiconCatalogRelatedTermsResponse:
+    return _list_related_catalog_terms(ontology_family, country, version, term_id, "properties")
+
+
+@router.get(
+    "/catalog/{ontology_family}/{country}/{version}/properties/{term_id}/classes",
+    response_model=LexiconCatalogRelatedTermsResponse,
+)
+def list_property_classes(
+    ontology_family: str,
+    country: str,
+    version: str,
+    term_id: str,
+) -> LexiconCatalogRelatedTermsResponse:
+    return _list_related_catalog_terms(ontology_family, country, version, term_id, "classes")
+
+
+@router.get(
+    "/catalog/{ontology_family}/{country}/{version}/properties/{term_id}/property-sets",
+    response_model=LexiconCatalogRelatedTermsResponse,
+)
+def list_property_property_sets(
+    ontology_family: str,
+    country: str,
+    version: str,
+    term_id: str,
+) -> LexiconCatalogRelatedTermsResponse:
+    return _list_related_catalog_terms(ontology_family, country, version, term_id, "property_sets")
+
+
+@router.get(
+    "/catalog/{ontology_family}/{country}/{version}/properties/{term_id}/related-properties",
+    response_model=LexiconCatalogRelatedTermsResponse,
+)
+def list_related_properties(
+    ontology_family: str,
+    country: str,
+    version: str,
+    term_id: str,
+) -> LexiconCatalogRelatedTermsResponse:
+    return _list_related_catalog_terms(ontology_family, country, version, term_id, "related_properties")
+
+
 @router.post("/mappings/validate", response_model=LexiconMappingValidationResponse)
 def validate_mapping(payload: LexiconMappingValidationRequest) -> LexiconMappingValidationResponse:
     try:
@@ -225,9 +330,19 @@ def create_handshake(
             ontology_family=payload.ontology_family,
             country=payload.country,
             version=payload.version,
+            selected_ontologies=payload.selected_ontologies,
+            canonical_target_ontology=payload.canonical_target_ontology,
             rule_id=payload.rule_id,
             rule=payload.rule,
         )
+        selected_ontologies = service.resolve_selected_ontologies(
+            ontology_family=payload.ontology_family,
+            country=payload.country,
+            version=payload.version,
+            selected_ontologies=payload.selected_ontologies,
+            canonical_target_ontology=payload.canonical_target_ontology,
+        )
+        canonical_target_ontology = selected_ontologies["canonical_target_ontology"]
         handshake = handshake_repo.create_handshake(
             user=current_user,
             ontology_family=ontology.ontology_family,
@@ -235,6 +350,8 @@ def create_handshake(
             version=ontology.version,
             canonical_family_uri=ontology.canonical_family_uri,
             canonical_country_uri=ontology.canonical_country_uri,
+            selected_ontologies=selected_ontologies["selected_ontologies"],
+            canonical_target_ontology=canonical_target_ontology,
             profile=profile,
             accepted_payload=payload.accepted_payload,
         )
@@ -376,8 +493,17 @@ def derive_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconPro
             ontology_family=payload.ontology_family,
             country=payload.country,
             version=payload.version,
+            selected_ontologies=payload.selected_ontologies,
+            canonical_target_ontology=payload.canonical_target_ontology,
             rule_id=payload.rule_id,
             rule=payload.rule,
+        )
+        selected_ontologies = service.resolve_selected_ontologies(
+            ontology_family=payload.ontology_family,
+            country=payload.country,
+            version=payload.version,
+            selected_ontologies=payload.selected_ontologies,
+            canonical_target_ontology=payload.canonical_target_ontology,
         )
         return LexiconProfileDeriveResponse(
             ontology_family=ontology.ontology_family,
@@ -385,6 +511,8 @@ def derive_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconPro
             version=ontology.version,
             canonical_family_uri=ontology.canonical_family_uri,
             canonical_country_uri=ontology.canonical_country_uri,
+            selected_ontologies=selected_ontologies["selected_ontologies"],
+            canonical_target_ontology=selected_ontologies["canonical_target_ontology"],
             profile=profile,
         )
     except (GraphStoreError, GraphStoreNotFoundError) as exc:
@@ -440,4 +568,31 @@ def check_lexicon_conformity(payload: LexiconConformityCheckRequest) -> LexiconC
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to check lexicon conformity",
+        ) from exc
+
+
+def _list_related_catalog_terms(
+    ontology_family: str,
+    country: str,
+    version: str,
+    term_id: str,
+    relation: str,
+) -> LexiconCatalogRelatedTermsResponse:
+    try:
+        return service.list_related_catalog_terms(
+            ontology_family=ontology_family,
+            country=country,
+            version=version,
+            term_id=term_id,
+            relation=relation,
+        )
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to list related lexicon catalog terms", exc_info=exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to list related lexicon catalog terms",
         ) from exc

@@ -82,6 +82,8 @@ class LexiconMappingRepository:
             for clause in clauses:
                 if clause.term is not None:
                     count += 1
+                elif clause.entity is not None:
+                    count += len(clause.entity.all_of or clause.entity.any_of)
                 elif clause.all_of:
                     count += _count_clauses(clause.all_of)
                 elif clause.any_of:

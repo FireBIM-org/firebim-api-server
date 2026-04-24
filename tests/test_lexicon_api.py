@@ -41,6 +41,9 @@ fbo-dk:BuildingElement a owl:Class .
 fbo-dk:Wall a owl:Class ;
     rdfs:subClassOf fbo-dk:BuildingElement ;
     meta:hasProperty fbo-dk:Combustible .
+fbo-dk:WallProperties a owl:Class ;
+    meta:groupOfProperties true ;
+    meta:hasProperty fbo-dk:Combustible .
 fbo-dk:Combustible a owl:DatatypeProperty .
 fbo-dk:hasPart a owl:ObjectProperty .
 """
@@ -55,7 +58,14 @@ ifc:IfcBuiltElement a owl:Class .
 ifc:IfcWall a owl:Class ;
     rdfs:subClassOf ifc:IfcBuiltElement .
 ifc:FireRating a owl:DatatypeProperty .
+ifc:ReferenceRating a owl:DatatypeProperty .
 ifc:MaterialReference a owl:ObjectProperty .
+ifc:FireRating meta:unit "min" ;
+    meta:belongsToClass ifc:IfcWall ;
+    meta:relatedProperty ifc:ReferenceRating .
+ifc:WallCommonProperties a owl:Class ;
+    meta:groupOfProperties true ;
+    meta:hasProperty ifc:FireRating .
 ifc:IfcWallUSERDEFINED a owl:Class ;
     rdfs:subClassOf ifc:IfcWall ;
     rdfs:comment "Technical note: This IFC class is a predefined type represented by its parent class." .
@@ -221,6 +231,22 @@ class DummyHandshakeRepo:
             version="2026.04.23",
             canonical_family_uri="https://firebim.org/ontologies/fbo#",
             canonical_country_uri="https://firebim.org/ontologies/fbo/dk#",
+            selected_ontologies=[
+                {
+                    "ontology_family": "fbo",
+                    "country": "dk",
+                    "version": "2026.04.23",
+                    "canonical_family_uri": "https://firebim.org/ontologies/fbo#",
+                    "canonical_country_uri": "https://firebim.org/ontologies/fbo/dk#",
+                }
+            ],
+            canonical_target_ontology={
+                "ontology_family": "fbo",
+                "country": "dk",
+                "version": "2026.04.23",
+                "canonical_family_uri": "https://firebim.org/ontologies/fbo#",
+                "canonical_country_uri": "https://firebim.org/ontologies/fbo/dk#",
+            },
             profile=LexiconExecutionProfile(
                 rule_id="wall_rule",
                 entry_node_id="start",
@@ -276,6 +302,8 @@ class DummyHandshakeRepo:
         version,
         canonical_family_uri,
         canonical_country_uri,
+        selected_ontologies,
+        canonical_target_ontology,
         profile,
         accepted_payload,
     ):
@@ -293,6 +321,8 @@ class DummyHandshakeRepo:
                 "version": version,
                 "canonical_family_uri": canonical_family_uri,
                 "canonical_country_uri": canonical_country_uri,
+                "selected_ontologies": selected_ontologies,
+                "canonical_target_ontology": canonical_target_ontology,
                 "profile": profile,
                 "accepted_payload": accepted_payload,
             }
@@ -392,6 +422,65 @@ def test_derive_execution_profile_from_inline_rule(monkeypatch):
     assert body["profile"]["target_classes"] == ["Wall"]
     assert body["profile"]["property_paths"] == ["Combustible"]
     assert body["profile"]["targets"][0]["property_requirements"][0]["property_path"] == "Combustible"
+    assert body["selected_ontologies"][0]["ontology_family"] == "fbo"
+    assert body["canonical_target_ontology"]["ontology_family"] == "fbo"
+
+
+def test_derive_execution_profile_with_multiple_selected_ontologies(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/profiles/derive",
+        json={
+            "ontology_family": "fbo",
+            "country": "dk",
+            "version": "latest",
+            "selected_ontologies": [
+                {
+                    "ontology_family": "ifc",
+                    "country": "global",
+                    "version": "latest",
+                },
+                {
+                    "ontology_family": "fbo",
+                    "country": "dk",
+                    "version": "latest",
+                },
+            ],
+            "canonical_target_ontology": {
+                "ontology_family": "fbo",
+                "country": "dk",
+                "version": "latest",
+            },
+            "rule": {
+                "id": "wall_rule",
+                "entry": "start",
+                "elements": [
+                    {
+                        "id": "start",
+                        "element_type": "decision",
+                        "target_class": "IfcWall",
+                        "property_path": "Combustible",
+                        "operator": "=",
+                        "value": True,
+                        "true_path": "ok",
+                        "false_path": "fail",
+                        "unknown_path": "unknown",
+                        "label": "Check combustibility",
+                        "config": {},
+                    },
+                    {"id": "ok", "element_type": "end", "label": "Ok", "config": {}},
+                    {"id": "fail", "element_type": "end", "label": "Fail", "config": {}},
+                    {"id": "unknown", "element_type": "end", "label": "Unknown", "config": {}},
+                ],
+            },
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["selected_ontologies"][0]["ontology_family"] == "ifc"
+    assert body["selected_ontologies"][1]["ontology_family"] == "fbo"
+    assert body["canonical_target_ontology"]["ontology_family"] == "fbo"
+    assert body["profile"]["warnings"] == []
 
 
 def test_derive_execution_profile_from_published_rule(monkeypatch):
@@ -576,10 +665,10 @@ def test_list_catalog_terms(monkeypatch):
     response = client.get("/lexicon/catalog/fbo/dk/latest/terms?kind=class&search=wall&limit=10")
     assert response.status_code == 200
     body = response.json()
-    assert body["count"] == 1
-    assert body["total_count"] == 1
+    assert body["count"] == 2
+    assert body["total_count"] == 2
     assert body["next_cursor"] is None
-    assert body["terms"][0]["term_id"] == "Wall"
+    assert [item["term_id"] for item in body["terms"]] == ["Wall", "WallProperties"]
     assert body["terms"][0]["kind"] == "class"
     assert body["terms"][0]["parent_term_ids"] == ["BuildingElement"]
 
@@ -591,7 +680,7 @@ def test_list_catalog_terms_supports_cursor_and_filters(monkeypatch):
     assert first_page.status_code == 200
     first_body = first_page.json()
     assert first_body["count"] == 1
-    assert first_body["total_count"] == 4
+    assert first_body["total_count"] == 5
     assert first_body["next_cursor"] == first_body["terms"][0]["term_id"]
 
     second_page = client.get(f"/lexicon/catalog/fbo/dk/latest/terms?limit=1&cursor={first_body['next_cursor']}")
@@ -632,6 +721,53 @@ def test_get_catalog_term(monkeypatch):
     assert body["term"]["term_id"] == "Wall"
     assert body["term"]["parent_term_ids"] == ["BuildingElement"]
     assert body["term"]["property_term_ids"] == ["Combustible"]
+    assert body["term"]["property_set_term_ids"] == ["WallProperties"]
+
+
+def test_property_and_property_set_related_catalog_endpoints(monkeypatch):
+    client = _build_client(monkeypatch)
+
+    class_properties = client.get("/lexicon/catalog/fbo/dk/latest/classes/Wall/properties")
+    assert class_properties.status_code == 200
+    assert class_properties.json()["terms"][0]["term_id"] == "Combustible"
+
+    class_property_sets = client.get("/lexicon/catalog/fbo/dk/latest/classes/Wall/property-sets")
+    assert class_property_sets.status_code == 200
+    assert class_property_sets.json()["terms"][0]["term_id"] == "WallProperties"
+
+    class_children = client.get("/lexicon/catalog/ifc/global/latest/classes/IfcWall/children")
+    assert class_children.status_code == 200
+    assert class_children.json()["terms"][0]["term_id"] == "IfcWallUSERDEFINED"
+
+    class_parents = client.get("/lexicon/catalog/ifc/global/latest/classes/IfcWall/parents")
+    assert class_parents.status_code == 200
+    assert class_parents.json()["terms"][0]["term_id"] == "IfcBuiltElement"
+
+    property_sets = client.get("/lexicon/catalog/ifc/global/latest/properties/FireRating/property-sets")
+    assert property_sets.status_code == 200
+    assert property_sets.json()["terms"][0]["term_id"] == "WallCommonProperties"
+
+    property_classes = client.get("/lexicon/catalog/ifc/global/latest/properties/FireRating/classes")
+    assert property_classes.status_code == 200
+    assert property_classes.json()["terms"][0]["term_id"] == "IfcWall"
+
+    related_properties = client.get("/lexicon/catalog/ifc/global/latest/properties/FireRating/related-properties")
+    assert related_properties.status_code == 200
+    assert related_properties.json()["terms"][0]["term_id"] == "ReferenceRating"
+
+    property_set_properties = client.get(
+        "/lexicon/catalog/ifc/global/latest/property-sets/WallCommonProperties/properties"
+    )
+    assert property_set_properties.status_code == 200
+    assert property_set_properties.json()["terms"][0]["term_id"] == "FireRating"
+
+    property_detail = client.get("/lexicon/catalog/ifc/global/latest/terms/FireRating")
+    assert property_detail.status_code == 200
+    term = property_detail.json()["term"]
+    assert term["unit"] == "min"
+    assert term["property_set_term_ids"] == ["WallCommonProperties"]
+    assert term["belongs_to_class_term_ids"] == ["IfcWall"]
+    assert term["related_property_term_ids"] == ["ReferenceRating"]
 
 
 def test_validate_mapping_allows_class_to_subclass(monkeypatch):
@@ -769,6 +905,141 @@ def test_validate_semantic_assertion_any_of(monkeypatch):
                             "country": "global",
                             "version": "latest",
                             "term_id": "MaterialReference",
+                        }
+                    },
+                ]
+            },
+            "target_assertions": [
+                {
+                    "assertion_kind": "property_value",
+                    "ontology_family": "fbo",
+                    "country": "dk",
+                    "version": "latest",
+                    "term_id": "Combustible",
+                    "value": True,
+                }
+            ],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is True
+    assert body["compatible"] is True
+
+
+def test_validate_semantic_assertion_entity_any_of(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/mappings/validate",
+        json={
+            "mapping_kind": "semantic_assertion",
+            "source_pattern": {
+                "any_of": [
+                    {
+                        "entity": {
+                            "all_of": [
+                                {
+                                    "term_kind": "class",
+                                    "ontology_family": "ifc",
+                                    "country": "global",
+                                    "version": "latest",
+                                    "term_id": "IfcWall",
+                                },
+                                {
+                                    "term_kind": "property",
+                                    "ontology_family": "ifc",
+                                    "country": "global",
+                                    "version": "latest",
+                                    "term_id": "FireRating",
+                                },
+                            ]
+                        }
+                    },
+                    {
+                        "entity": {
+                            "all_of": [
+                                {
+                                    "term_kind": "class",
+                                    "ontology_family": "ifc",
+                                    "country": "global",
+                                    "version": "latest",
+                                    "term_id": "IfcWallUSERDEFINED",
+                                },
+                                {
+                                    "term_kind": "property",
+                                    "ontology_family": "ifc",
+                                    "country": "global",
+                                    "version": "latest",
+                                    "term_id": "MaterialReference",
+                                },
+                            ]
+                        }
+                    },
+                ]
+            },
+            "target_assertions": [
+                {
+                    "assertion_kind": "class",
+                    "ontology_family": "fbo",
+                    "country": "dk",
+                    "version": "latest",
+                    "term_id": "Wall",
+                }
+            ],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is True
+    assert any("same source object" in item for item in body["warnings"])
+
+
+def test_validate_semantic_assertion_entity_all_of(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/mappings/validate",
+        json={
+            "mapping_kind": "semantic_assertion",
+            "source_pattern": {
+                "all_of": [
+                    {
+                        "entity": {
+                            "all_of": [
+                                {
+                                    "term_kind": "class",
+                                    "ontology_family": "ifc",
+                                    "country": "global",
+                                    "version": "latest",
+                                    "term_id": "IfcWall",
+                                },
+                                {
+                                    "term_kind": "property",
+                                    "ontology_family": "ifc",
+                                    "country": "global",
+                                    "version": "latest",
+                                    "term_id": "FireRating",
+                                },
+                            ]
+                        }
+                    },
+                    {
+                        "entity": {
+                            "all_of": [
+                                {
+                                    "term_kind": "class",
+                                    "ontology_family": "ifc",
+                                    "country": "global",
+                                    "version": "latest",
+                                    "term_id": "IfcWallUSERDEFINED",
+                                },
+                                {
+                                    "term_kind": "property",
+                                    "ontology_family": "ifc",
+                                    "country": "global",
+                                    "version": "latest",
+                                    "term_id": "MaterialReference",
+                                },
+                            ]
                         }
                     },
                 ]
@@ -944,6 +1215,7 @@ def test_create_handshake(monkeypatch):
     body = response.json()
     assert body["handshake"]["id"] == "hs_123"
     assert handshake_repo.created["ontology_family"] == "fbo"
+    assert body["handshake"]["selected_ontologies"][0]["ontology_family"] == "fbo"
 
 
 def test_get_handshake(monkeypatch):

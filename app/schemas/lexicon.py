@@ -12,6 +12,14 @@ class LexiconHealthResponse(BaseModel):
     ontologies_connected: bool
 
 
+class LexiconSelectedOntology(BaseModel):
+    ontology_family: str = Field(..., min_length=1)
+    country: str = Field(..., min_length=2)
+    version: str = Field(default="latest", min_length=2)
+    canonical_family_uri: str | None = None
+    canonical_country_uri: str | None = None
+
+
 class LexiconBranchReference(BaseModel):
     branch: str
     target_node_id: str | None = None
@@ -61,6 +69,8 @@ class LexiconProfileDeriveRequest(BaseModel):
     ontology_family: str = Field(default="fbo", min_length=1)
     country: str = Field(..., min_length=2)
     version: str = Field(default="latest", min_length=2)
+    selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list)
+    canonical_target_ontology: LexiconSelectedOntology | None = None
     rule_id: str | None = None
     rule: RuleDraft | None = None
 
@@ -77,6 +87,8 @@ class LexiconProfileDeriveResponse(BaseModel):
     version: str
     canonical_family_uri: str
     canonical_country_uri: str
+    selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list)
+    canonical_target_ontology: LexiconSelectedOntology | None = None
     profile: LexiconExecutionProfile
 
 
@@ -187,6 +199,11 @@ class LexiconCatalogTermDetail(BaseModel):
     parent_term_ids: list[str] = Field(default_factory=list)
     child_term_ids: list[str] = Field(default_factory=list)
     property_term_ids: list[str] = Field(default_factory=list)
+    property_set_term_ids: list[str] = Field(default_factory=list)
+    belongs_to_class_term_ids: list[str] = Field(default_factory=list)
+    related_property_term_ids: list[str] = Field(default_factory=list)
+    unit: str | None = None
+    is_property_set: bool = False
     is_predefined_type: bool = False
 
 
@@ -211,6 +228,16 @@ class LexiconCatalogTermResponse(BaseModel):
     term: LexiconCatalogTermDetail
 
 
+class LexiconCatalogRelatedTermsResponse(BaseModel):
+    ontology_family: str
+    country: str
+    version: str
+    canonical_family_uri: str
+    canonical_country_uri: str
+    count: int
+    terms: list[LexiconCatalogTermSummary] = Field(default_factory=list)
+
+
 class LexiconMappedTermReference(BaseModel):
     ontology_family: str = Field(..., min_length=1)
     country: str = Field(..., min_length=2)
@@ -228,16 +255,31 @@ class LexiconSourceTermCondition(BaseModel):
     uri: str | None = None
 
 
+class LexiconSourceEntityPattern(BaseModel):
+    all_of: list[LexiconSourceTermCondition] = Field(default_factory=list)
+    any_of: list[LexiconSourceTermCondition] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_entity_pattern_shape(self) -> LexiconSourceEntityPattern:
+        active = int(bool(self.all_of)) + int(bool(self.any_of))
+        if active != 1:
+            raise ValueError("Entity pattern must define exactly one of all_of or any_of")
+        return self
+
+
 class LexiconSourcePatternClause(BaseModel):
     term: LexiconSourceTermCondition | None = None
+    entity: LexiconSourceEntityPattern | None = None
     all_of: list[LexiconSourcePatternClause] = Field(default_factory=list)
     any_of: list[LexiconSourcePatternClause] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_clause_shape(self) -> LexiconSourcePatternClause:
-        active = int(self.term is not None) + int(bool(self.all_of)) + int(bool(self.any_of))
+        active = (
+            int(self.term is not None) + int(self.entity is not None) + int(bool(self.all_of)) + int(bool(self.any_of))
+        )
         if active != 1:
-            raise ValueError("Each source pattern clause must define exactly one of term, all_of, or any_of")
+            raise ValueError("Each source pattern clause must define exactly one of term, entity, all_of, or any_of")
         return self
 
 
@@ -378,6 +420,8 @@ class LexiconHandshake(BaseModel):
     version: str
     canonical_family_uri: str
     canonical_country_uri: str
+    selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list)
+    canonical_target_ontology: LexiconSelectedOntology | None = None
     profile: LexiconExecutionProfile
     accepted_payload: LexiconHandshakeAcceptedPayload
     created_at: str
@@ -388,6 +432,8 @@ class LexiconHandshakeCreateRequest(BaseModel):
     ontology_family: str = Field(default="fbo", min_length=1)
     country: str = Field(..., min_length=2)
     version: str = Field(default="latest", min_length=2)
+    selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list)
+    canonical_target_ontology: LexiconSelectedOntology | None = None
     rule_id: str | None = None
     rule: RuleDraft | None = None
     accepted_payload: LexiconHandshakeAcceptedPayload = Field(default_factory=LexiconHandshakeAcceptedPayload)

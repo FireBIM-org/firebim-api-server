@@ -13,6 +13,7 @@ from app.models.models import User
 from app.schemas.lexicon import (
     LexiconHandshake,
     LexiconHandshakeAcceptedPayload,
+    LexiconSelectedOntology,
 )
 
 
@@ -103,6 +104,8 @@ class LexiconHandshakeRepository:
         version: str,
         canonical_family_uri: str,
         canonical_country_uri: str,
+        selected_ontologies: list[LexiconSelectedOntology],
+        canonical_target_ontology: LexiconSelectedOntology | None,
         profile,
         accepted_payload: LexiconHandshakeAcceptedPayload,
     ) -> LexiconHandshake:
@@ -114,6 +117,8 @@ class LexiconHandshakeRepository:
             version=version,
             canonical_family_uri=canonical_family_uri,
             canonical_country_uri=canonical_country_uri,
+            selected_ontologies=selected_ontologies,
+            canonical_target_ontology=canonical_target_ontology,
             profile=profile,
             accepted_payload=accepted_payload,
             created_at=now,

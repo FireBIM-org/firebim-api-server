@@ -18,7 +18,12 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api import ontologies as ontologies_api
-from app.schemas.ontologies import OntologyReleaseStatus, OntologyVersionFetchResponse, OntologyVersionListResponse
+from app.schemas.ontologies import (
+    OntologyDictionaryCandidate,
+    OntologyReleaseStatus,
+    OntologyVersionFetchResponse,
+    OntologyVersionListResponse,
+)
 
 
 class DummyOntologyRepo:
@@ -169,6 +174,93 @@ class DummyOntologyRepo:
         return f"C:\\dummy\\resources\\{filename}"
 
 
+class DummyOntologyCandidateRepo:
+    def __init__(self) -> None:
+        self.deleted_id = None
+        self.updated_reports = []
+        self.candidate = OntologyDictionaryCandidate(
+            id="cand_123",
+            name="rir/global candidate",
+            ontology_family="rir",
+            country="global",
+            version="2026.03.25",
+            source_resource_filename="rir-1.0.json",
+            source_dictionary_name="RIR",
+            source_dictionary_code="rir",
+            source_dictionary_version="1.0",
+            dictionary_json={
+                "DictionaryName": "RIR",
+                "DictionaryCode": "rir",
+                "DictionaryVersion": "1.0",
+                "Classes": [
+                    {
+                        "Code": "FireCompartment",
+                        "Name": "Fire Compartment",
+                        "ClassType": "Class",
+                        "Definition": "A fire compartment",
+                        "Description": "A bounded fire compartment",
+                        "RelatedIfcEntityNamesList": ["IfcSpace"],
+                        "CountriesOfUse": ["DK"],
+                        "Uid": "rir-fire-compartment",
+                    }
+                ],
+                "Properties": [
+                    {
+                        "Code": "AreaFireCompartment",
+                        "PropertyCode": "AreaFireCompartment",
+                        "PropertyUri": "https://example.org/rir/area-fire-compartment",
+                        "Definition": "Area definition",
+                        "Description": "Fire compartment area",
+                        "Unit": "m2",
+                        "DataType": "Real",
+                        "PropertyType": "SingleValue",
+                        "PropertyValueKind": "Single",
+                        "AllowedValues": [],
+                        "Example": "12.5",
+                    }
+                ],
+            },
+            created_at="2026-04-24T08:00:00+00:00",
+            updated_at="2026-04-24T08:00:00+00:00",
+            last_validation_report=None,
+        )
+
+    def create_candidate(self, payload, *, dictionary_json, user):
+        _ = payload, user
+        self.candidate = self.candidate.model_copy(
+            update={
+                "dictionary_json": dictionary_json,
+                "source_dictionary_name": dictionary_json.get("DictionaryName"),
+                "source_dictionary_code": dictionary_json.get("DictionaryCode"),
+                "source_dictionary_version": dictionary_json.get("DictionaryVersion"),
+            }
+        )
+        return self.candidate
+
+    def list_candidates(self, user):
+        _ = user
+        return [self.candidate]
+
+    def get_candidate(self, candidate_id, user):
+        _ = user
+        return self.candidate.model_copy(update={"id": candidate_id})
+
+    def update_validation_report(self, candidate_id, validation_report, user):
+        _ = user
+        self.updated_reports.append((candidate_id, validation_report))
+        self.candidate = self.candidate.model_copy(
+            update={
+                "id": candidate_id,
+                "last_validation_report": validation_report,
+            }
+        )
+        return self.candidate
+
+    def delete_candidate(self, candidate_id, user):
+        _ = user
+        self.deleted_id = candidate_id
+
+
 def _dummy_current_user():
     return {"id": "user-1"}
 
@@ -177,6 +269,7 @@ def _build_client(monkeypatch) -> TestClient:
     app = FastAPI()
     app.include_router(ontologies_api.router)
     monkeypatch.setattr(ontologies_api, "repo", DummyOntologyRepo())
+    monkeypatch.setattr(ontologies_api, "candidate_repo", DummyOntologyCandidateRepo())
     app.dependency_overrides[ontologies_api.get_current_active_user] = _dummy_current_user
     return TestClient(app)
 
@@ -271,6 +364,69 @@ def test_convert_dictionary_json_to_ttl(monkeypatch):
     assert body["source_dictionary_code"] == "rir"
     assert body["class_count"] == 1
     assert body["property_count"] == 1
+    assert body["subclass_count"] == 0
     assert body["published"] is True
     assert body["publish_result"]["graph_uri"] == "https://api.firebim.org/ontologies/rir/global/versions/2026.03.25"
     assert "owl:Ontology" in body["ttl"]
+    assert body["validation_report"]["valid"] is False
+
+
+def test_dictionary_candidate_crud_validate_convert_and_publish(monkeypatch):
+    client = _build_client(monkeypatch)
+
+    create = client.post(
+        "/ontologies/candidates/dictionaries",
+        json={
+            "ontology_family": "rir",
+            "country": "global",
+            "version": "2026.03.25",
+            "source_resource_filename": "rir-1.0.json",
+            "name": "RIR candidate",
+        },
+    )
+    assert create.status_code == 201
+    assert create.json()["candidate"]["source_dictionary_code"] == "rir"
+
+    listing = client.get("/ontologies/candidates/dictionaries")
+    assert listing.status_code == 200
+    assert listing.json()["count"] == 1
+
+    candidate = client.get("/ontologies/candidates/dictionaries/cand_123")
+    assert candidate.status_code == 200
+    assert candidate.json()["candidate"]["id"] == "cand_123"
+
+    download = client.get("/ontologies/candidates/dictionaries/cand_123/json")
+    assert download.status_code == 200
+    assert download.json()["DictionaryCode"] == "rir"
+
+    validate = client.post("/ontologies/candidates/dictionaries/cand_123/validate")
+    assert validate.status_code == 200
+    validate_body = validate.json()
+    assert validate_body["class_count"] == 1
+    assert validate_body["property_count"] == 1
+    assert validate_body["ttl_has_ontology"] is True
+
+    convert = client.post("/ontologies/candidates/dictionaries/cand_123/convert")
+    assert convert.status_code == 200
+    convert_body = convert.json()
+    assert convert_body["class_count"] == 1
+    assert convert_body["validation_report"]["class_count"] == 1
+    assert "owl:Ontology" in convert_body["ttl"]
+
+    publish = client.post(
+        "/ontologies/candidates/dictionaries/cand_123/publish",
+        json={
+            "status": "candidate",
+            "issued_at": "2026-03-25",
+            "default_version": True,
+            "output_resource_filename": "rir-global.ttl",
+        },
+    )
+    assert publish.status_code == 200
+    publish_body = publish.json()
+    assert publish_body["published"] is True
+    assert publish_body["publish_result"]["resource_filename"] == "rir-global.ttl"
+
+    delete = client.delete("/ontologies/candidates/dictionaries/cand_123")
+    assert delete.status_code == 200
+    assert delete.json() == {"deleted": True, "candidate_id": "cand_123"}

@@ -3,18 +3,31 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.auth.jwt import get_current_active_user
 from app.core.config import settings
 from app.lexicon.dictionary_ontology import (
+    DictionaryFieldIssue,
+    DictionaryLinkIssue,
     convert_dictionary_json_text,
     convert_dictionary_payload,
+    normalize_dictionary_json,
+)
+from app.lexicon.dictionary_ontology import (
+    DictionaryOntologyValidationReport as DictionaryOntologyValidationReportData,
 )
 from app.schemas.ontologies import (
     OntologyDeleteResponse,
+    OntologyDictionaryCandidateCreateRequest,
+    OntologyDictionaryCandidateListResponse,
+    OntologyDictionaryCandidatePublishRequest,
+    OntologyDictionaryCandidateResponse,
     OntologyDictionaryConversionRequest,
     OntologyDictionaryConversionResponse,
+    OntologyDictionaryFieldIssue,
+    OntologyDictionaryLinkIssue,
+    OntologyDictionaryValidationReport,
     OntologyHealthResponse,
     OntologyPublishRequest,
     OntologyPublishResponse,
@@ -23,12 +36,18 @@ from app.schemas.ontologies import (
     OntologyVersionListResponse,
 )
 from app.storage.graph_store import GraphStoreError, GraphStoreNotFoundError
+from app.storage.ontology_candidate_repository import (
+    OntologyCandidateNotFoundError,
+    OntologyCandidateRepository,
+    OntologyCandidateRepositoryError,
+)
 from app.storage.ontology_repository import ONTOLOGIES_DATASET, OntologyRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ontologies", tags=["ontologies"])
 
 repo = OntologyRepository()
+candidate_repo = OntologyCandidateRepository()
 
 
 @router.get("/health", response_model=OntologyHealthResponse)
@@ -107,7 +126,10 @@ def convert_dictionary_json_to_ttl(
             property_count=conversion.property_count,
             datatype_property_count=conversion.datatype_property_count,
             object_property_count=conversion.object_property_count,
+            subclass_count=conversion.subclass_count,
+            class_property_link_count=conversion.class_property_link_count,
             ttl=conversion.ttl,
+            validation_report=_validation_report_model(conversion.validation_report),
             published=publish_result is not None,
             publish_result=publish_result,
         )
@@ -115,6 +137,234 @@ def convert_dictionary_json_to_ttl(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except GraphStoreError as exc:
         logger.exception("Failed to convert dictionary JSON to ontology TTL", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post(
+    "/candidates/dictionaries",
+    response_model=OntologyDictionaryCandidateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_dictionary_candidate(
+    payload: OntologyDictionaryCandidateCreateRequest,
+    current_user=Depends(get_current_active_user),
+) -> OntologyDictionaryCandidateResponse:
+    try:
+        dictionary_json = _resolve_candidate_dictionary_json(payload)
+        candidate = candidate_repo.create_candidate(payload, dictionary_json=dictionary_json, user=current_user)
+        return OntologyDictionaryCandidateResponse(candidate=candidate)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except OntologyCandidateRepositoryError as exc:
+        logger.exception("Failed to create ontology dictionary candidate", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.get("/candidates/dictionaries", response_model=OntologyDictionaryCandidateListResponse)
+def list_dictionary_candidates(
+    current_user=Depends(get_current_active_user),
+) -> OntologyDictionaryCandidateListResponse:
+    try:
+        candidates = candidate_repo.list_candidates(current_user)
+        return OntologyDictionaryCandidateListResponse(count=len(candidates), candidates=candidates)
+    except OntologyCandidateRepositoryError as exc:
+        logger.exception("Failed to list ontology dictionary candidates", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.get("/candidates/dictionaries/{candidate_id}", response_model=OntologyDictionaryCandidateResponse)
+def get_dictionary_candidate(
+    candidate_id: str,
+    current_user=Depends(get_current_active_user),
+) -> OntologyDictionaryCandidateResponse:
+    try:
+        candidate = candidate_repo.get_candidate(candidate_id, current_user)
+        return OntologyDictionaryCandidateResponse(candidate=candidate)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except OntologyCandidateNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except OntologyCandidateRepositoryError as exc:
+        logger.exception("Failed to fetch ontology dictionary candidate", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.get("/candidates/dictionaries/{candidate_id}/json")
+def download_dictionary_candidate_json(
+    candidate_id: str,
+    current_user=Depends(get_current_active_user),
+) -> JSONResponse:
+    try:
+        candidate = candidate_repo.get_candidate(candidate_id, current_user)
+        return JSONResponse(candidate.dictionary_json)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except OntologyCandidateNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except OntologyCandidateRepositoryError as exc:
+        logger.exception("Failed to download ontology dictionary candidate JSON", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post(
+    "/candidates/dictionaries/{candidate_id}/validate",
+    response_model=OntologyDictionaryValidationReport,
+)
+def validate_dictionary_candidate(
+    candidate_id: str,
+    current_user=Depends(get_current_active_user),
+) -> OntologyDictionaryValidationReport:
+    try:
+        candidate = candidate_repo.get_candidate(candidate_id, current_user)
+        conversion = convert_dictionary_payload(
+            candidate.dictionary_json,
+            ontology_family=candidate.ontology_family,
+            country=candidate.country,
+            version=candidate.version,
+        )
+        validation_report = _validation_report_model(conversion.validation_report)
+        candidate_repo.update_validation_report(candidate_id, validation_report, current_user)
+        return validation_report
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except OntologyCandidateNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except OntologyCandidateRepositoryError as exc:
+        logger.exception("Failed to validate ontology dictionary candidate", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post(
+    "/candidates/dictionaries/{candidate_id}/convert",
+    response_model=OntologyDictionaryConversionResponse,
+)
+def convert_dictionary_candidate(
+    candidate_id: str,
+    current_user=Depends(get_current_active_user),
+) -> OntologyDictionaryConversionResponse:
+    try:
+        candidate = candidate_repo.get_candidate(candidate_id, current_user)
+        conversion = convert_dictionary_payload(
+            candidate.dictionary_json,
+            ontology_family=candidate.ontology_family,
+            country=candidate.country,
+            version=candidate.version,
+        )
+        validation_report = _validation_report_model(conversion.validation_report)
+        candidate_repo.update_validation_report(candidate_id, validation_report, current_user)
+        return OntologyDictionaryConversionResponse(
+            ontology_family=conversion.ontology_family,
+            country=conversion.country,
+            version=conversion.version,
+            source_dictionary_name=conversion.source_dictionary_name,
+            source_dictionary_code=conversion.source_dictionary_code,
+            source_dictionary_version=conversion.source_dictionary_version,
+            source_resource_filename=candidate.source_resource_filename,
+            ontology_uri=conversion.ontology_uri,
+            version_iri=conversion.version_iri,
+            class_count=conversion.class_count,
+            property_count=conversion.property_count,
+            datatype_property_count=conversion.datatype_property_count,
+            object_property_count=conversion.object_property_count,
+            subclass_count=conversion.subclass_count,
+            class_property_link_count=conversion.class_property_link_count,
+            ttl=conversion.ttl,
+            validation_report=validation_report,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except OntologyCandidateNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except OntologyCandidateRepositoryError as exc:
+        logger.exception("Failed to convert ontology dictionary candidate", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post(
+    "/candidates/dictionaries/{candidate_id}/publish",
+    response_model=OntologyDictionaryConversionResponse,
+)
+def publish_dictionary_candidate(
+    candidate_id: str,
+    payload: OntologyDictionaryCandidatePublishRequest,
+    current_user=Depends(get_current_active_user),
+) -> OntologyDictionaryConversionResponse:
+    try:
+        candidate = candidate_repo.get_candidate(candidate_id, current_user)
+        conversion = convert_dictionary_payload(
+            candidate.dictionary_json,
+            ontology_family=candidate.ontology_family,
+            country=candidate.country,
+            version=candidate.version,
+        )
+        validation_report = _validation_report_model(conversion.validation_report)
+        candidate_repo.update_validation_report(candidate_id, validation_report, current_user)
+
+        saved_resource_filename = None
+        if payload.output_resource_filename:
+            repo.save_local_resource(payload.output_resource_filename, conversion.ttl)
+            saved_resource_filename = payload.output_resource_filename
+
+        published = repo.publish_version(
+            OntologyPublishRequest(
+                ontology_family=candidate.ontology_family,
+                country=candidate.country,
+                version=candidate.version,
+                status=payload.status,
+                issued_at=payload.issued_at,
+                ttl=conversion.ttl,
+                resource_filename=saved_resource_filename,
+                default_version=payload.default_version,
+            )
+        )
+        return OntologyDictionaryConversionResponse(
+            ontology_family=conversion.ontology_family,
+            country=conversion.country,
+            version=conversion.version,
+            source_dictionary_name=conversion.source_dictionary_name,
+            source_dictionary_code=conversion.source_dictionary_code,
+            source_dictionary_version=conversion.source_dictionary_version,
+            source_resource_filename=candidate.source_resource_filename,
+            output_resource_filename=saved_resource_filename,
+            ontology_uri=conversion.ontology_uri,
+            version_iri=conversion.version_iri,
+            class_count=conversion.class_count,
+            property_count=conversion.property_count,
+            datatype_property_count=conversion.datatype_property_count,
+            object_property_count=conversion.object_property_count,
+            subclass_count=conversion.subclass_count,
+            class_property_link_count=conversion.class_property_link_count,
+            ttl=conversion.ttl,
+            validation_report=validation_report,
+            published=True,
+            publish_result=OntologyPublishResponse(success=True, **published),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except OntologyCandidateNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except OntologyCandidateRepositoryError as exc:
+        logger.exception("Failed to publish ontology dictionary candidate", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except GraphStoreError as exc:
+        logger.exception("Failed to publish ontology dictionary candidate", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.delete("/candidates/dictionaries/{candidate_id}")
+def delete_dictionary_candidate(
+    candidate_id: str,
+    current_user=Depends(get_current_active_user),
+) -> dict[str, object]:
+    try:
+        candidate_repo.delete_candidate(candidate_id, current_user)
+        return {"deleted": True, "candidate_id": candidate_id}
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except OntologyCandidateNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except OntologyCandidateRepositoryError as exc:
+        logger.exception("Failed to delete ontology dictionary candidate", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
@@ -225,3 +475,59 @@ def _build_dictionary_conversion(payload: OntologyDictionaryConversionRequest):
             version=payload.version,
         )
     raise ValueError("Either dictionary_json or source_resource_filename must be provided")
+
+
+def _resolve_candidate_dictionary_json(payload: OntologyDictionaryCandidateCreateRequest) -> dict:
+    if payload.dictionary_json is not None:
+        return payload.dictionary_json
+    if payload.source_resource_filename:
+        return normalize_dictionary_json(repo.load_local_resource(payload.source_resource_filename))
+    raise ValueError("Either dictionary_json or source_resource_filename must be provided")
+
+
+def _validation_report_model(report: DictionaryOntologyValidationReportData) -> OntologyDictionaryValidationReport:
+    return OntologyDictionaryValidationReport(
+        valid=report.valid,
+        shape_ok=report.shape_ok,
+        completeness_ok=report.completeness_ok,
+        ttl_form_ok=report.ttl_form_ok,
+        source_dictionary_name=report.source_dictionary_name,
+        source_dictionary_code=report.source_dictionary_code,
+        source_dictionary_version=report.source_dictionary_version,
+        class_count=report.class_count,
+        subclass_count=report.subclass_count,
+        property_count=report.property_count,
+        datatype_property_count=report.datatype_property_count,
+        object_property_count=report.object_property_count,
+        class_property_link_count=report.class_property_link_count,
+        resolved_links_by_owned_uri=report.resolved_links_by_owned_uri,
+        resolved_links_by_code=report.resolved_links_by_code,
+        resolved_links_by_name=report.resolved_links_by_name,
+        unresolved_link_count=report.unresolved_link_count,
+        ambiguous_link_count=report.ambiguous_link_count,
+        classes_missing_required_fields=[_field_issue_model(item) for item in report.classes_missing_required_fields],
+        properties_missing_required_fields=[
+            _field_issue_model(item) for item in report.properties_missing_required_fields
+        ],
+        unresolved_class_property_links=[_link_issue_model(item) for item in report.unresolved_class_property_links],
+        ambiguous_class_property_links=[_link_issue_model(item) for item in report.ambiguous_class_property_links],
+        ttl_has_ontology=report.ttl_has_ontology,
+        ttl_has_classes=report.ttl_has_classes,
+        ttl_has_properties=report.ttl_has_properties,
+        ttl_has_class_property_links=report.ttl_has_class_property_links,
+        issues=list(report.issues),
+    )
+
+
+def _field_issue_model(issue: DictionaryFieldIssue) -> OntologyDictionaryFieldIssue:
+    return OntologyDictionaryFieldIssue(item_code=issue.item_code, missing_fields=list(issue.missing_fields))
+
+
+def _link_issue_model(issue: DictionaryLinkIssue) -> OntologyDictionaryLinkIssue:
+    return OntologyDictionaryLinkIssue(
+        class_code=issue.class_code,
+        class_property_code=issue.class_property_code,
+        owned_uri=issue.owned_uri,
+        reason=issue.reason,
+        candidate_property_codes=list(issue.candidate_property_codes),
+    )
