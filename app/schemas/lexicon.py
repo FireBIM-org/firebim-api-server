@@ -338,5 +338,77 @@ class LexiconMappingDeleteResponse(BaseModel):
     mapping_id: str
 
 
+class LexiconEvidenceItem(BaseModel):
+    kind: str
+    source_object_ref: str | None = None
+    term_id: str | None = None
+    property_set: str | None = None
+    property_code: str | None = None
+    value: Any | None = None
+    notes: str | None = None
+
+
+class LexiconAcceptedTarget(BaseModel):
+    target_class: str
+    source_object_ref: str | None = None
+    mapping_ids: list[str] = Field(default_factory=list)
+    property_paths: list[str] = Field(default_factory=list)
+    evidence: list[LexiconEvidenceItem] = Field(default_factory=list)
+
+
+class LexiconHandshakeAcceptedPayload(BaseModel):
+    mapping_ids: list[str] = Field(default_factory=list)
+    targets: list[LexiconAcceptedTarget] = Field(default_factory=list)
+
+
+class LexiconHandshake(BaseModel):
+    id: str
+    ontology_family: str
+    country: str
+    version: str
+    canonical_family_uri: str
+    canonical_country_uri: str
+    profile: LexiconExecutionProfile
+    accepted_payload: LexiconHandshakeAcceptedPayload
+    created_at: str
+    updated_at: str
+
+
+class LexiconHandshakeCreateRequest(BaseModel):
+    ontology_family: str = Field(default="fbo", min_length=1)
+    country: str = Field(..., min_length=2)
+    version: str = Field(default="latest", min_length=2)
+    rule_id: str | None = None
+    rule: RuleDraft | None = None
+    accepted_payload: LexiconHandshakeAcceptedPayload = Field(default_factory=LexiconHandshakeAcceptedPayload)
+
+    @model_validator(mode="after")
+    def validate_rule_source(self) -> LexiconHandshakeCreateRequest:
+        if bool(self.rule_id) == bool(self.rule):
+            raise ValueError("Provide exactly one of rule_id or rule")
+        return self
+
+
+class LexiconHandshakeAcceptRequest(BaseModel):
+    accepted_payload: LexiconHandshakeAcceptedPayload
+
+
+class LexiconHandshakeResponse(BaseModel):
+    handshake: LexiconHandshake
+
+
+class LexiconNeededProperty(BaseModel):
+    target_class: str
+    property_path: str
+    node_ids: list[str] = Field(default_factory=list)
+
+
+class LexiconNextNeededResponse(BaseModel):
+    handshake_id: str
+    complete: bool
+    remaining_target_classes: list[str] = Field(default_factory=list)
+    remaining_properties: list[LexiconNeededProperty] = Field(default_factory=list)
+
+
 LexiconSourcePatternClause.model_rebuild()
 LexiconSourcePattern.model_rebuild()

@@ -718,6 +718,213 @@
         }
       }
     },
+    "/lexicon/handshakes": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Create Handshake",
+        "operationId": "create_handshake_lexicon_handshakes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconHandshakeCreateRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconHandshakeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/lexicon/handshakes/{handshake_id}": {
+      "get": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Get Handshake",
+        "operationId": "get_handshake_lexicon_handshakes__handshake_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "handshake_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Handshake Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconHandshakeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lexicon/handshakes/{handshake_id}/accept": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Accept Handshake Payload",
+        "operationId": "accept_handshake_payload_lexicon_handshakes__handshake_id__accept_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "handshake_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Handshake Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconHandshakeAcceptRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconHandshakeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lexicon/handshakes/{handshake_id}/next-needed": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Get Handshake Next Needed",
+        "operationId": "get_handshake_next_needed_lexicon_handshakes__handshake_id__next_needed_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "handshake_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Handshake Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconNextNeededResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/lexicon/profiles/derive": {
       "post": {
         "tags": [
@@ -4966,6 +5173,51 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "LexiconAcceptedTarget": {
+        "properties": {
+          "target_class": {
+            "type": "string",
+            "title": "Target Class"
+          },
+          "source_object_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Object Ref"
+          },
+          "mapping_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Mapping Ids"
+          },
+          "property_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Property Paths"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconEvidenceItem"
+            },
+            "type": "array",
+            "title": "Evidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_class"
+        ],
+        "title": "LexiconAcceptedTarget"
+      },
       "LexiconBranchReference": {
         "properties": {
           "branch": {
@@ -5524,6 +5776,83 @@
         ],
         "title": "LexiconEntityRelationInput"
       },
+      "LexiconEvidenceItem": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "source_object_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Object Ref"
+          },
+          "term_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term Id"
+          },
+          "property_set": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Property Set"
+          },
+          "property_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Property Code"
+          },
+          "value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "LexiconEvidenceItem"
+      },
       "LexiconExecutionProfile": {
         "properties": {
           "rule_id": {
@@ -5727,6 +6056,176 @@
           "target_class"
         ],
         "title": "LexiconExecutionTarget"
+      },
+      "LexiconHandshake": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "canonical_family_uri": {
+            "type": "string",
+            "title": "Canonical Family Uri"
+          },
+          "canonical_country_uri": {
+            "type": "string",
+            "title": "Canonical Country Uri"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/LexiconExecutionProfile"
+          },
+          "accepted_payload": {
+            "$ref": "#/components/schemas/LexiconHandshakeAcceptedPayload-Output"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ontology_family",
+          "country",
+          "version",
+          "canonical_family_uri",
+          "canonical_country_uri",
+          "profile",
+          "accepted_payload",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "LexiconHandshake"
+      },
+      "LexiconHandshakeAcceptRequest": {
+        "properties": {
+          "accepted_payload": {
+            "$ref": "#/components/schemas/LexiconHandshakeAcceptedPayload-Input"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accepted_payload"
+        ],
+        "title": "LexiconHandshakeAcceptRequest"
+      },
+      "LexiconHandshakeAcceptedPayload-Input": {
+        "properties": {
+          "mapping_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Mapping Ids"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconAcceptedTarget"
+            },
+            "type": "array",
+            "title": "Targets"
+          }
+        },
+        "type": "object",
+        "title": "LexiconHandshakeAcceptedPayload"
+      },
+      "LexiconHandshakeAcceptedPayload-Output": {
+        "properties": {
+          "mapping_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Mapping Ids"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconAcceptedTarget"
+            },
+            "type": "array",
+            "title": "Targets"
+          }
+        },
+        "type": "object",
+        "title": "LexiconHandshakeAcceptedPayload"
+      },
+      "LexiconHandshakeCreateRequest": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ontology Family",
+            "default": "fbo"
+          },
+          "country": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Version",
+            "default": "latest"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accepted_payload": {
+            "$ref": "#/components/schemas/LexiconHandshakeAcceptedPayload-Input"
+          }
+        },
+        "type": "object",
+        "required": [
+          "country"
+        ],
+        "title": "LexiconHandshakeCreateRequest"
+      },
+      "LexiconHandshakeResponse": {
+        "properties": {
+          "handshake": {
+            "$ref": "#/components/schemas/LexiconHandshake"
+          }
+        },
+        "type": "object",
+        "required": [
+          "handshake"
+        ],
+        "title": "LexiconHandshakeResponse"
       },
       "LexiconHealthResponse": {
         "properties": {
@@ -6190,6 +6689,63 @@
           "compatible"
         ],
         "title": "LexiconMappingValidationResponse"
+      },
+      "LexiconNeededProperty": {
+        "properties": {
+          "target_class": {
+            "type": "string",
+            "title": "Target Class"
+          },
+          "property_path": {
+            "type": "string",
+            "title": "Property Path"
+          },
+          "node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Node Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_class",
+          "property_path"
+        ],
+        "title": "LexiconNeededProperty"
+      },
+      "LexiconNextNeededResponse": {
+        "properties": {
+          "handshake_id": {
+            "type": "string",
+            "title": "Handshake Id"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "remaining_target_classes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Remaining Target Classes"
+          },
+          "remaining_properties": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconNeededProperty"
+            },
+            "type": "array",
+            "title": "Remaining Properties"
+          }
+        },
+        "type": "object",
+        "required": [
+          "handshake_id",
+          "complete"
+        ],
+        "title": "LexiconNextNeededResponse"
       },
       "LexiconProfileDeriveRequest": {
         "properties": {

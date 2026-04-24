@@ -12,6 +12,9 @@ from app.schemas.lexicon import (
     LexiconCatalogTermsResponse,
     LexiconConformityCheckRequest,
     LexiconConformityCheckResponse,
+    LexiconHandshakeAcceptRequest,
+    LexiconHandshakeCreateRequest,
+    LexiconHandshakeResponse,
     LexiconHealthResponse,
     LexiconMappingCreateRequest,
     LexiconMappingDeleteResponse,
@@ -19,12 +22,18 @@ from app.schemas.lexicon import (
     LexiconMappingResponse,
     LexiconMappingValidationRequest,
     LexiconMappingValidationResponse,
+    LexiconNextNeededResponse,
     LexiconProfileDeriveRequest,
     LexiconProfileDeriveResponse,
     LexiconReconstructionRequest,
     LexiconReconstructionResponse,
 )
 from app.storage.graph_store import GraphStoreError, GraphStoreNotFoundError
+from app.storage.lexicon_handshake_repository import (
+    LexiconHandshakeNotFoundError,
+    LexiconHandshakeRepository,
+    LexiconHandshakeRepositoryError,
+)
 from app.storage.lexicon_mapping_repository import (
     LexiconMappingNotFoundError,
     LexiconMappingRepository,
@@ -36,6 +45,7 @@ router = APIRouter(prefix="/lexicon", tags=["lexicon"])
 
 service = LexiconService()
 mapping_repo = LexiconMappingRepository()
+handshake_repo = LexiconHandshakeRepository()
 
 
 @router.get("/health", response_model=LexiconHealthResponse)
@@ -200,6 +210,95 @@ def delete_mapping(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except LexiconMappingRepositoryError as exc:
         logger.exception("Failed to delete lexicon mapping", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post("/handshakes", response_model=LexiconHandshakeResponse, status_code=status.HTTP_201_CREATED)
+def create_handshake(
+    payload: LexiconHandshakeCreateRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconHandshakeResponse:
+    try:
+        ontology, profile = service.derive_profile(
+            ontology_family=payload.ontology_family,
+            country=payload.country,
+            version=payload.version,
+            rule_id=payload.rule_id,
+            rule=payload.rule,
+        )
+        handshake = handshake_repo.create_handshake(
+            user=current_user,
+            ontology_family=ontology.ontology_family,
+            country=ontology.country,
+            version=ontology.version,
+            canonical_family_uri=ontology.canonical_family_uri,
+            canonical_country_uri=ontology.canonical_country_uri,
+            profile=profile,
+            accepted_payload=payload.accepted_payload,
+        )
+        return LexiconHandshakeResponse(handshake=handshake)
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except LexiconHandshakeRepositoryError as exc:
+        logger.exception("Failed to create lexicon handshake", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.get("/handshakes/{handshake_id}", response_model=LexiconHandshakeResponse)
+def get_handshake(
+    handshake_id: str,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconHandshakeResponse:
+    try:
+        handshake = handshake_repo.get_handshake(handshake_id, current_user)
+        return LexiconHandshakeResponse(handshake=handshake)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except LexiconHandshakeNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LexiconHandshakeRepositoryError as exc:
+        logger.exception("Failed to fetch lexicon handshake", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post("/handshakes/{handshake_id}/accept", response_model=LexiconHandshakeResponse)
+def accept_handshake_payload(
+    handshake_id: str,
+    payload: LexiconHandshakeAcceptRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconHandshakeResponse:
+    try:
+        handshake = handshake_repo.update_accepted_payload(
+            handshake_id=handshake_id,
+            accepted_payload=payload.accepted_payload,
+            user=current_user,
+        )
+        return LexiconHandshakeResponse(handshake=handshake)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except LexiconHandshakeNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LexiconHandshakeRepositoryError as exc:
+        logger.exception("Failed to accept lexicon handshake payload", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post("/handshakes/{handshake_id}/next-needed", response_model=LexiconNextNeededResponse)
+def get_handshake_next_needed(
+    handshake_id: str,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconNextNeededResponse:
+    try:
+        handshake = handshake_repo.get_handshake(handshake_id, current_user)
+        return service.compute_next_needed(handshake)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except LexiconHandshakeNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LexiconHandshakeRepositoryError as exc:
+        logger.exception("Failed to calculate lexicon handshake next-needed", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 

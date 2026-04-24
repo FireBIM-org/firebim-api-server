@@ -24,9 +24,12 @@ from app.schemas.lexicon import (
     LexiconExecutionProfile,
     LexiconExecutionProfileNode,
     LexiconExecutionTarget,
+    LexiconHandshake,
     LexiconMappedTermReference,
     LexiconMappingValidationRequest,
     LexiconMappingValidationResponse,
+    LexiconNeededProperty,
+    LexiconNextNeededResponse,
     LexiconPropertyRequirement,
     LexiconReconstructionResponse,
     LexiconSourcePattern,
@@ -259,6 +262,39 @@ class LexiconService:
             compatible=compatible,
             warnings=warnings,
             errors=errors,
+        )
+
+    def compute_next_needed(self, handshake: LexiconHandshake) -> LexiconNextNeededResponse:
+        covered_target_classes = {item.target_class for item in handshake.accepted_payload.targets}
+        covered_properties = {
+            (item.target_class, property_path)
+            for item in handshake.accepted_payload.targets
+            for property_path in item.property_paths
+        }
+
+        remaining_target_classes = sorted(
+            {
+                target.target_class
+                for target in handshake.profile.targets
+                if target.target_class not in covered_target_classes
+            }
+        )
+        remaining_properties = [
+            LexiconNeededProperty(
+                target_class=target.target_class,
+                property_path=requirement.property_path,
+                node_ids=requirement.node_ids,
+            )
+            for target in handshake.profile.targets
+            for requirement in target.property_requirements
+            if (target.target_class, requirement.property_path) not in covered_properties
+        ]
+
+        return LexiconNextNeededResponse(
+            handshake_id=handshake.id,
+            complete=not remaining_target_classes and not remaining_properties,
+            remaining_target_classes=remaining_target_classes,
+            remaining_properties=remaining_properties,
         )
 
     def derive_profile(

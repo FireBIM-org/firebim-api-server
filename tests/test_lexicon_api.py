@@ -20,7 +20,16 @@ os.environ.setdefault("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
 from app.api import lexicon as lexicon_api
 from app.lexicon import service as lexicon_service
 from app.lexicon.service import LexiconService
-from app.schemas.lexicon import LexiconMapping, LexiconMappingSummary
+from app.schemas.lexicon import (
+    LexiconExecutionProfile,
+    LexiconExecutionProfileNode,
+    LexiconExecutionTarget,
+    LexiconHandshake,
+    LexiconHandshakeAcceptedPayload,
+    LexiconMapping,
+    LexiconMappingSummary,
+    LexiconPropertyRequirement,
+)
 
 FBO_ONTOLOGY_TTL = """
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
@@ -160,6 +169,110 @@ class DummyMappingRepo:
         self.deleted_id = mapping_id
 
 
+class DummyHandshakeRepo:
+    def __init__(self) -> None:
+        self.handshake = LexiconHandshake(
+            id="hs_123",
+            ontology_family="fbo",
+            country="dk",
+            version="2026.04.23",
+            canonical_family_uri="https://firebim.org/ontologies/fbo#",
+            canonical_country_uri="https://firebim.org/ontologies/fbo/dk#",
+            profile=LexiconExecutionProfile(
+                rule_id="wall_rule",
+                entry_node_id="start",
+                node_count=4,
+                complete=True,
+                open=False,
+                broken=False,
+                target_classes=["Wall"],
+                property_paths=["Combustible"],
+                relation_paths=[],
+                targets=[
+                    LexiconExecutionTarget(
+                        target_class="Wall",
+                        node_ids=["start"],
+                        property_requirements=[
+                            LexiconPropertyRequirement(
+                                property_path="Combustible",
+                                node_ids=["start"],
+                                operators=["="],
+                                sample_values=["True"],
+                            )
+                        ],
+                        relation_requirements=[],
+                    )
+                ],
+                nodes=[
+                    LexiconExecutionProfileNode(
+                        node_id="start",
+                        element_type="decision",
+                        label="Check combustibility",
+                        target_class="Wall",
+                        property_path="Combustible",
+                        operator="=",
+                        value=True,
+                        branches=[],
+                    )
+                ],
+                warnings=[],
+            ),
+            accepted_payload=LexiconHandshakeAcceptedPayload(),
+            created_at="2026-04-23T10:00:00+00:00",
+            updated_at="2026-04-23T10:00:00+00:00",
+        )
+        self.created = None
+        self.updated_payload = None
+
+    def create_handshake(
+        self,
+        *,
+        user,
+        ontology_family,
+        country,
+        version,
+        canonical_family_uri,
+        canonical_country_uri,
+        profile,
+        accepted_payload,
+    ):
+        _ = user
+        self.created = {
+            "ontology_family": ontology_family,
+            "country": country,
+            "version": version,
+            "accepted_payload": accepted_payload,
+        }
+        self.handshake = self.handshake.model_copy(
+            update={
+                "ontology_family": ontology_family,
+                "country": country,
+                "version": version,
+                "canonical_family_uri": canonical_family_uri,
+                "canonical_country_uri": canonical_country_uri,
+                "profile": profile,
+                "accepted_payload": accepted_payload,
+            }
+        )
+        return self.handshake
+
+    def get_handshake(self, handshake_id, user):
+        _ = user
+        return self.handshake.model_copy(update={"id": handshake_id})
+
+    def update_accepted_payload(self, handshake_id, accepted_payload, user):
+        _ = user
+        self.updated_payload = accepted_payload
+        self.handshake = self.handshake.model_copy(
+            update={
+                "id": handshake_id,
+                "accepted_payload": accepted_payload,
+                "updated_at": "2026-04-23T11:00:00+00:00",
+            }
+        )
+        return self.handshake
+
+
 def _build_client_with_mapping_repo(monkeypatch) -> tuple[TestClient, DummyMappingRepo]:
     app = FastAPI()
     app.include_router(lexicon_api.router)
@@ -171,6 +284,19 @@ def _build_client_with_mapping_repo(monkeypatch) -> tuple[TestClient, DummyMappi
         is_active=True,
     )
     return TestClient(app), mapping_repo
+
+
+def _build_client_with_handshake_repo(monkeypatch) -> tuple[TestClient, DummyHandshakeRepo]:
+    app = FastAPI()
+    app.include_router(lexicon_api.router)
+    handshake_repo = DummyHandshakeRepo()
+    monkeypatch.setattr(lexicon_api, "service", LexiconService(DummyOntologyRepo()))
+    monkeypatch.setattr(lexicon_api, "handshake_repo", handshake_repo)
+    app.dependency_overrides[lexicon_api.get_current_active_user] = lambda: SimpleNamespace(
+        id=f"user-{uuid4()}",
+        is_active=True,
+    )
+    return TestClient(app), handshake_repo
 
 
 def test_lexicon_health(monkeypatch):
@@ -696,3 +822,102 @@ def test_delete_mapping(monkeypatch):
     assert response.status_code == 200
     assert response.json() == {"deleted": True, "mapping_id": "map_123"}
     assert mapping_repo.deleted_id == "map_123"
+
+
+def test_create_handshake(monkeypatch):
+    client, handshake_repo = _build_client_with_handshake_repo(monkeypatch)
+    response = client.post(
+        "/lexicon/handshakes",
+        json={
+            "ontology_family": "fbo",
+            "country": "dk",
+            "version": "latest",
+            "rule": {
+                "id": "wall_rule",
+                "entry": "start",
+                "elements": [
+                    {
+                        "id": "start",
+                        "element_type": "decision",
+                        "target_class": "Wall",
+                        "property_path": "Combustible",
+                        "operator": "=",
+                        "value": True,
+                        "true_path": "ok",
+                        "false_path": "fail",
+                        "unknown_path": "unknown",
+                        "label": "Check combustibility",
+                        "config": {},
+                    },
+                    {"id": "ok", "element_type": "end", "label": "Ok", "config": {}},
+                    {"id": "fail", "element_type": "end", "label": "Fail", "config": {}},
+                    {"id": "unknown", "element_type": "end", "label": "Unknown", "config": {}},
+                ],
+            },
+        },
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["handshake"]["id"] == "hs_123"
+    assert handshake_repo.created["ontology_family"] == "fbo"
+
+
+def test_get_handshake(monkeypatch):
+    client, _handshake_repo = _build_client_with_handshake_repo(monkeypatch)
+    response = client.get("/lexicon/handshakes/hs_123")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["handshake"]["id"] == "hs_123"
+    assert body["handshake"]["profile"]["rule_id"] == "wall_rule"
+
+
+def test_accept_handshake_payload(monkeypatch):
+    client, handshake_repo = _build_client_with_handshake_repo(monkeypatch)
+    response = client.post(
+        "/lexicon/handshakes/hs_123/accept",
+        json={
+            "accepted_payload": {
+                "mapping_ids": ["map_123"],
+                "targets": [
+                    {
+                        "target_class": "Wall",
+                        "source_object_ref": "ifc_guid_123",
+                        "mapping_ids": ["map_123"],
+                        "property_paths": ["Combustible"],
+                        "evidence": [],
+                    }
+                ],
+            }
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["handshake"]["accepted_payload"]["mapping_ids"] == ["map_123"]
+    assert handshake_repo.updated_payload.mapping_ids == ["map_123"]
+
+
+def test_handshake_next_needed(monkeypatch):
+    client, handshake_repo = _build_client_with_handshake_repo(monkeypatch)
+    handshake_repo.handshake = handshake_repo.handshake.model_copy(
+        update={
+            "accepted_payload": LexiconHandshakeAcceptedPayload(
+                mapping_ids=["map_123"],
+                targets=[
+                    {
+                        "target_class": "Wall",
+                        "source_object_ref": "ifc_guid_123",
+                        "mapping_ids": ["map_123"],
+                        "property_paths": [],
+                        "evidence": [],
+                    }
+                ],
+            )
+        }
+    )
+    response = client.post("/lexicon/handshakes/hs_123/next-needed")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["handshake_id"] == "hs_123"
+    assert body["complete"] is False
+    assert body["remaining_target_classes"] == []
+    assert body["remaining_properties"][0]["property_path"] == "Combustible"
