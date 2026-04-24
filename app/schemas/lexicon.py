@@ -238,6 +238,53 @@ class LexiconCatalogRelatedTermsResponse(BaseModel):
     terms: list[LexiconCatalogTermSummary] = Field(default_factory=list)
 
 
+class LexiconCatalogResolveRequest(BaseModel):
+    selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list)
+    terms: list[str] = Field(default_factory=list, min_length=1)
+    limit_per_term: int = Field(default=10, ge=1, le=25)
+
+
+class LexiconCatalogResolvedMatch(BaseModel):
+    input_term: str
+    ontology_family: str
+    country: str
+    version: str
+    canonical_country_uri: str
+    match_type: str
+    score: int
+    term: LexiconCatalogTermSummary
+
+
+class LexiconCatalogResolvedTerm(BaseModel):
+    input_term: str
+    count: int
+    matches: list[LexiconCatalogResolvedMatch] = Field(default_factory=list)
+
+
+class LexiconCatalogResolveResponse(BaseModel):
+    count: int
+    results: list[LexiconCatalogResolvedTerm] = Field(default_factory=list)
+
+
+class LexiconCatalogCompareRequest(BaseModel):
+    left: LexiconMappedTermReference
+    right: LexiconMappedTermReference
+
+
+class LexiconCatalogCompareResponse(BaseModel):
+    left_term: LexiconCatalogTermSummary
+    right_term: LexiconCatalogTermSummary
+    left_kind: str
+    right_kind: str
+    same_kind: bool
+    compatible_for_mapping: bool
+    left_is_property_set: bool = False
+    right_is_property_set: bool = False
+    left_parent_term_ids: list[str] = Field(default_factory=list)
+    right_parent_term_ids: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
 class LexiconMappedTermReference(BaseModel):
     ontology_family: str = Field(..., min_length=1)
     country: str = Field(..., min_length=2)
@@ -390,6 +437,29 @@ class LexiconMappingDeleteResponse(BaseModel):
     mapping_id: str
 
 
+class LexiconGraphEvidenceSummaryRequest(BaseModel):
+    graph_id: str = Field(..., min_length=1)
+    selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list, min_length=1)
+
+
+class LexiconGraphEvidenceSubjectSummary(BaseModel):
+    source_object_ref: str
+    class_term_ids: list[str] = Field(default_factory=list)
+    property_term_ids: list[str] = Field(default_factory=list)
+    property_set_term_ids: list[str] = Field(default_factory=list)
+
+
+class LexiconGraphEvidenceSummaryResponse(BaseModel):
+    graph_id: str
+    graph_uri: str
+    triple_count: int
+    object_count: int
+    class_term_ids: list[str] = Field(default_factory=list)
+    property_term_ids: list[str] = Field(default_factory=list)
+    property_set_term_ids: list[str] = Field(default_factory=list)
+    subjects: list[LexiconGraphEvidenceSubjectSummary] = Field(default_factory=list)
+
+
 class LexiconEvidenceItem(BaseModel):
     kind: str
     source_object_ref: str | None = None
@@ -470,5 +540,37 @@ class LexiconNextNeededResponse(BaseModel):
     remaining_properties: list[LexiconNeededProperty] = Field(default_factory=list)
 
 
+class LexiconMappingEvaluationClauseResult(BaseModel):
+    clause_type: str
+    matched: bool
+    matched_source_objects: list[str] = Field(default_factory=list)
+    missing_conditions: list[str] = Field(default_factory=list)
+    children: list[LexiconMappingEvaluationClauseResult] = Field(default_factory=list)
+
+
+class LexiconMappingEvaluateRequest(BaseModel):
+    graph_id: str = Field(..., min_length=1)
+    mapping_id: str | None = None
+    mapping: LexiconMappingValidationRequest | None = None
+
+    @model_validator(mode="after")
+    def validate_source(self) -> LexiconMappingEvaluateRequest:
+        if bool(self.mapping_id) == bool(self.mapping):
+            raise ValueError("Provide exactly one of mapping_id or mapping")
+        return self
+
+
+class LexiconMappingEvaluateResponse(BaseModel):
+    graph_id: str
+    graph_uri: str
+    mapping_kind: str
+    matched: bool
+    matched_source_objects: list[str] = Field(default_factory=list)
+    missing_conditions: list[str] = Field(default_factory=list)
+    clause_evaluation: LexiconMappingEvaluationClauseResult | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
 LexiconSourcePatternClause.model_rebuild()
 LexiconSourcePattern.model_rebuild()
+LexiconMappingEvaluationClauseResult.model_rebuild()

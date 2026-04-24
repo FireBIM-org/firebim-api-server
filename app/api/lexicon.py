@@ -8,11 +8,17 @@ from app.auth.jwt import get_current_active_user
 from app.lexicon.service import LexiconService
 from app.models.models import User
 from app.schemas.lexicon import (
+    LexiconCatalogCompareRequest,
+    LexiconCatalogCompareResponse,
     LexiconCatalogRelatedTermsResponse,
+    LexiconCatalogResolveRequest,
+    LexiconCatalogResolveResponse,
     LexiconCatalogTermResponse,
     LexiconCatalogTermsResponse,
     LexiconConformityCheckRequest,
     LexiconConformityCheckResponse,
+    LexiconGraphEvidenceSummaryRequest,
+    LexiconGraphEvidenceSummaryResponse,
     LexiconHandshakeAcceptRequest,
     LexiconHandshakeConformityRequest,
     LexiconHandshakeCreateRequest,
@@ -21,6 +27,8 @@ from app.schemas.lexicon import (
     LexiconHealthResponse,
     LexiconMappingCreateRequest,
     LexiconMappingDeleteResponse,
+    LexiconMappingEvaluateRequest,
+    LexiconMappingEvaluateResponse,
     LexiconMappingListResponse,
     LexiconMappingResponse,
     LexiconMappingValidationRequest,
@@ -130,6 +138,38 @@ def get_catalog_term(
         ) from exc
 
 
+@router.post("/catalog/resolve-terms", response_model=LexiconCatalogResolveResponse)
+def resolve_catalog_terms(payload: LexiconCatalogResolveRequest) -> LexiconCatalogResolveResponse:
+    try:
+        return service.resolve_catalog_terms(payload)
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to resolve lexicon catalog terms", exc_info=exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to resolve lexicon catalog terms",
+        ) from exc
+
+
+@router.post("/catalog/compare", response_model=LexiconCatalogCompareResponse)
+def compare_catalog_terms(payload: LexiconCatalogCompareRequest) -> LexiconCatalogCompareResponse:
+    try:
+        return service.compare_catalog_terms(payload)
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to compare lexicon catalog terms", exc_info=exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to compare lexicon catalog terms",
+        ) from exc
+
+
 @router.get(
     "/catalog/{ontology_family}/{country}/{version}/classes/{term_id}/properties",
     response_model=LexiconCatalogRelatedTermsResponse,
@@ -234,6 +274,22 @@ def list_related_properties(
     return _list_related_catalog_terms(ontology_family, country, version, term_id, "related_properties")
 
 
+@router.post("/graphs/evidence-summary", response_model=LexiconGraphEvidenceSummaryResponse)
+def summarize_graph_evidence(payload: LexiconGraphEvidenceSummaryRequest) -> LexiconGraphEvidenceSummaryResponse:
+    try:
+        return service.summarize_graph_evidence(payload)
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to summarize graph evidence", exc_info=exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to summarize graph evidence",
+        ) from exc
+
+
 @router.post("/mappings/validate", response_model=LexiconMappingValidationResponse)
 def validate_mapping(payload: LexiconMappingValidationRequest) -> LexiconMappingValidationResponse:
     try:
@@ -247,6 +303,37 @@ def validate_mapping(payload: LexiconMappingValidationRequest) -> LexiconMapping
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to validate lexicon mapping",
+        ) from exc
+
+
+@router.post("/mappings/evaluate", response_model=LexiconMappingEvaluateResponse)
+def evaluate_mapping(
+    payload: LexiconMappingEvaluateRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconMappingEvaluateResponse:
+    try:
+        mapping_payload = (
+            LexiconMappingValidationRequest.model_validate(mapping_repo.get_mapping(payload.mapping_id, current_user))
+            if payload.mapping_id
+            else payload.mapping
+        )
+        if mapping_payload is None:
+            raise ValueError("mapping payload is required")
+        return service.evaluate_mapping(payload=payload, mapping=mapping_payload)
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LexiconMappingNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except LexiconMappingRepositoryError as exc:
+        logger.exception("Failed to load lexicon mapping for evaluation", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to evaluate lexicon mapping", exc_info=exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to evaluate lexicon mapping",
         ) from exc
 
 

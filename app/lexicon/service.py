@@ -14,7 +14,13 @@ from app.rules.composer import check_ruleset_completeness
 from app.rules.decompiler import decompile_ruleset_ttl
 from app.schemas.lexicon import (
     LexiconBranchReference,
+    LexiconCatalogCompareRequest,
+    LexiconCatalogCompareResponse,
     LexiconCatalogRelatedTermsResponse,
+    LexiconCatalogResolvedMatch,
+    LexiconCatalogResolvedTerm,
+    LexiconCatalogResolveRequest,
+    LexiconCatalogResolveResponse,
     LexiconCatalogTermDetail,
     LexiconCatalogTermResponse,
     LexiconCatalogTermsResponse,
@@ -25,9 +31,15 @@ from app.schemas.lexicon import (
     LexiconExecutionProfile,
     LexiconExecutionProfileNode,
     LexiconExecutionTarget,
+    LexiconGraphEvidenceSubjectSummary,
+    LexiconGraphEvidenceSummaryRequest,
+    LexiconGraphEvidenceSummaryResponse,
     LexiconHandshake,
     LexiconMappedTermReference,
     LexiconMapping,
+    LexiconMappingEvaluateRequest,
+    LexiconMappingEvaluateResponse,
+    LexiconMappingEvaluationClauseResult,
     LexiconMappingValidationRequest,
     LexiconMappingValidationResponse,
     LexiconNeededProperty,
@@ -42,6 +54,7 @@ from app.schemas.lexicon import (
     LexiconTargetAssertion,
 )
 from app.schemas.rules import RuleDraft
+from app.storage.building_repository import BuildingRepository
 from app.storage.graph_store import GraphStoreNotFoundError
 from app.storage.ontology_repository import OntologyRepository
 
@@ -84,8 +97,13 @@ class LexiconService:
     CACHE_MAX_ENTRIES = 16
     CACHE_TTL_SECONDS = 300.0
 
-    def __init__(self, ontology_repo: OntologyRepository | None = None) -> None:
+    def __init__(
+        self,
+        ontology_repo: OntologyRepository | None = None,
+        building_repo: BuildingRepository | None = None,
+    ) -> None:
         self.ontology_repo = ontology_repo or OntologyRepository()
+        self.building_repo = building_repo or BuildingRepository()
         self._ontology_cache: OrderedDict[tuple[str, str, str], LexiconOntologyCacheEntry] = OrderedDict()
         self._cache_lock = RLock()
 
@@ -227,6 +245,116 @@ class LexiconService:
             ),
         )
 
+    def resolve_catalog_terms(self, payload: LexiconCatalogResolveRequest) -> LexiconCatalogResolveResponse:
+        bundles = [
+            self._resolve_ontology_bundle(
+                ontology_family=selection.ontology_family,
+                country=selection.country,
+                version=selection.version,
+            )
+            for selection in payload.selected_ontologies
+        ]
+        results: list[LexiconCatalogResolvedTerm] = []
+        for input_term in payload.terms:
+            matches: list[LexiconCatalogResolvedMatch] = []
+            seen_uris: set[str] = set()
+            normalized_input = input_term.strip()
+            lowered_input = normalized_input.lower()
+            for bundle in bundles:
+                bundle_matches: list[tuple[int, str, dict[str, Any]]] = []
+                direct_uri = (
+                    normalized_input
+                    if normalized_input.startswith("http://") or normalized_input.startswith("https://")
+                    else None
+                )
+                for term in bundle.catalog.values():
+                    match_type: str | None = None
+                    score = 0
+                    if direct_uri and term["uri"] == direct_uri:
+                        match_type = "exact_uri"
+                        score = 100
+                    elif term["term_id"].lower() == lowered_input:
+                        match_type = "exact_term_id"
+                        score = 95
+                    elif (term["label"] or "").lower() == lowered_input:
+                        match_type = "exact_label"
+                        score = 90
+                    elif lowered_input in term["term_id"].lower():
+                        match_type = "term_id_contains"
+                        score = 75
+                    elif lowered_input in (term["label"] or "").lower():
+                        match_type = "label_contains"
+                        score = 70
+                    elif lowered_input in (term["definition"] or "").lower():
+                        match_type = "definition_contains"
+                        score = 60
+
+                    if match_type is None:
+                        continue
+                    bundle_matches.append((score, match_type, term))
+
+                bundle_matches.sort(key=lambda item: (-item[0], (item[2]["label"] or item[2]["term_id"]).lower()))
+                for score, match_type, term in bundle_matches:
+                    if term["uri"] in seen_uris:
+                        continue
+                    seen_uris.add(term["uri"])
+                    matches.append(
+                        LexiconCatalogResolvedMatch(
+                            input_term=normalized_input,
+                            ontology_family=bundle.ontology.ontology_family,
+                            country=bundle.ontology.country,
+                            version=bundle.ontology.version,
+                            canonical_country_uri=bundle.ontology.canonical_country_uri,
+                            match_type=match_type,
+                            score=score,
+                            term=self._summary_from_catalog_term(term),
+                        )
+                    )
+                    if len(matches) >= payload.limit_per_term:
+                        break
+                if len(matches) >= payload.limit_per_term:
+                    break
+
+            results.append(
+                LexiconCatalogResolvedTerm(
+                    input_term=normalized_input,
+                    count=len(matches),
+                    matches=matches,
+                )
+            )
+
+        return LexiconCatalogResolveResponse(count=len(results), results=results)
+
+    def compare_catalog_terms(self, payload: LexiconCatalogCompareRequest) -> LexiconCatalogCompareResponse:
+        left_term = self._get_catalog_term_detail_from_reference(payload.left)
+        right_term = self._get_catalog_term_detail_from_reference(payload.right)
+        same_kind = left_term.kind == right_term.kind
+        notes: list[str] = []
+        if same_kind and left_term.kind == "class":
+            notes.append("Class-to-class mapping is structurally allowed.")
+        elif same_kind and left_term.kind == "property":
+            notes.append("Property-to-property mapping is structurally allowed.")
+        else:
+            notes.append("Mixed class/property mappings are not structurally allowed.")
+        if left_term.is_property_set or right_term.is_property_set:
+            notes.append("Property sets are modeled as classes and may need special frontend treatment.")
+        if left_term.is_predefined_type or right_term.is_predefined_type:
+            notes.append("Predefined types still count as classes for structural validation.")
+
+        return LexiconCatalogCompareResponse(
+            left_term=self._summary_from_catalog_term(left_term.model_dump()),
+            right_term=self._summary_from_catalog_term(right_term.model_dump()),
+            left_kind=left_term.kind,
+            right_kind=right_term.kind,
+            same_kind=same_kind,
+            compatible_for_mapping=same_kind,
+            left_is_property_set=left_term.is_property_set,
+            right_is_property_set=right_term.is_property_set,
+            left_parent_term_ids=left_term.parent_term_ids,
+            right_parent_term_ids=right_term.parent_term_ids,
+            notes=notes,
+        )
+
     def list_related_catalog_terms(
         self,
         *,
@@ -273,6 +401,76 @@ class LexiconService:
             canonical_country_uri=bundle.ontology.canonical_country_uri,
             count=len(related_terms),
             terms=related_terms,
+        )
+
+    def summarize_graph_evidence(
+        self,
+        payload: LexiconGraphEvidenceSummaryRequest,
+    ) -> LexiconGraphEvidenceSummaryResponse:
+        graph_uri, ttl = self.building_repo.fetch_graph(payload.graph_id)
+        data_graph = Graph()
+        data_graph.parse(data=ttl, format="turtle")
+        bundles = [
+            self._resolve_ontology_bundle(
+                ontology_family=selection.ontology_family,
+                country=selection.country,
+                version=selection.version,
+            )
+            for selection in payload.selected_ontologies
+        ]
+        term_lookup = self._catalog_lookup_by_uri(bundles)
+        subject_types: dict[str, set[str]] = defaultdict(set)
+        subject_predicates: dict[str, set[str]] = defaultdict(set)
+
+        for subject, _, object_value in data_graph.triples((None, RDF.type, None)):
+            subject_types[str(subject)].add(str(object_value))
+        for subject, predicate, _ in data_graph:
+            if predicate != RDF.type:
+                subject_predicates[str(subject)].add(str(predicate))
+
+        class_term_ids: set[str] = set()
+        property_term_ids: set[str] = set()
+        property_set_term_ids: set[str] = set()
+        subjects: list[LexiconGraphEvidenceSubjectSummary] = []
+
+        for subject in sorted({str(item) for item in data_graph.subjects()}):
+            matched_classes = [
+                term_lookup[uri]["term_id"] for uri in sorted(subject_types.get(subject, set())) if uri in term_lookup
+            ]
+            matched_properties = [
+                term_lookup[uri]["term_id"]
+                for uri in sorted(subject_predicates.get(subject, set()))
+                if uri in term_lookup and term_lookup[uri]["kind"] == "property"
+            ]
+            matched_property_sets = sorted(
+                {
+                    property_set_id
+                    for uri in sorted(subject_types.get(subject, set()) | subject_predicates.get(subject, set()))
+                    if uri in term_lookup
+                    for property_set_id in term_lookup[uri]["property_set_term_ids"]
+                }
+            )
+            class_term_ids.update(matched_classes)
+            property_term_ids.update(matched_properties)
+            property_set_term_ids.update(matched_property_sets)
+            subjects.append(
+                LexiconGraphEvidenceSubjectSummary(
+                    source_object_ref=subject,
+                    class_term_ids=matched_classes,
+                    property_term_ids=matched_properties,
+                    property_set_term_ids=matched_property_sets,
+                )
+            )
+
+        return LexiconGraphEvidenceSummaryResponse(
+            graph_id=payload.graph_id,
+            graph_uri=graph_uri,
+            triple_count=len(data_graph),
+            object_count=len(subjects),
+            class_term_ids=sorted(class_term_ids),
+            property_term_ids=sorted(property_term_ids),
+            property_set_term_ids=sorted(property_set_term_ids),
+            subjects=subjects,
         )
 
     def validate_mapping(
@@ -323,6 +521,71 @@ class LexiconService:
             compatible=compatible,
             warnings=warnings,
             errors=errors,
+        )
+
+    def evaluate_mapping(
+        self,
+        *,
+        payload: LexiconMappingEvaluateRequest,
+        mapping: LexiconMappingValidationRequest,
+    ) -> LexiconMappingEvaluateResponse:
+        graph_uri, ttl = self.building_repo.fetch_graph(payload.graph_id)
+        data_graph = Graph()
+        data_graph.parse(data=ttl, format="turtle")
+        subject_types: dict[str, set[str]] = defaultdict(set)
+        subject_predicates: dict[str, set[str]] = defaultdict(set)
+        for subject, _, object_value in data_graph.triples((None, RDF.type, None)):
+            subject_types[str(subject)].add(str(object_value))
+        for subject, predicate, _ in data_graph:
+            if predicate != RDF.type:
+                subject_predicates[str(subject)].add(str(predicate))
+
+        clause_evaluation: LexiconMappingEvaluationClauseResult | None = None
+        matched_source_objects: list[str] = []
+        missing_conditions: list[str] = []
+        warnings: list[str] = []
+
+        if mapping.mapping_kind == "class_to_class" and mapping.source_term is not None:
+            source_uri = self._resolve_reference_uri(mapping.source_term)
+            matched_subjects = sorted(subject for subject, types in subject_types.items() if source_uri in types)
+            clause_evaluation = LexiconMappingEvaluationClauseResult(
+                clause_type="source_term",
+                matched=bool(matched_subjects),
+                matched_source_objects=matched_subjects,
+                missing_conditions=[] if matched_subjects else [f"Missing class: {mapping.source_term.term_id}"],
+            )
+        elif mapping.mapping_kind == "property_to_property" and mapping.source_term is not None:
+            source_uri = self._resolve_reference_uri(mapping.source_term)
+            matched_subjects = sorted(
+                subject for subject, predicates in subject_predicates.items() if source_uri in predicates
+            )
+            clause_evaluation = LexiconMappingEvaluationClauseResult(
+                clause_type="source_term",
+                matched=bool(matched_subjects),
+                matched_source_objects=matched_subjects,
+                missing_conditions=[] if matched_subjects else [f"Missing property: {mapping.source_term.term_id}"],
+            )
+        elif mapping.mapping_kind == "semantic_assertion" and mapping.source_pattern is not None:
+            clause_evaluation = self._evaluate_source_pattern(
+                pattern=mapping.source_pattern,
+                subject_types=subject_types,
+                subject_predicates=subject_predicates,
+            )
+            warnings.append("Semantic assertion evaluation checks source-side presence only.")
+        else:
+            raise ValueError(f"Unsupported mapping payload for evaluation: {mapping.mapping_kind}")
+
+        matched_source_objects = clause_evaluation.matched_source_objects if clause_evaluation is not None else []
+        missing_conditions = clause_evaluation.missing_conditions if clause_evaluation is not None else []
+        return LexiconMappingEvaluateResponse(
+            graph_id=payload.graph_id,
+            graph_uri=graph_uri,
+            mapping_kind=mapping.mapping_kind,
+            matched=bool(clause_evaluation and clause_evaluation.matched),
+            matched_source_objects=matched_source_objects,
+            missing_conditions=missing_conditions,
+            clause_evaluation=clause_evaluation,
+            warnings=warnings,
         )
 
     def compute_next_needed(self, handshake: LexiconHandshake) -> LexiconNextNeededResponse:
@@ -923,6 +1186,171 @@ class LexiconService:
         if resolved is None:
             raise GraphStoreNotFoundError(f"Lexicon term not found: {term.term_id}")
         return str(resolved["kind"])
+
+    def _get_catalog_term_detail_from_reference(
+        self,
+        reference: LexiconMappedTermReference,
+    ) -> LexiconCatalogTermDetail:
+        response = self.get_catalog_term(
+            ontology_family=reference.ontology_family,
+            country=reference.country,
+            version=reference.version,
+            term_id=reference.uri or reference.term_id,
+        )
+        return response.term
+
+    @staticmethod
+    def _catalog_lookup_by_uri(
+        bundles: list[LexiconOntologyBundle],
+    ) -> dict[str, dict[str, Any]]:
+        lookup: dict[str, dict[str, Any]] = {}
+        for bundle in bundles:
+            for uri, term in bundle.catalog.items():
+                lookup.setdefault(uri, term)
+        return lookup
+
+    def _evaluate_source_pattern(
+        self,
+        *,
+        pattern: LexiconSourcePattern,
+        subject_types: dict[str, set[str]],
+        subject_predicates: dict[str, set[str]],
+    ) -> LexiconMappingEvaluationClauseResult:
+        clauses = pattern.all_of if pattern.all_of else pattern.any_of
+        clause_type = "all_of" if pattern.all_of else "any_of"
+        child_results = [
+            self._evaluate_source_clause(
+                clause=clause,
+                subject_types=subject_types,
+                subject_predicates=subject_predicates,
+            )
+            for clause in clauses
+        ]
+        return self._combine_clause_results(clause_type=clause_type, children=child_results)
+
+    def _evaluate_source_clause(
+        self,
+        *,
+        clause: LexiconSourcePatternClause,
+        subject_types: dict[str, set[str]],
+        subject_predicates: dict[str, set[str]],
+    ) -> LexiconMappingEvaluationClauseResult:
+        if clause.term is not None:
+            return self._evaluate_term_condition(
+                condition=clause.term,
+                subject_types=subject_types,
+                subject_predicates=subject_predicates,
+            )
+        if clause.entity is not None:
+            return self._evaluate_entity_pattern(
+                entity=clause.entity,
+                subject_types=subject_types,
+                subject_predicates=subject_predicates,
+            )
+
+        child_results = [
+            self._evaluate_source_clause(
+                clause=item,
+                subject_types=subject_types,
+                subject_predicates=subject_predicates,
+            )
+            for item in (clause.all_of if clause.all_of else clause.any_of)
+        ]
+        return self._combine_clause_results(
+            clause_type="all_of" if clause.all_of else "any_of",
+            children=child_results,
+        )
+
+    def _evaluate_term_condition(
+        self,
+        *,
+        condition: LexiconSourceTermCondition,
+        subject_types: dict[str, set[str]],
+        subject_predicates: dict[str, set[str]],
+    ) -> LexiconMappingEvaluationClauseResult:
+        uri = self._resolve_term_uri_from_condition(condition)
+        if condition.term_kind == "class":
+            matched_subjects = sorted(subject for subject, types in subject_types.items() if uri in types)
+            missing = [] if matched_subjects else [f"Missing class: {condition.term_id}"]
+        else:
+            matched_subjects = sorted(
+                subject for subject, predicates in subject_predicates.items() if uri in predicates
+            )
+            missing = [] if matched_subjects else [f"Missing property: {condition.term_id}"]
+        return LexiconMappingEvaluationClauseResult(
+            clause_type="term",
+            matched=bool(matched_subjects),
+            matched_source_objects=matched_subjects,
+            missing_conditions=missing,
+        )
+
+    def _evaluate_entity_pattern(
+        self,
+        *,
+        entity: LexiconSourceEntityPattern,
+        subject_types: dict[str, set[str]],
+        subject_predicates: dict[str, set[str]],
+    ) -> LexiconMappingEvaluationClauseResult:
+        conditions = entity.all_of if entity.all_of else entity.any_of
+        child_results = [
+            self._evaluate_term_condition(
+                condition=condition,
+                subject_types=subject_types,
+                subject_predicates=subject_predicates,
+            )
+            for condition in conditions
+        ]
+        clause_type = "entity_all_of" if entity.all_of else "entity_any_of"
+        combined = self._combine_clause_results(clause_type=clause_type, children=child_results)
+        combined.missing_conditions.append("Entity-scoped terms must be found on the same source object.")
+        if combined.matched:
+            combined.missing_conditions = [
+                item
+                for item in combined.missing_conditions
+                if item != "Entity-scoped terms must be found on the same source object."
+            ]
+        return combined
+
+    @staticmethod
+    def _combine_clause_results(
+        *,
+        clause_type: str,
+        children: list[LexiconMappingEvaluationClauseResult],
+    ) -> LexiconMappingEvaluationClauseResult:
+        if clause_type in {"all_of", "entity_all_of"}:
+            matched = all(child.matched for child in children)
+            if clause_type == "entity_all_of":
+                subject_sets = [set(child.matched_source_objects) for child in children if child.matched_source_objects]
+                matched_subjects = sorted(set.intersection(*subject_sets)) if subject_sets else []
+                matched = matched and bool(matched_subjects)
+            else:
+                matched_subjects = sorted({subject for child in children for subject in child.matched_source_objects})
+            missing_conditions = [item for child in children for item in child.missing_conditions]
+        else:
+            matched = any(child.matched for child in children)
+            if clause_type == "entity_any_of":
+                matched_subjects = sorted({subject for child in children for subject in child.matched_source_objects})
+            else:
+                matched_subjects = sorted({subject for child in children for subject in child.matched_source_objects})
+            missing_conditions = [] if matched else [item for child in children for item in child.missing_conditions]
+
+        return LexiconMappingEvaluationClauseResult(
+            clause_type=clause_type,
+            matched=matched,
+            matched_source_objects=matched_subjects,
+            missing_conditions=missing_conditions,
+            children=children,
+        )
+
+    def _resolve_term_uri_from_condition(self, condition: LexiconSourceTermCondition) -> str:
+        if condition.uri:
+            return condition.uri
+        ontology = self.resolve_ontology(
+            ontology_family=condition.ontology_family,
+            country=condition.country,
+            version=condition.version,
+        )
+        return self._normalize_term_uri(condition.term_id, ontology.canonical_country_uri)
 
     def _entities_from_handshake(
         self,

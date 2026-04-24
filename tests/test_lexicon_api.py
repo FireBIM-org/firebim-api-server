@@ -71,6 +71,17 @@ ifc:IfcWallUSERDEFINED a owl:Class ;
     rdfs:comment "Technical note: This IFC class is a predefined type represented by its parent class." .
 """
 
+BUILDING_GRAPH_TTL = """
+@prefix ifc: <https://firebim.org/ontologies/ifc/global#> .
+@prefix fbo: <https://firebim.org/ontologies/fbo/dk#> .
+@prefix ex: <https://example.org/buildings/> .
+ex:wall-1 a ifc:IfcWall ;
+    ifc:FireRating "EI60" ;
+    fbo:Combustible true .
+ex:wall-2 a ifc:IfcWallUSERDEFINED ;
+    ifc:MaterialReference ex:material-1 .
+"""
+
 
 class DummyOntologyRepo:
     def __init__(self) -> None:
@@ -97,10 +108,15 @@ class DummyOntologyRepo:
         )
 
 
+class DummyBuildingRepo:
+    def fetch_graph(self, graph_id: str):
+        return f"https://firebim.org/graphs/buildings/{graph_id}", BUILDING_GRAPH_TTL
+
+
 def _build_client(monkeypatch) -> TestClient:
     app = FastAPI()
     app.include_router(lexicon_api.router)
-    monkeypatch.setattr(lexicon_api, "service", LexiconService(DummyOntologyRepo()))
+    monkeypatch.setattr(lexicon_api, "service", LexiconService(DummyOntologyRepo(), DummyBuildingRepo()))
     app.dependency_overrides[lexicon_api.get_current_active_user] = lambda: SimpleNamespace(
         id="user-1",
         is_active=True,
@@ -112,7 +128,7 @@ def _build_client_with_repo(monkeypatch) -> tuple[TestClient, DummyOntologyRepo]
     app = FastAPI()
     app.include_router(lexicon_api.router)
     repo = DummyOntologyRepo()
-    monkeypatch.setattr(lexicon_api, "service", LexiconService(repo))
+    monkeypatch.setattr(lexicon_api, "service", LexiconService(repo, DummyBuildingRepo()))
     app.dependency_overrides[lexicon_api.get_current_active_user] = lambda: SimpleNamespace(
         id="user-1",
         is_active=True,
@@ -350,7 +366,7 @@ def _build_client_with_mapping_repo(monkeypatch) -> tuple[TestClient, DummyMappi
     app = FastAPI()
     app.include_router(lexicon_api.router)
     mapping_repo = DummyMappingRepo()
-    monkeypatch.setattr(lexicon_api, "service", LexiconService(DummyOntologyRepo()))
+    monkeypatch.setattr(lexicon_api, "service", LexiconService(DummyOntologyRepo(), DummyBuildingRepo()))
     monkeypatch.setattr(lexicon_api, "mapping_repo", mapping_repo)
     app.dependency_overrides[lexicon_api.get_current_active_user] = lambda: SimpleNamespace(
         id=f"user-{uuid4()}",
@@ -363,7 +379,7 @@ def _build_client_with_handshake_repo(monkeypatch) -> tuple[TestClient, DummyHan
     app = FastAPI()
     app.include_router(lexicon_api.router)
     handshake_repo = DummyHandshakeRepo()
-    monkeypatch.setattr(lexicon_api, "service", LexiconService(DummyOntologyRepo()))
+    monkeypatch.setattr(lexicon_api, "service", LexiconService(DummyOntologyRepo(), DummyBuildingRepo()))
     monkeypatch.setattr(lexicon_api, "handshake_repo", handshake_repo)
     monkeypatch.setattr(lexicon_api, "mapping_repo", DummyMappingRepo())
     app.dependency_overrides[lexicon_api.get_current_active_user] = lambda: SimpleNamespace(
@@ -724,6 +740,53 @@ def test_get_catalog_term(monkeypatch):
     assert body["term"]["property_set_term_ids"] == ["WallProperties"]
 
 
+def test_resolve_catalog_terms(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/catalog/resolve-terms",
+        json={
+            "selected_ontologies": [
+                {"ontology_family": "ifc", "country": "global", "version": "latest"},
+                {"ontology_family": "fbo", "country": "dk", "version": "latest"},
+            ],
+            "terms": ["IfcWall", "Combustible"],
+            "limit_per_term": 5,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 2
+    assert body["results"][0]["matches"][0]["term"]["term_id"] == "IfcWall"
+    assert body["results"][0]["matches"][0]["match_type"] == "exact_term_id"
+    assert body["results"][1]["matches"][0]["term"]["term_id"] == "Combustible"
+
+
+def test_compare_catalog_terms(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/catalog/compare",
+        json={
+            "left": {
+                "ontology_family": "fbo",
+                "country": "dk",
+                "version": "latest",
+                "term_id": "Wall",
+            },
+            "right": {
+                "ontology_family": "ifc",
+                "country": "global",
+                "version": "latest",
+                "term_id": "IfcWall",
+            },
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["same_kind"] is True
+    assert body["compatible_for_mapping"] is True
+    assert any("Class-to-class mapping" in note for note in body["notes"])
+
+
 def test_property_and_property_set_related_catalog_endpoints(monkeypatch):
     client = _build_client(monkeypatch)
 
@@ -768,6 +831,27 @@ def test_property_and_property_set_related_catalog_endpoints(monkeypatch):
     assert term["property_set_term_ids"] == ["WallCommonProperties"]
     assert term["belongs_to_class_term_ids"] == ["IfcWall"]
     assert term["related_property_term_ids"] == ["ReferenceRating"]
+
+
+def test_graph_evidence_summary(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/graphs/evidence-summary",
+        json={
+            "graph_id": "demo-graph",
+            "selected_ontologies": [
+                {"ontology_family": "ifc", "country": "global", "version": "latest"},
+                {"ontology_family": "fbo", "country": "dk", "version": "latest"},
+            ],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["graph_id"] == "demo-graph"
+    assert "IfcWall" in body["class_term_ids"]
+    assert "FireRating" in body["property_term_ids"]
+    assert "WallCommonProperties" in body["property_set_term_ids"]
+    assert body["subjects"][0]["source_object_ref"].startswith("https://example.org/buildings/")
 
 
 def test_validate_mapping_allows_class_to_subclass(monkeypatch):
@@ -1096,6 +1180,72 @@ def test_validate_semantic_assertion_rejects_wrong_source_kind(monkeypatch):
     body = response.json()
     assert body["valid"] is False
     assert any("was declared as property but resolves to class" in item for item in body["errors"])
+
+
+def test_evaluate_mapping_from_repository(monkeypatch):
+    client, _mapping_repo = _build_client_with_mapping_repo(monkeypatch)
+    response = client.post(
+        "/lexicon/mappings/evaluate",
+        json={
+            "graph_id": "demo-graph",
+            "mapping_id": "map_123",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["matched"] is True
+    assert "https://example.org/buildings/wall-1" in body["matched_source_objects"]
+
+
+def test_evaluate_semantic_assertion_entity_pattern(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/mappings/evaluate",
+        json={
+            "graph_id": "demo-graph",
+            "mapping": {
+                "mapping_kind": "semantic_assertion",
+                "source_pattern": {
+                    "any_of": [
+                        {
+                            "entity": {
+                                "all_of": [
+                                    {
+                                        "term_kind": "class",
+                                        "ontology_family": "ifc",
+                                        "country": "global",
+                                        "version": "latest",
+                                        "term_id": "IfcWall",
+                                    },
+                                    {
+                                        "term_kind": "property",
+                                        "ontology_family": "ifc",
+                                        "country": "global",
+                                        "version": "latest",
+                                        "term_id": "FireRating",
+                                    },
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "target_assertions": [
+                    {
+                        "assertion_kind": "class",
+                        "ontology_family": "fbo",
+                        "country": "dk",
+                        "version": "latest",
+                        "term_id": "Wall",
+                    }
+                ],
+            },
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["matched"] is True
+    assert body["clause_evaluation"]["clause_type"] == "any_of"
+    assert "https://example.org/buildings/wall-1" in body["matched_source_objects"]
 
 
 def test_create_mapping(monkeypatch):

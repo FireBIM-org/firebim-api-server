@@ -505,6 +505,98 @@
         }
       }
     },
+    "/lexicon/catalog/resolve-terms": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Resolve Catalog Terms",
+        "operationId": "resolve_catalog_terms_lexicon_catalog_resolve_terms_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconCatalogResolveRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconCatalogResolveResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lexicon/catalog/compare": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Compare Catalog Terms",
+        "operationId": "compare_catalog_terms_lexicon_catalog_compare_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconCatalogCompareRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconCatalogCompareResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/lexicon/catalog/{ontology_family}/{country}/{version}/classes/{term_id}/properties": {
       "get": {
         "tags": [
@@ -1057,6 +1149,52 @@
         }
       }
     },
+    "/lexicon/graphs/evidence-summary": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Summarize Graph Evidence",
+        "operationId": "summarize_graph_evidence_lexicon_graphs_evidence_summary_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconGraphEvidenceSummaryRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconGraphEvidenceSummaryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/lexicon/mappings/validate": {
       "post": {
         "tags": [
@@ -1101,6 +1239,57 @@
             }
           }
         }
+      }
+    },
+    "/lexicon/mappings/evaluate": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Evaluate Mapping",
+        "operationId": "evaluate_mapping_lexicon_mappings_evaluate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconMappingEvaluateRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconMappingEvaluateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/lexicon/mappings": {
@@ -6287,6 +6476,89 @@
         ],
         "title": "LexiconBranchReference"
       },
+      "LexiconCatalogCompareRequest": {
+        "properties": {
+          "left": {
+            "$ref": "#/components/schemas/LexiconMappedTermReference"
+          },
+          "right": {
+            "$ref": "#/components/schemas/LexiconMappedTermReference"
+          }
+        },
+        "type": "object",
+        "required": [
+          "left",
+          "right"
+        ],
+        "title": "LexiconCatalogCompareRequest"
+      },
+      "LexiconCatalogCompareResponse": {
+        "properties": {
+          "left_term": {
+            "$ref": "#/components/schemas/LexiconCatalogTermSummary"
+          },
+          "right_term": {
+            "$ref": "#/components/schemas/LexiconCatalogTermSummary"
+          },
+          "left_kind": {
+            "type": "string",
+            "title": "Left Kind"
+          },
+          "right_kind": {
+            "type": "string",
+            "title": "Right Kind"
+          },
+          "same_kind": {
+            "type": "boolean",
+            "title": "Same Kind"
+          },
+          "compatible_for_mapping": {
+            "type": "boolean",
+            "title": "Compatible For Mapping"
+          },
+          "left_is_property_set": {
+            "type": "boolean",
+            "title": "Left Is Property Set",
+            "default": false
+          },
+          "right_is_property_set": {
+            "type": "boolean",
+            "title": "Right Is Property Set",
+            "default": false
+          },
+          "left_parent_term_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Left Parent Term Ids"
+          },
+          "right_parent_term_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Right Parent Term Ids"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "left_term",
+          "right_term",
+          "left_kind",
+          "right_kind",
+          "same_kind",
+          "compatible_for_mapping"
+        ],
+        "title": "LexiconCatalogCompareResponse"
+      },
       "LexiconCatalogRelatedTermsResponse": {
         "properties": {
           "ontology_family": {
@@ -6331,6 +6603,126 @@
           "count"
         ],
         "title": "LexiconCatalogRelatedTermsResponse"
+      },
+      "LexiconCatalogResolveRequest": {
+        "properties": {
+          "selected_ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSelectedOntology"
+            },
+            "type": "array",
+            "title": "Selected Ontologies"
+          },
+          "terms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Terms"
+          },
+          "limit_per_term": {
+            "type": "integer",
+            "maximum": 25.0,
+            "minimum": 1.0,
+            "title": "Limit Per Term",
+            "default": 10
+          }
+        },
+        "type": "object",
+        "title": "LexiconCatalogResolveRequest"
+      },
+      "LexiconCatalogResolveResponse": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconCatalogResolvedTerm"
+            },
+            "type": "array",
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count"
+        ],
+        "title": "LexiconCatalogResolveResponse"
+      },
+      "LexiconCatalogResolvedMatch": {
+        "properties": {
+          "input_term": {
+            "type": "string",
+            "title": "Input Term"
+          },
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "canonical_country_uri": {
+            "type": "string",
+            "title": "Canonical Country Uri"
+          },
+          "match_type": {
+            "type": "string",
+            "title": "Match Type"
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score"
+          },
+          "term": {
+            "$ref": "#/components/schemas/LexiconCatalogTermSummary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_term",
+          "ontology_family",
+          "country",
+          "version",
+          "canonical_country_uri",
+          "match_type",
+          "score",
+          "term"
+        ],
+        "title": "LexiconCatalogResolvedMatch"
+      },
+      "LexiconCatalogResolvedTerm": {
+        "properties": {
+          "input_term": {
+            "type": "string",
+            "title": "Input Term"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconCatalogResolvedMatch"
+            },
+            "type": "array",
+            "title": "Matches"
+          }
+        },
+        "type": "object",
+        "required": [
+          "input_term",
+          "count"
+        ],
+        "title": "LexiconCatalogResolvedTerm"
       },
       "LexiconCatalogTermDetail": {
         "properties": {
@@ -7210,6 +7602,118 @@
         ],
         "title": "LexiconExecutionTarget"
       },
+      "LexiconGraphEvidenceSubjectSummary": {
+        "properties": {
+          "source_object_ref": {
+            "type": "string",
+            "title": "Source Object Ref"
+          },
+          "class_term_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Class Term Ids"
+          },
+          "property_term_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Property Term Ids"
+          },
+          "property_set_term_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Property Set Term Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_object_ref"
+        ],
+        "title": "LexiconGraphEvidenceSubjectSummary"
+      },
+      "LexiconGraphEvidenceSummaryRequest": {
+        "properties": {
+          "graph_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Graph Id"
+          },
+          "selected_ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSelectedOntology"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Selected Ontologies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_id"
+        ],
+        "title": "LexiconGraphEvidenceSummaryRequest"
+      },
+      "LexiconGraphEvidenceSummaryResponse": {
+        "properties": {
+          "graph_id": {
+            "type": "string",
+            "title": "Graph Id"
+          },
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "triple_count": {
+            "type": "integer",
+            "title": "Triple Count"
+          },
+          "object_count": {
+            "type": "integer",
+            "title": "Object Count"
+          },
+          "class_term_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Class Term Ids"
+          },
+          "property_term_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Property Term Ids"
+          },
+          "property_set_term_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Property Set Term Ids"
+          },
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconGraphEvidenceSubjectSummary"
+            },
+            "type": "array",
+            "title": "Subjects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_id",
+          "graph_uri",
+          "triple_count",
+          "object_count"
+        ],
+        "title": "LexiconGraphEvidenceSummaryResponse"
+      },
       "LexiconHandshake": {
         "properties": {
           "id": {
@@ -7715,6 +8219,139 @@
           "mapping_id"
         ],
         "title": "LexiconMappingDeleteResponse"
+      },
+      "LexiconMappingEvaluateRequest": {
+        "properties": {
+          "graph_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Graph Id"
+          },
+          "mapping_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mapping Id"
+          },
+          "mapping": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconMappingValidationRequest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_id"
+        ],
+        "title": "LexiconMappingEvaluateRequest"
+      },
+      "LexiconMappingEvaluateResponse": {
+        "properties": {
+          "graph_id": {
+            "type": "string",
+            "title": "Graph Id"
+          },
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "mapping_kind": {
+            "type": "string",
+            "title": "Mapping Kind"
+          },
+          "matched": {
+            "type": "boolean",
+            "title": "Matched"
+          },
+          "matched_source_objects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Matched Source Objects"
+          },
+          "missing_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Conditions"
+          },
+          "clause_evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconMappingEvaluationClauseResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_id",
+          "graph_uri",
+          "mapping_kind",
+          "matched"
+        ],
+        "title": "LexiconMappingEvaluateResponse"
+      },
+      "LexiconMappingEvaluationClauseResult": {
+        "properties": {
+          "clause_type": {
+            "type": "string",
+            "title": "Clause Type"
+          },
+          "matched": {
+            "type": "boolean",
+            "title": "Matched"
+          },
+          "matched_source_objects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Matched Source Objects"
+          },
+          "missing_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Conditions"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconMappingEvaluationClauseResult"
+            },
+            "type": "array",
+            "title": "Children"
+          }
+        },
+        "type": "object",
+        "required": [
+          "clause_type",
+          "matched"
+        ],
+        "title": "LexiconMappingEvaluationClauseResult"
       },
       "LexiconMappingListResponse": {
         "properties": {
