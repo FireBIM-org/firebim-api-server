@@ -925,6 +925,68 @@
         }
       }
     },
+    "/lexicon/handshakes/{handshake_id}/reconstruction": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Reconstruct Handshake Graph",
+        "operationId": "reconstruct_handshake_graph_lexicon_handshakes__handshake_id__reconstruction_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "handshake_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Handshake Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconHandshakeReconstructionRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconReconstructionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/lexicon/profiles/derive": {
       "post": {
         "tags": [
@@ -5686,6 +5748,13 @@
             "type": "string",
             "title": "Class Uri"
           },
+          "additional_class_uris": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Additional Class Uris"
+          },
           "label": {
             "anyOf": [
               {
@@ -6214,6 +6283,29 @@
           "country"
         ],
         "title": "LexiconHandshakeCreateRequest"
+      },
+      "LexiconHandshakeReconstructionRequest": {
+        "properties": {
+          "graph_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Graph Id",
+            "default": "lexicon-handshake-reconstruction"
+          },
+          "instance_base_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance Base Uri"
+          }
+        },
+        "type": "object",
+        "title": "LexiconHandshakeReconstructionRequest"
       },
       "LexiconHandshakeResponse": {
         "properties": {

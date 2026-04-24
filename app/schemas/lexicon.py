@@ -95,6 +95,7 @@ class LexiconEntityRelationInput(BaseModel):
 class LexiconEntityInput(BaseModel):
     entity_id: str
     class_uri: str
+    additional_class_uris: list[str] = Field(default_factory=list)
     label: str | None = None
     properties: list[LexiconEntityPropertyInput] = Field(default_factory=list)
     relations: list[LexiconEntityRelationInput] = Field(default_factory=list)
@@ -395,6 +396,11 @@ class LexiconHandshakeAcceptRequest(BaseModel):
 
 class LexiconHandshakeResponse(BaseModel):
     handshake: LexiconHandshake
+
+
+class LexiconHandshakeReconstructionRequest(BaseModel):
+    graph_id: str = Field(default="lexicon-handshake-reconstruction", min_length=1)
+    instance_base_uri: str | None = None
 
 
 class LexiconNeededProperty(BaseModel):

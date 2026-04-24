@@ -26,6 +26,7 @@ from app.schemas.lexicon import (
     LexiconExecutionTarget,
     LexiconHandshake,
     LexiconMappedTermReference,
+    LexiconMapping,
     LexiconMappingValidationRequest,
     LexiconMappingValidationResponse,
     LexiconNeededProperty,
@@ -453,6 +454,14 @@ class LexiconService:
             subject = URIRef(f"{base_instance_uri}{entity.entity_id}")
             class_uri = URIRef(self._normalize_term_uri(entity.class_uri, ontology.canonical_country_uri))
             graph.add((subject, RDF.type, class_uri))
+            for additional_class_uri in entity.additional_class_uris:
+                graph.add(
+                    (
+                        subject,
+                        RDF.type,
+                        URIRef(self._normalize_term_uri(additional_class_uri, ontology.canonical_country_uri)),
+                    )
+                )
             if entity.label:
                 graph.add((subject, RDFS.label, Literal(entity.label)))
 
@@ -481,6 +490,24 @@ class LexiconService:
             version_iri=ontology.version_iri,
             triple_count=len(graph),
             ttl=str(ttl),
+        )
+
+    def reconstruct_graph_from_handshake(
+        self,
+        *,
+        handshake: LexiconHandshake,
+        mappings: list[LexiconMapping],
+        graph_id: str,
+        instance_base_uri: str | None,
+    ) -> LexiconReconstructionResponse:
+        entities = self._entities_from_handshake(handshake, mappings)
+        return self.reconstruct_graph(
+            ontology_family=handshake.ontology_family,
+            country=handshake.country,
+            version=handshake.version,
+            graph_id=graph_id,
+            instance_base_uri=instance_base_uri,
+            entities=entities,
         )
 
     def check_conformity(
@@ -693,6 +720,89 @@ class LexiconService:
             raise GraphStoreNotFoundError(f"Lexicon term not found: {term.term_id}")
         return str(resolved["kind"])
 
+    def _entities_from_handshake(
+        self,
+        handshake: LexiconHandshake,
+        mappings: list[LexiconMapping],
+    ) -> list[LexiconEntityInput]:
+        mapping_by_id = {mapping.id: mapping for mapping in mappings}
+        global_mapping_ids = set(handshake.accepted_payload.mapping_ids)
+        entities: list[LexiconEntityInput] = []
+
+        for index, target in enumerate(handshake.accepted_payload.targets, start=1):
+            primary_class_uri = self._normalize_term_uri(
+                target.target_class,
+                handshake.canonical_country_uri,
+            )
+            additional_class_uris: list[str] = []
+            properties: list[dict[str, Any]] = []
+            seen_property_values: set[tuple[str, str, str | None, str | None]] = set()
+            applicable_mapping_ids = global_mapping_ids | set(target.mapping_ids)
+
+            for mapping_id in applicable_mapping_ids:
+                mapping = mapping_by_id.get(mapping_id)
+                if mapping is None:
+                    continue
+                if mapping.mapping_kind == "class_to_class" and mapping.target_term is not None:
+                    target_uri = self._resolve_reference_uri(mapping.target_term)
+                    if target_uri != primary_class_uri and target_uri not in additional_class_uris:
+                        additional_class_uris.append(target_uri)
+                elif mapping.mapping_kind == "property_to_property" and mapping.target_term is not None:
+                    evidence_value = self._first_evidence_value(target.evidence)
+                    if evidence_value is not None:
+                        property_uri = self._resolve_reference_uri(mapping.target_term)
+                        property_key = (
+                            property_uri,
+                            str(evidence_value),
+                            None,
+                            None,
+                        )
+                        if property_key not in seen_property_values:
+                            properties.append(
+                                {
+                                    "property_uri": property_uri,
+                                    "value": evidence_value,
+                                }
+                            )
+                            seen_property_values.add(property_key)
+                elif mapping.mapping_kind == "semantic_assertion":
+                    for assertion in mapping.target_assertions:
+                        assertion_uri = self._resolve_assertion_uri(assertion)
+                        if assertion.assertion_kind == "class":
+                            if assertion_uri != primary_class_uri and assertion_uri not in additional_class_uris:
+                                additional_class_uris.append(assertion_uri)
+                        elif assertion.assertion_kind == "property_value":
+                            property_key = (
+                                assertion_uri,
+                                str(assertion.value),
+                                assertion.datatype_uri,
+                                assertion.language,
+                            )
+                            if property_key not in seen_property_values:
+                                properties.append(
+                                    {
+                                        "property_uri": assertion_uri,
+                                        "value": assertion.value,
+                                        "datatype_uri": assertion.datatype_uri,
+                                        "language": assertion.language,
+                                    }
+                                )
+                                seen_property_values.add(property_key)
+
+            entity_id = self._entity_id_from_source_ref(target.source_object_ref, index)
+            entities.append(
+                LexiconEntityInput(
+                    entity_id=entity_id,
+                    class_uri=primary_class_uri,
+                    additional_class_uris=additional_class_uris,
+                    label=target.source_object_ref,
+                    properties=properties,
+                    relations=[],
+                )
+            )
+
+        return entities
+
     def _validate_source_pattern(self, pattern: LexiconSourcePattern) -> tuple[list[str], list[str]]:
         errors: list[str] = []
         warnings: list[str] = []
@@ -783,6 +893,40 @@ class LexiconService:
         if resolved is None:
             raise GraphStoreNotFoundError(f"Lexicon term not found: {term_id}")
         return str(resolved["kind"])
+
+    def _resolve_reference_uri(self, reference: LexiconMappedTermReference) -> str:
+        if reference.uri:
+            return reference.uri
+        ontology = self.resolve_ontology(
+            ontology_family=reference.ontology_family,
+            country=reference.country,
+            version=reference.version,
+        )
+        return self._normalize_term_uri(reference.term_id, ontology.canonical_country_uri)
+
+    def _resolve_assertion_uri(self, assertion: LexiconTargetAssertion) -> str:
+        if assertion.uri:
+            return assertion.uri
+        ontology = self.resolve_ontology(
+            ontology_family=assertion.ontology_family,
+            country=assertion.country,
+            version=assertion.version,
+        )
+        return self._normalize_term_uri(assertion.term_id, ontology.canonical_country_uri)
+
+    @staticmethod
+    def _first_evidence_value(evidence_items: list[Any]) -> Any | None:
+        for item in evidence_items:
+            if item.value is not None:
+                return item.value
+        return None
+
+    @staticmethod
+    def _entity_id_from_source_ref(source_ref: str | None, index: int) -> str:
+        if not source_ref:
+            return f"handshake-entity-{index}"
+        sanitized = "".join(char if char.isalnum() or char in {"-", "_"} else "-" for char in source_ref).strip("-")
+        return sanitized or f"handshake-entity-{index}"
 
     def _get_cached_bundle(
         self,

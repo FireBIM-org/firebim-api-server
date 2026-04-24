@@ -139,6 +139,47 @@ class DummyMappingRepo:
             created_at="2026-04-23T10:00:00+00:00",
             updated_at="2026-04-23T10:00:00+00:00",
         )
+        self.semantic_mapping = LexiconMapping(
+            id="map_semantic",
+            name="Wall combustible assertion",
+            mapping_kind="semantic_assertion",
+            source_term=None,
+            target_term=None,
+            source_pattern={
+                "all_of": [
+                    {
+                        "term": {
+                            "term_kind": "class",
+                            "ontology_family": "ifc",
+                            "country": "global",
+                            "version": "latest",
+                            "term_id": "IfcWall",
+                        }
+                    }
+                ]
+            },
+            target_assertions=[
+                {
+                    "assertion_kind": "class",
+                    "ontology_family": "fbo",
+                    "country": "dk",
+                    "version": "latest",
+                    "term_id": "Wall",
+                },
+                {
+                    "assertion_kind": "property_value",
+                    "ontology_family": "fbo",
+                    "country": "dk",
+                    "version": "latest",
+                    "term_id": "Combustible",
+                    "value": True,
+                },
+            ],
+            relationship="supports",
+            notes="Chosen by frontend",
+            created_at="2026-04-23T10:00:00+00:00",
+            updated_at="2026-04-23T10:00:00+00:00",
+        )
 
     def create_mapping(self, payload, user):
         _ = user
@@ -162,6 +203,8 @@ class DummyMappingRepo:
 
     def get_mapping(self, mapping_id, user):
         _ = user
+        if mapping_id == "map_semantic":
+            return self.semantic_mapping
         return self.mapping.model_copy(update={"id": mapping_id})
 
     def delete_mapping(self, mapping_id, user):
@@ -292,6 +335,7 @@ def _build_client_with_handshake_repo(monkeypatch) -> tuple[TestClient, DummyHan
     handshake_repo = DummyHandshakeRepo()
     monkeypatch.setattr(lexicon_api, "service", LexiconService(DummyOntologyRepo()))
     monkeypatch.setattr(lexicon_api, "handshake_repo", handshake_repo)
+    monkeypatch.setattr(lexicon_api, "mapping_repo", DummyMappingRepo())
     app.dependency_overrides[lexicon_api.get_current_active_user] = lambda: SimpleNamespace(
         id=f"user-{uuid4()}",
         is_active=True,
@@ -921,3 +965,32 @@ def test_handshake_next_needed(monkeypatch):
     assert body["complete"] is False
     assert body["remaining_target_classes"] == []
     assert body["remaining_properties"][0]["property_path"] == "Combustible"
+
+
+def test_reconstruct_handshake_graph_uses_mappings(monkeypatch):
+    client, handshake_repo = _build_client_with_handshake_repo(monkeypatch)
+    handshake_repo.handshake = handshake_repo.handshake.model_copy(
+        update={
+            "accepted_payload": LexiconHandshakeAcceptedPayload(
+                mapping_ids=["map_semantic"],
+                targets=[
+                    {
+                        "target_class": "Wall",
+                        "source_object_ref": "ifc_guid_123",
+                        "mapping_ids": [],
+                        "property_paths": ["Combustible"],
+                        "evidence": [],
+                    }
+                ],
+            )
+        }
+    )
+    response = client.post(
+        "/lexicon/handshakes/hs_123/reconstruction",
+        json={"graph_id": "hs-graph"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["graph_uri"] == "https://firebim.org/graphs/lexicon/hs-graph"
+    assert "ns1:Wall" in body["ttl"]
+    assert "ns1:Combustible true" in body["ttl"]

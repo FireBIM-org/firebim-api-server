@@ -14,6 +14,7 @@ from app.schemas.lexicon import (
     LexiconConformityCheckResponse,
     LexiconHandshakeAcceptRequest,
     LexiconHandshakeCreateRequest,
+    LexiconHandshakeReconstructionRequest,
     LexiconHandshakeResponse,
     LexiconHealthResponse,
     LexiconMappingCreateRequest,
@@ -299,6 +300,35 @@ def get_handshake_next_needed(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except LexiconHandshakeRepositoryError as exc:
         logger.exception("Failed to calculate lexicon handshake next-needed", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post("/handshakes/{handshake_id}/reconstruction", response_model=LexiconReconstructionResponse)
+def reconstruct_handshake_graph(
+    handshake_id: str,
+    payload: LexiconHandshakeReconstructionRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconReconstructionResponse:
+    try:
+        handshake = handshake_repo.get_handshake(handshake_id, current_user)
+        mapping_ids = set(handshake.accepted_payload.mapping_ids)
+        for target in handshake.accepted_payload.targets:
+            mapping_ids.update(target.mapping_ids)
+        mappings = [mapping_repo.get_mapping(mapping_id, current_user) for mapping_id in sorted(mapping_ids)]
+        return service.reconstruct_graph_from_handshake(
+            handshake=handshake,
+            mappings=mappings,
+            graph_id=payload.graph_id,
+            instance_base_uri=payload.instance_base_uri,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (LexiconHandshakeNotFoundError, LexiconMappingNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (LexiconHandshakeRepositoryError, LexiconMappingRepositoryError) as exc:
+        logger.exception("Failed to reconstruct lexicon handshake graph", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
