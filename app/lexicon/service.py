@@ -517,6 +517,7 @@ class LexiconService:
         country: str,
         version: str,
         ttl: str,
+        expected_profile: LexiconExecutionProfile | None = None,
     ) -> LexiconConformityCheckResponse:
         bundle = self._resolve_ontology_bundle(
             ontology_family=ontology_family,
@@ -529,9 +530,13 @@ class LexiconService:
         unknown_classes: set[str] = set()
         unknown_properties: set[str] = set()
         missing_type_subjects: set[str] = set()
+        missing_profile_target_classes: list[str] = []
+        missing_profile_properties: list[LexiconNeededProperty] = []
         issues: list[LexiconConformityIssue] = []
 
         typed_subjects = {str(subject) for subject, _, _ in data_graph.triples((None, RDF.type, None))}
+        subject_types: dict[str, set[str]] = defaultdict(set)
+        subject_predicates: dict[str, set[str]] = defaultdict(set)
         for subject in {str(item) for item in data_graph.subjects()}:
             if subject not in typed_subjects:
                 missing_type_subjects.add(subject)
@@ -545,6 +550,7 @@ class LexiconService:
 
         for subject, _, object_value in data_graph.triples((None, RDF.type, None)):
             text = str(object_value)
+            subject_types[str(subject)].add(text)
             if text.startswith(str(RDF)) or text.startswith(str(RDFS)) or text.startswith(str(OWL)):
                 continue
             if text not in bundle.declared_classes:
@@ -568,6 +574,7 @@ class LexiconService:
                 or predicate_text.startswith(str(OWL))
             ):
                 continue
+            subject_predicates[str(subject)].add(predicate_text)
             if predicate_text not in bundle.declared_properties:
                 unknown_properties.add(predicate_text)
                 issues.append(
@@ -580,9 +587,18 @@ class LexiconService:
                     )
                 )
 
+        if expected_profile is not None:
+            missing_profile_target_classes, missing_profile_properties = self._profile_gaps(
+                expected_profile=expected_profile,
+                subject_types=subject_types,
+                subject_predicates=subject_predicates,
+                canonical_country_uri=bundle.ontology.canonical_country_uri,
+            )
+
         structure_ok = not missing_type_subjects
         semantic_ok = not unknown_classes and not unknown_properties
-        execution_ready = structure_ok and semantic_ok and len(data_graph) > 0
+        profile_alignment_ok = not missing_profile_target_classes and not missing_profile_properties
+        execution_ready = structure_ok and semantic_ok and profile_alignment_ok and len(data_graph) > 0
         return LexiconConformityCheckResponse(
             ontology_family=ontology_family,
             country=country,
@@ -598,6 +614,9 @@ class LexiconService:
             unknown_classes=sorted(unknown_classes),
             unknown_properties=sorted(unknown_properties),
             missing_type_subjects=sorted(missing_type_subjects),
+            profile_alignment_ok=profile_alignment_ok,
+            missing_profile_target_classes=missing_profile_target_classes,
+            missing_profile_properties=missing_profile_properties,
             issues=issues,
         )
 
@@ -855,6 +874,59 @@ class LexiconService:
                     "semantic meaning is frontend-defined."
                 )
         return errors, warnings
+
+    @staticmethod
+    def _profile_gaps(
+        *,
+        expected_profile: LexiconExecutionProfile,
+        subject_types: dict[str, set[str]],
+        subject_predicates: dict[str, set[str]],
+        canonical_country_uri: str,
+    ) -> tuple[list[str], list[LexiconNeededProperty]]:
+        missing_target_classes: list[str] = []
+        missing_properties: list[LexiconNeededProperty] = []
+
+        for target in expected_profile.targets:
+            normalized_target_class = (
+                target.target_class
+                if target.target_class.startswith("http://") or target.target_class.startswith("https://")
+                else f"{canonical_country_uri}{target.target_class}"
+            )
+            subjects_for_target = [
+                subject for subject, types in subject_types.items() if normalized_target_class in types
+            ]
+            if not subjects_for_target:
+                missing_target_classes.append(target.target_class)
+                for requirement in target.property_requirements:
+                    missing_properties.append(
+                        LexiconNeededProperty(
+                            target_class=target.target_class,
+                            property_path=requirement.property_path,
+                            node_ids=requirement.node_ids,
+                        )
+                    )
+                continue
+
+            for requirement in target.property_requirements:
+                normalized_property_path = (
+                    requirement.property_path
+                    if requirement.property_path.startswith("http://")
+                    or requirement.property_path.startswith("https://")
+                    else f"{canonical_country_uri}{requirement.property_path}"
+                )
+                if not any(
+                    normalized_property_path in subject_predicates.get(subject, set())
+                    for subject in subjects_for_target
+                ):
+                    missing_properties.append(
+                        LexiconNeededProperty(
+                            target_class=target.target_class,
+                            property_path=requirement.property_path,
+                            node_ids=requirement.node_ids,
+                        )
+                    )
+
+        return sorted(set(missing_target_classes)), missing_properties
 
     def _resolve_condition_term_kind(self, condition: LexiconSourceTermCondition) -> str:
         return self._resolve_term_kind(

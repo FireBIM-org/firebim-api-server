@@ -529,6 +529,46 @@ ex:wall-1 a fbo-dk:Wall ;
     assert body["conforms"] is False
     assert body["semantic_ok"] is False
     assert body["unknown_properties"] == ["https://firebim.org/ontologies/fbo/dk#UnknownProperty"]
+    assert body["profile_alignment_ok"] is True
+
+
+def test_check_conformity_reports_profile_gaps(monkeypatch):
+    service = LexiconService(DummyOntologyRepo())
+    _ontology, profile = service.derive_profile(
+        ontology_family="fbo",
+        country="dk",
+        version="latest",
+        rule=SimpleNamespace(
+            as_internal_dict=lambda: {
+                "id": "wall_rule",
+                "entry": "start",
+                "elements": [
+                    {
+                        "id": "start",
+                        "element_type": "decision",
+                        "target_class": "Wall",
+                        "property_path": "Combustible",
+                        "operator": "=",
+                        "value": True,
+                    }
+                ],
+            }
+        ),
+    )
+    response = service.check_conformity(
+        ontology_family="fbo",
+        country="dk",
+        version="latest",
+        ttl="""
+@prefix ex: <https://firebim.org/instances/> .
+@prefix fbo-dk: <https://firebim.org/ontologies/fbo/dk#> .
+ex:wall-1 a fbo-dk:Wall .
+""",
+        expected_profile=profile,
+    )
+    assert response.profile_alignment_ok is False
+    assert response.missing_profile_target_classes == []
+    assert response.missing_profile_properties[0].property_path == "Combustible"
 
 
 def test_list_catalog_terms(monkeypatch):
@@ -994,3 +1034,34 @@ def test_reconstruct_handshake_graph_uses_mappings(monkeypatch):
     assert body["graph_uri"] == "https://firebim.org/graphs/lexicon/hs-graph"
     assert "ns1:Wall" in body["ttl"]
     assert "ns1:Combustible true" in body["ttl"]
+
+
+def test_handshake_conformity_uses_profile_and_mappings(monkeypatch):
+    client, handshake_repo = _build_client_with_handshake_repo(monkeypatch)
+    handshake_repo.handshake = handshake_repo.handshake.model_copy(
+        update={
+            "accepted_payload": LexiconHandshakeAcceptedPayload(
+                mapping_ids=["map_semantic"],
+                targets=[
+                    {
+                        "target_class": "Wall",
+                        "source_object_ref": "ifc_guid_123",
+                        "mapping_ids": [],
+                        "property_paths": ["Combustible"],
+                        "evidence": [],
+                    }
+                ],
+            )
+        }
+    )
+    response = client.post(
+        "/lexicon/handshakes/hs_123/conformity",
+        json={"graph_id": "hs-conformity"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["semantic_ok"] is True
+    assert body["profile_alignment_ok"] is True
+    assert body["execution_ready"] is True
+    assert body["missing_profile_target_classes"] == []
+    assert body["missing_profile_properties"] == []

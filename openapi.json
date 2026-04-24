@@ -987,6 +987,68 @@
         }
       }
     },
+    "/lexicon/handshakes/{handshake_id}/conformity": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Check Handshake Conformity",
+        "operationId": "check_handshake_conformity_lexicon_handshakes__handshake_id__conformity_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "handshake_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Handshake Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconHandshakeConformityRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconConformityCheckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/lexicon/profiles/derive": {
       "post": {
         "tags": [
@@ -5665,6 +5727,25 @@
             "type": "array",
             "title": "Missing Type Subjects"
           },
+          "profile_alignment_ok": {
+            "type": "boolean",
+            "title": "Profile Alignment Ok",
+            "default": true
+          },
+          "missing_profile_target_classes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Profile Target Classes"
+          },
+          "missing_profile_properties": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconNeededProperty"
+            },
+            "type": "array",
+            "title": "Missing Profile Properties"
+          },
           "issues": {
             "items": {
               "$ref": "#/components/schemas/LexiconConformityIssue"
@@ -6233,6 +6314,29 @@
         },
         "type": "object",
         "title": "LexiconHandshakeAcceptedPayload"
+      },
+      "LexiconHandshakeConformityRequest": {
+        "properties": {
+          "graph_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Graph Id",
+            "default": "lexicon-handshake-conformity"
+          },
+          "instance_base_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance Base Uri"
+          }
+        },
+        "type": "object",
+        "title": "LexiconHandshakeConformityRequest"
       },
       "LexiconHandshakeCreateRequest": {
         "properties": {

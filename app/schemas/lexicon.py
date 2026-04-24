@@ -139,6 +139,12 @@ class LexiconConformityIssue(BaseModel):
     object: str | None = None
 
 
+class LexiconNeededProperty(BaseModel):
+    target_class: str
+    property_path: str
+    node_ids: list[str] = Field(default_factory=list)
+
+
 class LexiconConformityCheckResponse(BaseModel):
     ontology_family: str
     country: str
@@ -154,6 +160,9 @@ class LexiconConformityCheckResponse(BaseModel):
     unknown_classes: list[str] = Field(default_factory=list)
     unknown_properties: list[str] = Field(default_factory=list)
     missing_type_subjects: list[str] = Field(default_factory=list)
+    profile_alignment_ok: bool = True
+    missing_profile_target_classes: list[str] = Field(default_factory=list)
+    missing_profile_properties: list[LexiconNeededProperty] = Field(default_factory=list)
     issues: list[LexiconConformityIssue] = Field(default_factory=list)
 
 
@@ -403,10 +412,9 @@ class LexiconHandshakeReconstructionRequest(BaseModel):
     instance_base_uri: str | None = None
 
 
-class LexiconNeededProperty(BaseModel):
-    target_class: str
-    property_path: str
-    node_ids: list[str] = Field(default_factory=list)
+class LexiconHandshakeConformityRequest(BaseModel):
+    graph_id: str = Field(default="lexicon-handshake-conformity", min_length=1)
+    instance_base_uri: str | None = None
 
 
 class LexiconNextNeededResponse(BaseModel):

@@ -13,6 +13,7 @@ from app.schemas.lexicon import (
     LexiconConformityCheckRequest,
     LexiconConformityCheckResponse,
     LexiconHandshakeAcceptRequest,
+    LexiconHandshakeConformityRequest,
     LexiconHandshakeCreateRequest,
     LexiconHandshakeReconstructionRequest,
     LexiconHandshakeResponse,
@@ -329,6 +330,42 @@ def reconstruct_handshake_graph(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except (LexiconHandshakeRepositoryError, LexiconMappingRepositoryError) as exc:
         logger.exception("Failed to reconstruct lexicon handshake graph", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post("/handshakes/{handshake_id}/conformity", response_model=LexiconConformityCheckResponse)
+def check_handshake_conformity(
+    handshake_id: str,
+    payload: LexiconHandshakeConformityRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconConformityCheckResponse:
+    try:
+        handshake = handshake_repo.get_handshake(handshake_id, current_user)
+        mapping_ids = set(handshake.accepted_payload.mapping_ids)
+        for target in handshake.accepted_payload.targets:
+            mapping_ids.update(target.mapping_ids)
+        mappings = [mapping_repo.get_mapping(mapping_id, current_user) for mapping_id in sorted(mapping_ids)]
+        reconstruction = service.reconstruct_graph_from_handshake(
+            handshake=handshake,
+            mappings=mappings,
+            graph_id=payload.graph_id,
+            instance_base_uri=payload.instance_base_uri,
+        )
+        return service.check_conformity(
+            ontology_family=handshake.ontology_family,
+            country=handshake.country,
+            version=handshake.version,
+            ttl=reconstruction.ttl,
+            expected_profile=handshake.profile,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (LexiconHandshakeNotFoundError, LexiconMappingNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (LexiconHandshakeRepositoryError, LexiconMappingRepositoryError) as exc:
+        logger.exception("Failed to check lexicon handshake conformity", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
