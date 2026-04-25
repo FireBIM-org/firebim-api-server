@@ -16,7 +16,6 @@ from sqlmodel import Session
 from app.api.checks import router as checks_router
 from app.api.graphs import router as graphs_router
 from app.api.lexicon import router as lexicon_router
-from app.api.ontologies import repo as ontologies_repo
 from app.api.ontologies import router as ontologies_router
 from app.api.rulebuilder import router as rulebuilder_router
 from app.api.rules import router as rules_router
@@ -26,9 +25,11 @@ from app.core.config import settings
 from app.models.database import engine, get_db, init_db
 from app.models.models import CheckResult, IdsFile, IfcModel, User
 from app.storage.ontology_bootstrap import bootstrap_default_ontologies
+from app.storage.ontology_repository import OntologyRepository
 from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
+ontologies_repo = OntologyRepository()
 
 app = FastAPI(title="FireBIM API")
 

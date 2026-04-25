@@ -28,6 +28,9 @@ class DummyBootstrapRepo:
         self.manifests: dict[tuple[str, str], dict] = {}
         self.published_payloads: list[object] = []
 
+    def load_manifest(self, ontology_family: str, country: str) -> dict:
+        return self._load_manifest(ontology_family, country)
+
     def _load_manifest(self, ontology_family: str, country: str) -> dict:
         key = (ontology_family, country)
         if key not in self.manifests:
@@ -62,6 +65,12 @@ class DummyBootstrapRepo:
         return {
             "sha256": f"hash:{ttl}",
         }
+
+    def extract_ttl_metadata(self, ttl: str) -> dict:
+        return self._extract_ttl_metadata(ttl)
+
+    def find_version_entry(self, versions: list[dict], version: str) -> dict | None:
+        return self._find_version_entry(versions, version)
 
     def _find_version_entry(self, versions: list[dict], version: str) -> dict | None:
         for item in versions:

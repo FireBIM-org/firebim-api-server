@@ -1,7 +1,7 @@
 from rdflib import RDF, RDFS, Graph, URIRef
 from rdflib.namespace import OWL
 
-from app.lexicon.dictionary_ontology import convert_dictionary_payload
+from app.ontologies.dictionary_ontology import convert_dictionary_payload
 
 
 def test_rir_dictionary_items_are_converted_as_classes_and_properties():

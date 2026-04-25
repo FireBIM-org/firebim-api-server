@@ -203,6 +203,15 @@ class OntologyRepository:
     def _manifest_key(self, ontology_family: str, country: str) -> str:
         return f"{MANIFEST_ROOT_PREFIX}/{ontology_family}/{country}.json"
 
+    def load_manifest(self, ontology_family: str, country: str) -> dict:
+        return self._load_manifest(ontology_family, country)
+
+    def find_version_entry(self, versions: list[dict], version: str) -> dict | None:
+        return self._find_version_entry(versions, version)
+
+    def extract_ttl_metadata(self, ttl: str) -> dict:
+        return self._extract_ttl_metadata(ttl)
+
     def _load_manifest_or_default(self, ontology_family: str, country: str) -> dict:
         try:
             return self._load_manifest(ontology_family, country)

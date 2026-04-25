@@ -68,7 +68,7 @@ def bootstrap_default_ontologies(
 
 def _bootstrap_single_ontology(repo: OntologyRepository, spec: OntologyBootstrapSpec) -> dict[str, str | bool]:
     try:
-        manifest = repo._load_manifest(spec.ontology_family, spec.country)
+        manifest = repo.load_manifest(spec.ontology_family, spec.country)
     except OntologyManifestNotFoundError:
         manifest = None
     except GraphStoreError:
@@ -80,10 +80,10 @@ def _bootstrap_single_ontology(repo: OntologyRepository, spec: OntologyBootstrap
         raise
 
     ttl = _resolve_bootstrap_ttl(repo, spec)
-    metadata = repo._extract_ttl_metadata(ttl)
+    metadata = repo.extract_ttl_metadata(ttl)
 
     if manifest is not None:
-        existing_entry = repo._find_version_entry(manifest.get("versions", []), spec.version)
+        existing_entry = repo.find_version_entry(manifest.get("versions", []), spec.version)
         if existing_entry is not None:
             same_payload = existing_entry.get("sha256") == metadata["sha256"]
             same_default = manifest.get("default_version") == spec.version
