@@ -3,18 +3,14 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from urllib.parse import quote
 
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
-
-from app.core.config import settings
 from app.models.models import User
 from app.schemas.lexicon import (
     LexiconMapping,
     LexiconMappingCreateRequest,
     LexiconMappingSummary,
 )
+from app.storage.s3_json_store import S3JsonStoreError, S3JsonStoreNotFoundError, UserScopedS3JsonStore
 
 
 class LexiconMappingRepositoryError(Exception):
@@ -38,27 +34,14 @@ class LexiconMappingRepository:
         region_name: str | None = None,
         s3_client=None,
     ) -> None:
-        self.bucket_name = bucket_name or settings.S3_BUCKET_NAME
-        self.client = s3_client or boto3.client(
-            "s3",
-            endpoint_url=endpoint_url or settings.S3_ENDPOINT_URL,
-            aws_access_key_id=access_key_id or settings.S3_ACCESS_KEY_ID,
-            aws_secret_access_key=(secret_access_key or settings.S3_SECRET_ACCESS_KEY.get_secret_value()),
-            region_name=region_name or settings.S3_REGION,
+        self.store = UserScopedS3JsonStore(
+            bucket_name=bucket_name,
+            endpoint_url=endpoint_url,
+            access_key_id=access_key_id,
+            secret_access_key=secret_access_key,
+            region_name=region_name,
+            s3_client=s3_client,
         )
-
-    @staticmethod
-    def _user_prefix(user: User | SimpleNamespace) -> str:
-        return quote(str(user.id).strip(), safe="")
-
-    def _mapping_prefix(self, user: User | SimpleNamespace) -> str:
-        return f"{self.ROOT_PREFIX}/{self._user_prefix(user)}/"
-
-    def _mapping_key(self, user: User | SimpleNamespace, mapping_id: str) -> str:
-        mapping_id = str(mapping_id).strip()
-        if not mapping_id:
-            raise ValueError("mapping_id must not be empty")
-        return f"{self._mapping_prefix(user)}{quote(mapping_id, safe='')}.json"
 
     @staticmethod
     def _now() -> datetime:
@@ -103,34 +86,32 @@ class LexiconMappingRepository:
         return len(payload.target_assertions)
 
     def _read_mapping(self, user: User | SimpleNamespace, mapping_id: str) -> LexiconMapping:
-        key = self._mapping_key(user, mapping_id)
         try:
-            response = self.client.get_object(Bucket=self.bucket_name, Key=key)
-        except ClientError as exc:
-            code = str(exc.response.get("Error", {}).get("Code", ""))
-            if code in {"404", "NoSuchKey", "NotFound"}:
-                raise LexiconMappingNotFoundError(f"Lexicon mapping not found: {mapping_id}") from exc
-            raise LexiconMappingRepositoryError(f"Lexicon mapping fetch failed: {exc}") from exc
-        except BotoCoreError as exc:
-            raise LexiconMappingRepositoryError(f"Lexicon mapping fetch failed: {exc}") from exc
-
-        try:
-            payload = response["Body"].read().decode("utf-8")
-            return LexiconMapping.model_validate_json(payload)
-        except Exception as exc:
-            raise LexiconMappingRepositoryError(f"Lexicon mapping payload is invalid: {exc}") from exc
+            return self.store.read_model(
+                self.ROOT_PREFIX,
+                user,
+                mapping_id,
+                model_type=LexiconMapping,
+                not_found_message=f"Lexicon mapping not found: {mapping_id}",
+                fetch_error_message="Lexicon mapping fetch failed",
+                payload_error_message="Lexicon mapping payload is invalid",
+            )
+        except S3JsonStoreNotFoundError as exc:
+            raise LexiconMappingNotFoundError(str(exc)) from exc
+        except S3JsonStoreError as exc:
+            raise LexiconMappingRepositoryError(str(exc)) from exc
 
     def _write_mapping(self, user: User | SimpleNamespace, mapping: LexiconMapping) -> LexiconMapping:
-        key = self._mapping_key(user, mapping.id)
         try:
-            self.client.put_object(
-                Bucket=self.bucket_name,
-                Key=key,
-                Body=mapping.model_dump_json(indent=2).encode("utf-8"),
-                ContentType="application/json",
+            self.store.write_model(
+                self.ROOT_PREFIX,
+                user,
+                mapping.id,
+                mapping,
+                write_error_message="Lexicon mapping write failed",
             )
-        except (BotoCoreError, ClientError) as exc:
-            raise LexiconMappingRepositoryError(f"Lexicon mapping write failed: {exc}") from exc
+        except S3JsonStoreError as exc:
+            raise LexiconMappingRepositoryError(str(exc)) from exc
         return mapping
 
     def create_mapping(self, payload: LexiconMappingCreateRequest, user: User | SimpleNamespace) -> LexiconMapping:
@@ -154,55 +135,39 @@ class LexiconMappingRepository:
         return self._read_mapping(user, mapping_id)
 
     def list_mappings(self, user: User | SimpleNamespace) -> list[LexiconMappingSummary]:
+        try:
+            mapping_ids = self.store.list_document_ids(self.ROOT_PREFIX, user)
+        except S3JsonStoreError as exc:
+            raise LexiconMappingRepositoryError(f"Lexicon mapping list failed: {exc}") from exc
+
         items: list[LexiconMappingSummary] = []
-        continuation_token: str | None = None
-        prefix = self._mapping_prefix(user)
-
-        while True:
-            kwargs = {
-                "Bucket": self.bucket_name,
-                "Prefix": prefix,
-                "MaxKeys": 1000,
-            }
-            if continuation_token:
-                kwargs["ContinuationToken"] = continuation_token
-
-            try:
-                response = self.client.list_objects_v2(**kwargs)
-            except (BotoCoreError, ClientError) as exc:
-                raise LexiconMappingRepositoryError(f"Lexicon mapping list failed: {exc}") from exc
-
-            for obj in response.get("Contents", []):
-                mapping_id = obj["Key"].rsplit("/", 1)[-1].removesuffix(".json")
-                mapping = self._read_mapping(user, mapping_id)
-                items.append(
-                    LexiconMappingSummary(
-                        id=mapping.id,
-                        name=mapping.name,
-                        mapping_kind=mapping.mapping_kind,
-                        relationship=mapping.relationship,
-                        created_at=mapping.created_at,
-                        updated_at=mapping.updated_at,
-                        source_term_count=self._source_term_count(mapping),
-                        target_assertion_count=self._target_assertion_count(mapping),
-                    )
+        for mapping_id in mapping_ids:
+            mapping = self._read_mapping(user, mapping_id)
+            items.append(
+                LexiconMappingSummary(
+                    id=mapping.id,
+                    name=mapping.name,
+                    mapping_kind=mapping.mapping_kind,
+                    relationship=mapping.relationship,
+                    created_at=mapping.created_at,
+                    updated_at=mapping.updated_at,
+                    source_term_count=self._source_term_count(mapping),
+                    target_assertion_count=self._target_assertion_count(mapping),
                 )
-
-            if not response.get("IsTruncated"):
-                break
-            continuation_token = response.get("NextContinuationToken")
+            )
 
         return sorted(items, key=lambda item: item.updated_at, reverse=True)
 
     def delete_mapping(self, mapping_id: str, user: User | SimpleNamespace) -> None:
-        key = self._mapping_key(user, mapping_id)
         try:
-            self.client.head_object(Bucket=self.bucket_name, Key=key)
-            self.client.delete_object(Bucket=self.bucket_name, Key=key)
-        except ClientError as exc:
-            code = str(exc.response.get("Error", {}).get("Code", ""))
-            if code in {"404", "NoSuchKey", "NotFound"}:
-                raise LexiconMappingNotFoundError(f"Lexicon mapping not found: {mapping_id}") from exc
-            raise LexiconMappingRepositoryError(f"Lexicon mapping delete failed: {exc}") from exc
-        except BotoCoreError as exc:
-            raise LexiconMappingRepositoryError(f"Lexicon mapping delete failed: {exc}") from exc
+            self.store.delete_document(
+                self.ROOT_PREFIX,
+                user,
+                mapping_id,
+                not_found_message=f"Lexicon mapping not found: {mapping_id}",
+                delete_error_message="Lexicon mapping delete failed",
+            )
+        except S3JsonStoreNotFoundError as exc:
+            raise LexiconMappingNotFoundError(str(exc)) from exc
+        except S3JsonStoreError as exc:
+            raise LexiconMappingRepositoryError(str(exc)) from exc

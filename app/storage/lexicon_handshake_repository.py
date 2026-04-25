@@ -3,18 +3,14 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from urllib.parse import quote
 
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
-
-from app.core.config import settings
 from app.models.models import User
 from app.schemas.lexicon import (
     LexiconHandshake,
     LexiconHandshakeAcceptedPayload,
     LexiconSelectedOntology,
 )
+from app.storage.s3_json_store import S3JsonStoreError, S3JsonStoreNotFoundError, UserScopedS3JsonStore
 
 
 class LexiconHandshakeRepositoryError(Exception):
@@ -38,61 +34,46 @@ class LexiconHandshakeRepository:
         region_name: str | None = None,
         s3_client=None,
     ) -> None:
-        self.bucket_name = bucket_name or settings.S3_BUCKET_NAME
-        self.client = s3_client or boto3.client(
-            "s3",
-            endpoint_url=endpoint_url or settings.S3_ENDPOINT_URL,
-            aws_access_key_id=access_key_id or settings.S3_ACCESS_KEY_ID,
-            aws_secret_access_key=(secret_access_key or settings.S3_SECRET_ACCESS_KEY.get_secret_value()),
-            region_name=region_name or settings.S3_REGION,
+        self.store = UserScopedS3JsonStore(
+            bucket_name=bucket_name,
+            endpoint_url=endpoint_url,
+            access_key_id=access_key_id,
+            secret_access_key=secret_access_key,
+            region_name=region_name,
+            s3_client=s3_client,
         )
-
-    @staticmethod
-    def _user_prefix(user: User | SimpleNamespace) -> str:
-        return quote(str(user.id).strip(), safe="")
-
-    def _handshake_prefix(self, user: User | SimpleNamespace) -> str:
-        return f"{self.ROOT_PREFIX}/{self._user_prefix(user)}/"
-
-    def _handshake_key(self, user: User | SimpleNamespace, handshake_id: str) -> str:
-        handshake_id = str(handshake_id).strip()
-        if not handshake_id:
-            raise ValueError("handshake_id must not be empty")
-        return f"{self._handshake_prefix(user)}{quote(handshake_id, safe='')}.json"
 
     @staticmethod
     def _now() -> str:
         return datetime.now(UTC).isoformat()
 
     def _read_handshake(self, user: User | SimpleNamespace, handshake_id: str) -> LexiconHandshake:
-        key = self._handshake_key(user, handshake_id)
         try:
-            response = self.client.get_object(Bucket=self.bucket_name, Key=key)
-        except ClientError as exc:
-            code = str(exc.response.get("Error", {}).get("Code", ""))
-            if code in {"404", "NoSuchKey", "NotFound"}:
-                raise LexiconHandshakeNotFoundError(f"Lexicon handshake not found: {handshake_id}") from exc
-            raise LexiconHandshakeRepositoryError(f"Lexicon handshake fetch failed: {exc}") from exc
-        except BotoCoreError as exc:
-            raise LexiconHandshakeRepositoryError(f"Lexicon handshake fetch failed: {exc}") from exc
-
-        try:
-            payload = response["Body"].read().decode("utf-8")
-            return LexiconHandshake.model_validate_json(payload)
-        except Exception as exc:
-            raise LexiconHandshakeRepositoryError(f"Lexicon handshake payload is invalid: {exc}") from exc
+            return self.store.read_model(
+                self.ROOT_PREFIX,
+                user,
+                handshake_id,
+                model_type=LexiconHandshake,
+                not_found_message=f"Lexicon handshake not found: {handshake_id}",
+                fetch_error_message="Lexicon handshake fetch failed",
+                payload_error_message="Lexicon handshake payload is invalid",
+            )
+        except S3JsonStoreNotFoundError as exc:
+            raise LexiconHandshakeNotFoundError(str(exc)) from exc
+        except S3JsonStoreError as exc:
+            raise LexiconHandshakeRepositoryError(str(exc)) from exc
 
     def _write_handshake(self, user: User | SimpleNamespace, handshake: LexiconHandshake) -> LexiconHandshake:
-        key = self._handshake_key(user, handshake.id)
         try:
-            self.client.put_object(
-                Bucket=self.bucket_name,
-                Key=key,
-                Body=handshake.model_dump_json(indent=2).encode("utf-8"),
-                ContentType="application/json",
+            self.store.write_model(
+                self.ROOT_PREFIX,
+                user,
+                handshake.id,
+                handshake,
+                write_error_message="Lexicon handshake write failed",
             )
-        except (BotoCoreError, ClientError) as exc:
-            raise LexiconHandshakeRepositoryError(f"Lexicon handshake write failed: {exc}") from exc
+        except S3JsonStoreError as exc:
+            raise LexiconHandshakeRepositoryError(str(exc)) from exc
         return handshake
 
     def create_handshake(

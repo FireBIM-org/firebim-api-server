@@ -3,12 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from urllib.parse import quote
 
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError
-
-from app.core.config import settings
 from app.models.models import User
 from app.schemas.ontologies import (
     OntologyDictionaryCandidate,
@@ -16,6 +11,7 @@ from app.schemas.ontologies import (
     OntologyDictionaryCandidateSummary,
     OntologyDictionaryValidationReport,
 )
+from app.storage.s3_json_store import S3JsonStoreError, S3JsonStoreNotFoundError, UserScopedS3JsonStore
 
 
 class OntologyCandidateRepositoryError(Exception):
@@ -39,27 +35,14 @@ class OntologyCandidateRepository:
         region_name: str | None = None,
         s3_client=None,
     ) -> None:
-        self.bucket_name = bucket_name or settings.S3_BUCKET_NAME
-        self.client = s3_client or boto3.client(
-            "s3",
-            endpoint_url=endpoint_url or settings.S3_ENDPOINT_URL,
-            aws_access_key_id=access_key_id or settings.S3_ACCESS_KEY_ID,
-            aws_secret_access_key=(secret_access_key or settings.S3_SECRET_ACCESS_KEY.get_secret_value()),
-            region_name=region_name or settings.S3_REGION,
+        self.store = UserScopedS3JsonStore(
+            bucket_name=bucket_name,
+            endpoint_url=endpoint_url,
+            access_key_id=access_key_id,
+            secret_access_key=secret_access_key,
+            region_name=region_name,
+            s3_client=s3_client,
         )
-
-    @staticmethod
-    def _user_prefix(user: User | SimpleNamespace) -> str:
-        return quote(str(user.id).strip(), safe="")
-
-    def _candidate_prefix(self, user: User | SimpleNamespace) -> str:
-        return f"{self.ROOT_PREFIX}/{self._user_prefix(user)}/"
-
-    def _candidate_key(self, user: User | SimpleNamespace, candidate_id: str) -> str:
-        candidate_id = str(candidate_id).strip()
-        if not candidate_id:
-            raise ValueError("candidate_id must not be empty")
-        return f"{self._candidate_prefix(user)}{quote(candidate_id, safe='')}.json"
 
     @staticmethod
     def _now() -> str:
@@ -72,40 +55,36 @@ class OntologyCandidateRepository:
         return f"{payload.ontology_family}/{payload.country}/{payload.version} candidate"
 
     def _read_candidate(self, user: User | SimpleNamespace, candidate_id: str) -> OntologyDictionaryCandidate:
-        key = self._candidate_key(user, candidate_id)
         try:
-            response = self.client.get_object(Bucket=self.bucket_name, Key=key)
-        except ClientError as exc:
-            code = str(exc.response.get("Error", {}).get("Code", ""))
-            if code in {"404", "NoSuchKey", "NotFound"}:
-                raise OntologyCandidateNotFoundError(
-                    f"Ontology dictionary candidate not found: {candidate_id}"
-                ) from exc
-            raise OntologyCandidateRepositoryError(f"Ontology dictionary candidate fetch failed: {exc}") from exc
-        except BotoCoreError as exc:
-            raise OntologyCandidateRepositoryError(f"Ontology dictionary candidate fetch failed: {exc}") from exc
-
-        try:
-            payload = response["Body"].read().decode("utf-8")
-            return OntologyDictionaryCandidate.model_validate_json(payload)
-        except Exception as exc:
-            raise OntologyCandidateRepositoryError(f"Ontology dictionary candidate payload is invalid: {exc}") from exc
+            return self.store.read_model(
+                self.ROOT_PREFIX,
+                user,
+                candidate_id,
+                model_type=OntologyDictionaryCandidate,
+                not_found_message=f"Ontology dictionary candidate not found: {candidate_id}",
+                fetch_error_message="Ontology dictionary candidate fetch failed",
+                payload_error_message="Ontology dictionary candidate payload is invalid",
+            )
+        except S3JsonStoreNotFoundError as exc:
+            raise OntologyCandidateNotFoundError(str(exc)) from exc
+        except S3JsonStoreError as exc:
+            raise OntologyCandidateRepositoryError(str(exc)) from exc
 
     def _write_candidate(
         self,
         user: User | SimpleNamespace,
         candidate: OntologyDictionaryCandidate,
     ) -> OntologyDictionaryCandidate:
-        key = self._candidate_key(user, candidate.id)
         try:
-            self.client.put_object(
-                Bucket=self.bucket_name,
-                Key=key,
-                Body=candidate.model_dump_json(indent=2).encode("utf-8"),
-                ContentType="application/json",
+            self.store.write_model(
+                self.ROOT_PREFIX,
+                user,
+                candidate.id,
+                candidate,
+                write_error_message="Ontology dictionary candidate write failed",
             )
-        except (BotoCoreError, ClientError) as exc:
-            raise OntologyCandidateRepositoryError(f"Ontology dictionary candidate write failed: {exc}") from exc
+        except S3JsonStoreError as exc:
+            raise OntologyCandidateRepositoryError(str(exc)) from exc
         return candidate
 
     def create_candidate(
@@ -137,33 +116,12 @@ class OntologyCandidateRepository:
         return self._read_candidate(user, candidate_id)
 
     def list_candidates(self, user: User | SimpleNamespace) -> list[OntologyDictionaryCandidateSummary]:
-        items: list[OntologyDictionaryCandidateSummary] = []
-        continuation_token: str | None = None
-        prefix = self._candidate_prefix(user)
+        try:
+            candidate_ids = self.store.list_document_ids(self.ROOT_PREFIX, user)
+        except S3JsonStoreError as exc:
+            raise OntologyCandidateRepositoryError(f"Ontology dictionary candidate list failed: {exc}") from exc
 
-        while True:
-            kwargs = {
-                "Bucket": self.bucket_name,
-                "Prefix": prefix,
-                "MaxKeys": 1000,
-            }
-            if continuation_token:
-                kwargs["ContinuationToken"] = continuation_token
-
-            try:
-                response = self.client.list_objects_v2(**kwargs)
-            except (BotoCoreError, ClientError) as exc:
-                raise OntologyCandidateRepositoryError(f"Ontology dictionary candidate list failed: {exc}") from exc
-
-            for obj in response.get("Contents", []):
-                candidate_id = obj["Key"].rsplit("/", 1)[-1].removesuffix(".json")
-                candidate = self._read_candidate(user, candidate_id)
-                items.append(self._summary(candidate))
-
-            if not response.get("IsTruncated"):
-                break
-            continuation_token = response.get("NextContinuationToken")
-
+        items = [self._summary(self._read_candidate(user, candidate_id)) for candidate_id in candidate_ids]
         return sorted(items, key=lambda item: item.updated_at, reverse=True)
 
     def update_validation_report(
@@ -182,19 +140,18 @@ class OntologyCandidateRepository:
         return self._write_candidate(user, updated)
 
     def delete_candidate(self, candidate_id: str, user: User | SimpleNamespace) -> None:
-        key = self._candidate_key(user, candidate_id)
         try:
-            self.client.head_object(Bucket=self.bucket_name, Key=key)
-            self.client.delete_object(Bucket=self.bucket_name, Key=key)
-        except ClientError as exc:
-            code = str(exc.response.get("Error", {}).get("Code", ""))
-            if code in {"404", "NoSuchKey", "NotFound"}:
-                raise OntologyCandidateNotFoundError(
-                    f"Ontology dictionary candidate not found: {candidate_id}"
-                ) from exc
-            raise OntologyCandidateRepositoryError(f"Ontology dictionary candidate delete failed: {exc}") from exc
-        except BotoCoreError as exc:
-            raise OntologyCandidateRepositoryError(f"Ontology dictionary candidate delete failed: {exc}") from exc
+            self.store.delete_document(
+                self.ROOT_PREFIX,
+                user,
+                candidate_id,
+                not_found_message=f"Ontology dictionary candidate not found: {candidate_id}",
+                delete_error_message="Ontology dictionary candidate delete failed",
+            )
+        except S3JsonStoreNotFoundError as exc:
+            raise OntologyCandidateNotFoundError(str(exc)) from exc
+        except S3JsonStoreError as exc:
+            raise OntologyCandidateRepositoryError(str(exc)) from exc
 
     @staticmethod
     def _summary(candidate: OntologyDictionaryCandidate) -> OntologyDictionaryCandidateSummary:
