@@ -13,6 +13,10 @@ from app.schemas.lexicon import (
     LexiconCatalogRelatedTermsResponse,
     LexiconCatalogResolveRequest,
     LexiconCatalogResolveResponse,
+    LexiconCatalogSimilarityMatrixRequest,
+    LexiconCatalogSimilarityMatrixResponse,
+    LexiconCatalogSimilarityRequest,
+    LexiconCatalogSimilarityResponse,
     LexiconCatalogTermResponse,
     LexiconCatalogTermsResponse,
     LexiconConformityCheckRequest,
@@ -36,6 +40,7 @@ from app.schemas.lexicon import (
     LexiconNextNeededResponse,
     LexiconProfileDeriveRequest,
     LexiconProfileDeriveResponse,
+    LexiconProfileSummaryResponse,
     LexiconReconstructionRequest,
     LexiconReconstructionResponse,
 )
@@ -167,6 +172,40 @@ def compare_catalog_terms(payload: LexiconCatalogCompareRequest) -> LexiconCatal
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to compare lexicon catalog terms",
+        ) from exc
+
+
+@router.post("/catalog/similarity", response_model=LexiconCatalogSimilarityResponse)
+def score_catalog_similarity(payload: LexiconCatalogSimilarityRequest) -> LexiconCatalogSimilarityResponse:
+    try:
+        return service.score_catalog_similarity(payload)
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to score lexicon catalog similarity", exc_info=exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to score lexicon catalog similarity",
+        ) from exc
+
+
+@router.post("/catalog/similarity-matrix", response_model=LexiconCatalogSimilarityMatrixResponse)
+def score_catalog_similarity_matrix(
+    payload: LexiconCatalogSimilarityMatrixRequest,
+) -> LexiconCatalogSimilarityMatrixResponse:
+    try:
+        return service.score_catalog_similarity_matrix(payload)
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to score lexicon similarity matrix", exc_info=exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to score lexicon similarity matrix",
         ) from exc
 
 
@@ -611,6 +650,30 @@ def derive_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconPro
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to derive lexicon execution profile",
+        ) from exc
+
+
+@router.post("/profiles/summary", response_model=LexiconProfileSummaryResponse)
+def summarize_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconProfileSummaryResponse:
+    try:
+        return service.summarize_profile(
+            ontology_family=payload.ontology_family,
+            country=payload.country,
+            version=payload.version,
+            selected_ontologies=payload.selected_ontologies,
+            canonical_target_ontology=payload.canonical_target_ontology,
+            rule_id=payload.rule_id,
+            rule=payload.rule,
+        )
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to summarize lexicon execution profile", exc_info=exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to summarize lexicon execution profile",
         ) from exc
 
 

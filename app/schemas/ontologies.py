@@ -324,6 +324,28 @@ class OntologyDictionaryCandidateListResponse(BaseModel):
     candidates: list[OntologyDictionaryCandidateSummary] = Field(default_factory=list)
 
 
+class OntologyDictionaryCandidateSummaryResponse(BaseModel):
+    id: str
+    name: str
+    ontology_family: str
+    country: str
+    version: str
+    source_dictionary_name: str | None = None
+    source_dictionary_code: str | None = None
+    source_dictionary_version: str | None = None
+    class_count: int | None = None
+    subclass_count: int | None = None
+    property_count: int | None = None
+    datatype_property_count: int | None = None
+    object_property_count: int | None = None
+    class_property_link_count: int | None = None
+    valid: bool | None = None
+    completeness_ok: bool | None = None
+    ttl_form_ok: bool | None = None
+    publish_ready: bool
+    warnings: list[str] = Field(default_factory=list)
+
+
 class OntologyDeleteResponse(BaseModel):
     success: bool = True
     deleted: bool
@@ -386,3 +408,21 @@ class OntologyVersionFetchResponse(BaseModel):
     canonical_country_uri: str
     version: OntologyVersionMetadata
     ttl: str
+
+
+class OntologyVersionSummaryResponse(BaseModel):
+    ontology_family: str
+    country: str
+    version: str
+    ontology_uri: str | None = None
+    version_iri: str | None = None
+    title: str
+    description: str | None = None
+    status: OntologyReleaseStatus
+    class_count: int
+    property_count: int
+    property_set_count: int
+    subclass_count: int
+    class_property_link_count: int
+    publish_ready: bool
+    warnings: list[str] = Field(default_factory=list)

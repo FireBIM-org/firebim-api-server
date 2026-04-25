@@ -597,6 +597,98 @@
         }
       }
     },
+    "/lexicon/catalog/similarity": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Score Catalog Similarity",
+        "operationId": "score_catalog_similarity_lexicon_catalog_similarity_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconCatalogSimilarityRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconCatalogSimilarityResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lexicon/catalog/similarity-matrix": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Score Catalog Similarity Matrix",
+        "operationId": "score_catalog_similarity_matrix_lexicon_catalog_similarity_matrix_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconCatalogSimilarityMatrixRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconCatalogSimilarityMatrixResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/lexicon/catalog/{ontology_family}/{country}/{version}/classes/{term_id}/properties": {
       "get": {
         "tags": [
@@ -1836,6 +1928,52 @@
         }
       }
     },
+    "/lexicon/profiles/summary": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Summarize Execution Profile",
+        "operationId": "summarize_execution_profile_lexicon_profiles_summary_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/LexiconProfileDeriveRequest"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconProfileSummaryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/lexicon/reconstruction": {
       "post": {
         "tags": [
@@ -2202,6 +2340,53 @@
                 "schema": {
                   "type": "object",
                   "title": "Response Delete Dictionary Candidate Ontologies Candidates Dictionaries  Candidate Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ontologies/candidates/dictionaries/{candidate_id}/summary": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Get Dictionary Candidate Summary",
+        "operationId": "get_dictionary_candidate_summary_ontologies_candidates_dictionaries__candidate_id__summary_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "candidate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Candidate Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologyDictionaryCandidateSummaryResponse"
                 }
               }
             }
@@ -2730,6 +2915,66 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OntologyVersionFetchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ontologies/{ontology_family}/{country}/versions/{version}/summary": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Fetch Ontology Version Summary",
+        "operationId": "fetch_ontology_version_summary_ontologies__ontology_family___country__versions__version__summary_get",
+        "parameters": [
+          {
+            "name": "ontology_family",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Family"
+            }
+          },
+          {
+            "name": "country",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Country"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologyVersionSummaryResponse"
                 }
               }
             }
@@ -6724,6 +6969,131 @@
         ],
         "title": "LexiconCatalogResolvedTerm"
       },
+      "LexiconCatalogSimilarityMatrixCell": {
+        "properties": {
+          "left_term_id": {
+            "type": "string",
+            "title": "Left Term Id"
+          },
+          "right_term_id": {
+            "type": "string",
+            "title": "Right Term Id"
+          },
+          "score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "left_term_id",
+          "right_term_id",
+          "score"
+        ],
+        "title": "LexiconCatalogSimilarityMatrixCell"
+      },
+      "LexiconCatalogSimilarityMatrixRequest": {
+        "properties": {
+          "left_terms": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconMappedTermReference"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Left Terms"
+          },
+          "right_terms": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconMappedTermReference"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Right Terms"
+          }
+        },
+        "type": "object",
+        "title": "LexiconCatalogSimilarityMatrixRequest"
+      },
+      "LexiconCatalogSimilarityMatrixResponse": {
+        "properties": {
+          "left_count": {
+            "type": "integer",
+            "title": "Left Count"
+          },
+          "right_count": {
+            "type": "integer",
+            "title": "Right Count"
+          },
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconCatalogSimilarityMatrixCell"
+            },
+            "type": "array",
+            "title": "Cells"
+          }
+        },
+        "type": "object",
+        "required": [
+          "left_count",
+          "right_count"
+        ],
+        "title": "LexiconCatalogSimilarityMatrixResponse"
+      },
+      "LexiconCatalogSimilarityRequest": {
+        "properties": {
+          "left": {
+            "$ref": "#/components/schemas/LexiconMappedTermReference"
+          },
+          "right": {
+            "$ref": "#/components/schemas/LexiconMappedTermReference"
+          }
+        },
+        "type": "object",
+        "required": [
+          "left",
+          "right"
+        ],
+        "title": "LexiconCatalogSimilarityRequest"
+      },
+      "LexiconCatalogSimilarityResponse": {
+        "properties": {
+          "left_term": {
+            "$ref": "#/components/schemas/LexiconCatalogTermSummary"
+          },
+          "right_term": {
+            "$ref": "#/components/schemas/LexiconCatalogTermSummary"
+          },
+          "score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSimilarityComponentScore"
+            },
+            "type": "array",
+            "title": "Components"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "left_term",
+          "right_term",
+          "score"
+        ],
+        "title": "LexiconCatalogSimilarityResponse"
+      },
       "LexiconCatalogTermDetail": {
         "properties": {
           "term_id": {
@@ -8735,6 +9105,118 @@
         ],
         "title": "LexiconProfileDeriveResponse"
       },
+      "LexiconProfileSummaryResponse": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "selected_ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSelectedOntology"
+            },
+            "type": "array",
+            "title": "Selected Ontologies"
+          },
+          "canonical_target_ontology": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconSelectedOntology"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entry_node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Node Id"
+          },
+          "node_count": {
+            "type": "integer",
+            "title": "Node Count"
+          },
+          "target_count": {
+            "type": "integer",
+            "title": "Target Count"
+          },
+          "property_requirement_count": {
+            "type": "integer",
+            "title": "Property Requirement Count"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "open": {
+            "type": "boolean",
+            "title": "Open"
+          },
+          "broken": {
+            "type": "boolean",
+            "title": "Broken"
+          },
+          "publish_ready": {
+            "type": "boolean",
+            "title": "Publish Ready"
+          },
+          "target_classes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Classes"
+          },
+          "property_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Property Paths"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "ontology_family",
+          "country",
+          "version",
+          "node_count",
+          "target_count",
+          "property_requirement_count",
+          "complete",
+          "open",
+          "broken",
+          "publish_ready"
+        ],
+        "title": "LexiconProfileSummaryResponse"
+      },
       "LexiconPropertyRequirement": {
         "properties": {
           "property_path": {
@@ -8941,6 +9423,37 @@
           "country"
         ],
         "title": "LexiconSelectedOntology"
+      },
+      "LexiconSimilarityComponentScore": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "score"
+        ],
+        "title": "LexiconSimilarityComponentScore"
       },
       "LexiconSourceEntityPattern": {
         "properties": {
@@ -9610,6 +10123,183 @@
           "updated_at"
         ],
         "title": "OntologyDictionaryCandidateSummary"
+      },
+      "OntologyDictionaryCandidateSummaryResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "source_dictionary_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Dictionary Name"
+          },
+          "source_dictionary_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Dictionary Code"
+          },
+          "source_dictionary_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Dictionary Version"
+          },
+          "class_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Count"
+          },
+          "subclass_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subclass Count"
+          },
+          "property_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Property Count"
+          },
+          "datatype_property_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datatype Property Count"
+          },
+          "object_property_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Property Count"
+          },
+          "class_property_link_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Class Property Link Count"
+          },
+          "valid": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid"
+          },
+          "completeness_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completeness Ok"
+          },
+          "ttl_form_ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttl Form Ok"
+          },
+          "publish_ready": {
+            "type": "boolean",
+            "title": "Publish Ready"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "ontology_family",
+          "country",
+          "version",
+          "publish_ready"
+        ],
+        "title": "OntologyDictionaryCandidateSummaryResponse"
       },
       "OntologyDictionaryConversionRequest": {
         "properties": {
@@ -10634,6 +11324,108 @@
           "published_at"
         ],
         "title": "OntologyVersionMetadata"
+      },
+      "OntologyVersionSummaryResponse": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "ontology_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ontology Uri"
+          },
+          "version_iri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Iri"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OntologyReleaseStatus"
+          },
+          "class_count": {
+            "type": "integer",
+            "title": "Class Count"
+          },
+          "property_count": {
+            "type": "integer",
+            "title": "Property Count"
+          },
+          "property_set_count": {
+            "type": "integer",
+            "title": "Property Set Count"
+          },
+          "subclass_count": {
+            "type": "integer",
+            "title": "Subclass Count"
+          },
+          "class_property_link_count": {
+            "type": "integer",
+            "title": "Class Property Link Count"
+          },
+          "publish_ready": {
+            "type": "boolean",
+            "title": "Publish Ready"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "version",
+          "title",
+          "status",
+          "class_count",
+          "property_count",
+          "property_set_count",
+          "subclass_count",
+          "class_property_link_count",
+          "publish_ready"
+        ],
+        "title": "OntologyVersionSummaryResponse"
       },
       "RuleAssembleCompileResponse": {
         "properties": {

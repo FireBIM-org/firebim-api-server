@@ -21,6 +21,11 @@ from app.schemas.lexicon import (
     LexiconCatalogResolvedTerm,
     LexiconCatalogResolveRequest,
     LexiconCatalogResolveResponse,
+    LexiconCatalogSimilarityMatrixCell,
+    LexiconCatalogSimilarityMatrixRequest,
+    LexiconCatalogSimilarityMatrixResponse,
+    LexiconCatalogSimilarityRequest,
+    LexiconCatalogSimilarityResponse,
     LexiconCatalogTermDetail,
     LexiconCatalogTermResponse,
     LexiconCatalogTermsResponse,
@@ -44,9 +49,11 @@ from app.schemas.lexicon import (
     LexiconMappingValidationResponse,
     LexiconNeededProperty,
     LexiconNextNeededResponse,
+    LexiconProfileSummaryResponse,
     LexiconPropertyRequirement,
     LexiconReconstructionResponse,
     LexiconSelectedOntology,
+    LexiconSimilarityComponentScore,
     LexiconSourceEntityPattern,
     LexiconSourcePattern,
     LexiconSourcePatternClause,
@@ -353,6 +360,92 @@ class LexiconService:
             left_parent_term_ids=left_term.parent_term_ids,
             right_parent_term_ids=right_term.parent_term_ids,
             notes=notes,
+        )
+
+    def score_catalog_similarity(
+        self,
+        payload: LexiconCatalogSimilarityRequest,
+    ) -> LexiconCatalogSimilarityResponse:
+        left_term = self._get_catalog_term_detail_from_reference(payload.left)
+        right_term = self._get_catalog_term_detail_from_reference(payload.right)
+        components = self._similarity_components(left_term, right_term)
+        score = round(sum(item.score for item in components) / len(components), 3) if components else 0.0
+        notes = [item.note for item in components if item.note]
+        return LexiconCatalogSimilarityResponse(
+            left_term=self._summary_from_catalog_term(left_term.model_dump()),
+            right_term=self._summary_from_catalog_term(right_term.model_dump()),
+            score=score,
+            components=components,
+            notes=notes,
+        )
+
+    def score_catalog_similarity_matrix(
+        self,
+        payload: LexiconCatalogSimilarityMatrixRequest,
+    ) -> LexiconCatalogSimilarityMatrixResponse:
+        cells: list[LexiconCatalogSimilarityMatrixCell] = []
+        for left in payload.left_terms:
+            for right in payload.right_terms:
+                similarity = self.score_catalog_similarity(LexiconCatalogSimilarityRequest(left=left, right=right))
+                cells.append(
+                    LexiconCatalogSimilarityMatrixCell(
+                        left_term_id=similarity.left_term.term_id,
+                        right_term_id=similarity.right_term.term_id,
+                        score=similarity.score,
+                    )
+                )
+        return LexiconCatalogSimilarityMatrixResponse(
+            left_count=len(payload.left_terms),
+            right_count=len(payload.right_terms),
+            cells=cells,
+        )
+
+    def summarize_profile(
+        self,
+        *,
+        ontology_family: str,
+        country: str,
+        version: str,
+        selected_ontologies: list[LexiconSelectedOntology] | None = None,
+        canonical_target_ontology: LexiconSelectedOntology | None = None,
+        rule_id: str | None = None,
+        rule: RuleDraft | None = None,
+    ) -> LexiconProfileSummaryResponse:
+        ontology, profile = self.derive_profile(
+            ontology_family=ontology_family,
+            country=country,
+            version=version,
+            selected_ontologies=selected_ontologies,
+            canonical_target_ontology=canonical_target_ontology,
+            rule_id=rule_id,
+            rule=rule,
+        )
+        resolved = self.resolve_selected_ontologies(
+            ontology_family=ontology_family,
+            country=country,
+            version=version,
+            selected_ontologies=selected_ontologies,
+            canonical_target_ontology=canonical_target_ontology,
+        )
+        property_requirement_count = sum(len(target.property_requirements) for target in profile.targets)
+        return LexiconProfileSummaryResponse(
+            rule_id=profile.rule_id,
+            ontology_family=ontology.ontology_family,
+            country=ontology.country,
+            version=ontology.version,
+            selected_ontologies=resolved["selected_ontologies"],
+            canonical_target_ontology=resolved["canonical_target_ontology"],
+            entry_node_id=profile.entry_node_id,
+            node_count=profile.node_count,
+            target_count=len(profile.targets),
+            property_requirement_count=property_requirement_count,
+            complete=profile.complete,
+            open=profile.open,
+            broken=profile.broken,
+            publish_ready=profile.complete and not profile.open and not profile.broken,
+            target_classes=profile.target_classes,
+            property_paths=profile.property_paths,
+            warnings=profile.warnings,
         )
 
     def list_related_catalog_terms(
@@ -1199,6 +1292,89 @@ class LexiconService:
         )
         return response.term
 
+    def _similarity_components(
+        self,
+        left_term: LexiconCatalogTermDetail,
+        right_term: LexiconCatalogTermDetail,
+    ) -> list[LexiconSimilarityComponentScore]:
+        left_label = (left_term.label or left_term.term_id).strip().lower()
+        right_label = (right_term.label or right_term.term_id).strip().lower()
+        left_tokens = self._tokenize_similarity_text(
+            " ".join(
+                filter(
+                    None,
+                    [
+                        left_term.term_id,
+                        left_term.label,
+                        left_term.definition,
+                        left_term.description,
+                    ],
+                )
+            )
+        )
+        right_tokens = self._tokenize_similarity_text(
+            " ".join(
+                filter(
+                    None,
+                    [
+                        right_term.term_id,
+                        right_term.label,
+                        right_term.definition,
+                        right_term.description,
+                    ],
+                )
+            )
+        )
+        shared_tokens = left_tokens & right_tokens
+        union_tokens = left_tokens | right_tokens
+        token_score = round(len(shared_tokens) / len(union_tokens), 3) if union_tokens else 0.0
+        hierarchy_overlap = set(left_term.parent_term_ids) & set(right_term.parent_term_ids)
+        hierarchy_score = 1.0 if hierarchy_overlap else 0.0
+        property_set_overlap = set(left_term.property_set_term_ids) & set(right_term.property_set_term_ids)
+        property_set_score = 1.0 if property_set_overlap else 0.0
+        class_overlap = set(left_term.belongs_to_class_term_ids) & set(right_term.belongs_to_class_term_ids)
+        class_context_score = 1.0 if class_overlap else 0.0
+        unit_score = 1.0 if left_term.unit and right_term.unit and left_term.unit == right_term.unit else 0.0
+        components = [
+            LexiconSimilarityComponentScore(
+                name="kind_match",
+                score=1.0 if left_term.kind == right_term.kind else 0.0,
+                note=(
+                    "Both concepts are the same kind." if left_term.kind == right_term.kind else "Concept kinds differ."
+                ),
+            ),
+            LexiconSimilarityComponentScore(
+                name="label_similarity",
+                score=1.0 if left_label == right_label else token_score,
+                note=(
+                    "Labels or concept tokens overlap strongly."
+                    if token_score > 0.0 or left_label == right_label
+                    else None
+                ),
+            ),
+            LexiconSimilarityComponentScore(
+                name="hierarchy_similarity",
+                score=hierarchy_score,
+                note="The concepts share parent hierarchy." if hierarchy_overlap else None,
+            ),
+            LexiconSimilarityComponentScore(
+                name="property_set_similarity",
+                score=property_set_score,
+                note="The concepts participate in the same property set." if property_set_overlap else None,
+            ),
+            LexiconSimilarityComponentScore(
+                name="class_context_similarity",
+                score=class_context_score,
+                note="The properties belong to the same classes." if class_overlap else None,
+            ),
+            LexiconSimilarityComponentScore(
+                name="unit_similarity",
+                score=unit_score,
+                note="The concepts share the same unit." if unit_score else None,
+            ),
+        ]
+        return components
+
     @staticmethod
     def _catalog_lookup_by_uri(
         bundles: list[LexiconOntologyBundle],
@@ -1208,6 +1384,11 @@ class LexiconService:
             for uri, term in bundle.catalog.items():
                 lookup.setdefault(uri, term)
         return lookup
+
+    @staticmethod
+    def _tokenize_similarity_text(value: str) -> set[str]:
+        normalized = "".join(char.lower() if char.isalnum() else " " for char in value)
+        return {token for token in normalized.split() if len(token) > 1}
 
     def _evaluate_source_pattern(
         self,

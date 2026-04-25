@@ -499,6 +499,46 @@ def test_derive_execution_profile_with_multiple_selected_ontologies(monkeypatch)
     assert body["profile"]["warnings"] == []
 
 
+def test_profile_summary(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/profiles/summary",
+        json={
+            "ontology_family": "fbo",
+            "country": "dk",
+            "version": "latest",
+            "rule": {
+                "id": "wall_rule",
+                "entry": "start",
+                "elements": [
+                    {
+                        "id": "start",
+                        "element_type": "decision",
+                        "target_class": "Wall",
+                        "property_path": "Combustible",
+                        "operator": "=",
+                        "value": True,
+                        "true_path": "ok",
+                        "false_path": "fail",
+                        "unknown_path": "unknown",
+                        "label": "Check combustibility",
+                        "config": {},
+                    },
+                    {"id": "ok", "element_type": "end", "label": "Ok", "config": {}},
+                    {"id": "fail", "element_type": "end", "label": "Fail", "config": {}},
+                    {"id": "unknown", "element_type": "end", "label": "Unknown", "config": {}},
+                ],
+            },
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["rule_id"] == "wall_rule"
+    assert body["target_count"] == 1
+    assert body["property_requirement_count"] == 1
+    assert body["publish_ready"] is True
+
+
 def test_derive_execution_profile_from_published_rule(monkeypatch):
     client = _build_client(monkeypatch)
     monkeypatch.setattr(
@@ -785,6 +825,67 @@ def test_compare_catalog_terms(monkeypatch):
     assert body["same_kind"] is True
     assert body["compatible_for_mapping"] is True
     assert any("Class-to-class mapping" in note for note in body["notes"])
+
+
+def test_catalog_similarity(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/catalog/similarity",
+        json={
+            "left": {
+                "ontology_family": "fbo",
+                "country": "dk",
+                "version": "latest",
+                "term_id": "Wall",
+            },
+            "right": {
+                "ontology_family": "ifc",
+                "country": "global",
+                "version": "latest",
+                "term_id": "IfcWall",
+            },
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert 0.0 <= body["score"] <= 1.0
+    assert any(component["name"] == "kind_match" for component in body["components"])
+
+
+def test_catalog_similarity_matrix(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/catalog/similarity-matrix",
+        json={
+            "left_terms": [
+                {
+                    "ontology_family": "fbo",
+                    "country": "dk",
+                    "version": "latest",
+                    "term_id": "Wall",
+                }
+            ],
+            "right_terms": [
+                {
+                    "ontology_family": "ifc",
+                    "country": "global",
+                    "version": "latest",
+                    "term_id": "IfcWall",
+                },
+                {
+                    "ontology_family": "ifc",
+                    "country": "global",
+                    "version": "latest",
+                    "term_id": "IfcWallUSERDEFINED",
+                },
+            ],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["left_count"] == 1
+    assert body["right_count"] == 2
+    assert len(body["cells"]) == 2
 
 
 def test_property_and_property_set_related_catalog_endpoints(monkeypatch):

@@ -4,6 +4,8 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse, PlainTextResponse
+from rdflib import RDF, Graph, URIRef
+from rdflib.namespace import OWL, RDFS
 
 from app.auth.jwt import get_current_active_user
 from app.core.config import settings
@@ -23,6 +25,7 @@ from app.schemas.ontologies import (
     OntologyDictionaryCandidateListResponse,
     OntologyDictionaryCandidatePublishRequest,
     OntologyDictionaryCandidateResponse,
+    OntologyDictionaryCandidateSummaryResponse,
     OntologyDictionaryConversionRequest,
     OntologyDictionaryConversionResponse,
     OntologyDictionaryFieldIssue,
@@ -34,6 +37,7 @@ from app.schemas.ontologies import (
     OntologySummaryResponse,
     OntologyVersionFetchResponse,
     OntologyVersionListResponse,
+    OntologyVersionSummaryResponse,
 )
 from app.storage.graph_store import GraphStoreError, GraphStoreNotFoundError
 from app.storage.ontology_candidate_repository import (
@@ -186,6 +190,48 @@ def get_dictionary_candidate(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except OntologyCandidateRepositoryError as exc:
         logger.exception("Failed to fetch ontology dictionary candidate", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.get(
+    "/candidates/dictionaries/{candidate_id}/summary",
+    response_model=OntologyDictionaryCandidateSummaryResponse,
+)
+def get_dictionary_candidate_summary(
+    candidate_id: str,
+    current_user=Depends(get_current_active_user),
+) -> OntologyDictionaryCandidateSummaryResponse:
+    try:
+        candidate = candidate_repo.get_candidate(candidate_id, current_user)
+        report = candidate.last_validation_report
+        warnings = list(report.issues) if report is not None else []
+        return OntologyDictionaryCandidateSummaryResponse(
+            id=candidate.id,
+            name=candidate.name,
+            ontology_family=candidate.ontology_family,
+            country=candidate.country,
+            version=candidate.version,
+            source_dictionary_name=candidate.source_dictionary_name,
+            source_dictionary_code=candidate.source_dictionary_code,
+            source_dictionary_version=candidate.source_dictionary_version,
+            class_count=report.class_count if report else None,
+            subclass_count=report.subclass_count if report else None,
+            property_count=report.property_count if report else None,
+            datatype_property_count=report.datatype_property_count if report else None,
+            object_property_count=report.object_property_count if report else None,
+            class_property_link_count=report.class_property_link_count if report else None,
+            valid=report.valid if report else None,
+            completeness_ok=report.completeness_ok if report else None,
+            ttl_form_ok=report.ttl_form_ok if report else None,
+            publish_ready=bool(report and report.valid and report.completeness_ok and report.ttl_form_ok),
+            warnings=warnings,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except OntologyCandidateNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except OntologyCandidateRepositoryError as exc:
+        logger.exception("Failed to summarize ontology dictionary candidate", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
@@ -435,6 +481,46 @@ def fetch_ontology_version(ontology_family: str, country: str, version: str) -> 
 
 
 @router.get(
+    "/{ontology_family}/{country}/versions/{version}/summary",
+    response_model=OntologyVersionSummaryResponse,
+)
+def fetch_ontology_version_summary(
+    ontology_family: str,
+    country: str,
+    version: str,
+) -> OntologyVersionSummaryResponse:
+    response = _fetch_ontology_version(ontology_family, country, version)
+    summary = _summarize_ontology_ttl(response.ttl)
+    warnings: list[str] = []
+    if summary["class_count"] == 0:
+        warnings.append("Ontology has no declared classes.")
+    if summary["property_count"] == 0:
+        warnings.append("Ontology has no declared properties.")
+    if response.version.triple_count <= 0:
+        warnings.append("Ontology version has no triples.")
+    return OntologyVersionSummaryResponse(
+        ontology_family=response.ontology_family,
+        country=response.country,
+        version=response.version.version,
+        ontology_uri=response.version.ontology_uri,
+        version_iri=response.version.version_iri,
+        title=(
+            response.version.label
+            or f"{response.ontology_family.upper()} {response.country.upper()} {response.version.version}"
+        ),
+        description=response.version.description,
+        status=response.version.status,
+        class_count=summary["class_count"],
+        property_count=summary["property_count"],
+        property_set_count=summary["property_set_count"],
+        subclass_count=summary["subclass_count"],
+        class_property_link_count=summary["class_property_link_count"],
+        publish_ready=summary["class_count"] > 0 and summary["property_count"] > 0,
+        warnings=warnings,
+    )
+
+
+@router.get(
     "/{ontology_family}/{country}/versions/{version}/ttl",
     response_class=PlainTextResponse,
     responses={200: {"description": "Raw ontology Turtle"}},
@@ -531,3 +617,32 @@ def _link_issue_model(issue: DictionaryLinkIssue) -> OntologyDictionaryLinkIssue
         reason=issue.reason,
         candidate_property_codes=list(issue.candidate_property_codes),
     )
+
+
+def _summarize_ontology_ttl(ttl: str) -> dict[str, int]:
+    graph = Graph()
+    graph.parse(data=ttl, format="turtle")
+    class_uris = {str(subject) for subject in graph.subjects(RDF.type, OWL.Class)} | {
+        str(subject) for subject in graph.subjects(RDF.type, RDFS.Class)
+    }
+    property_uris = (
+        {str(subject) for subject in graph.subjects(RDF.type, RDF.Property)}
+        | {str(subject) for subject in graph.subjects(RDF.type, OWL.ObjectProperty)}
+        | {str(subject) for subject in graph.subjects(RDF.type, OWL.DatatypeProperty)}
+    )
+    group_predicate = URIRef("https://firebim.org/ontology-meta#groupOfProperties")
+    has_property_predicate = URIRef("https://firebim.org/ontology-meta#hasProperty")
+    property_set_count = sum(
+        1
+        for class_uri in class_uris
+        if str(graph.value(URIRef(class_uri), group_predicate, default="")).strip().lower() == "true"
+    )
+    subclass_count = sum(1 for _ in graph.triples((None, RDFS.subClassOf, None)))
+    class_property_link_count = sum(1 for _ in graph.triples((None, has_property_predicate, None)))
+    return {
+        "class_count": len(class_uris),
+        "property_count": len(property_uris),
+        "property_set_count": property_set_count,
+        "subclass_count": subclass_count,
+        "class_property_link_count": class_property_link_count,
+    }

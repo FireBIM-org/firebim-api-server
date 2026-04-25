@@ -92,6 +92,26 @@ class LexiconProfileDeriveResponse(BaseModel):
     profile: LexiconExecutionProfile
 
 
+class LexiconProfileSummaryResponse(BaseModel):
+    rule_id: str
+    ontology_family: str
+    country: str
+    version: str
+    selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list)
+    canonical_target_ontology: LexiconSelectedOntology | None = None
+    entry_node_id: str | None = None
+    node_count: int
+    target_count: int
+    property_requirement_count: int
+    complete: bool
+    open: bool
+    broken: bool
+    publish_ready: bool
+    target_classes: list[str] = Field(default_factory=list)
+    property_paths: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
 class LexiconEntityPropertyInput(BaseModel):
     property_uri: str
     value: Any
@@ -283,6 +303,42 @@ class LexiconCatalogCompareResponse(BaseModel):
     left_parent_term_ids: list[str] = Field(default_factory=list)
     right_parent_term_ids: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+
+
+class LexiconSimilarityComponentScore(BaseModel):
+    name: str
+    score: float = Field(ge=0.0, le=1.0)
+    note: str | None = None
+
+
+class LexiconCatalogSimilarityRequest(BaseModel):
+    left: LexiconMappedTermReference
+    right: LexiconMappedTermReference
+
+
+class LexiconCatalogSimilarityResponse(BaseModel):
+    left_term: LexiconCatalogTermSummary
+    right_term: LexiconCatalogTermSummary
+    score: float = Field(ge=0.0, le=1.0)
+    components: list[LexiconSimilarityComponentScore] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
+class LexiconCatalogSimilarityMatrixRequest(BaseModel):
+    left_terms: list[LexiconMappedTermReference] = Field(default_factory=list, min_length=1)
+    right_terms: list[LexiconMappedTermReference] = Field(default_factory=list, min_length=1)
+
+
+class LexiconCatalogSimilarityMatrixCell(BaseModel):
+    left_term_id: str
+    right_term_id: str
+    score: float = Field(ge=0.0, le=1.0)
+
+
+class LexiconCatalogSimilarityMatrixResponse(BaseModel):
+    left_count: int
+    right_count: int
+    cells: list[LexiconCatalogSimilarityMatrixCell] = Field(default_factory=list)
 
 
 class LexiconMappedTermReference(BaseModel):

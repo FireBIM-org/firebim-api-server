@@ -316,6 +316,17 @@ def test_fetch_latest_stable_and_ttl(monkeypatch):
     assert "owl:Ontology" in ttl.text
 
 
+def test_fetch_ontology_version_summary(monkeypatch):
+    client = _build_client(monkeypatch)
+    summary = client.get("/ontologies/fbo/dk/versions/2026.03/summary")
+    assert summary.status_code == 200
+    body = summary.json()
+    assert body["version"] == "2026.03"
+    assert body["class_count"] >= 0
+    assert body["property_count"] >= 0
+    assert "publish_ready" in body
+
+
 def test_publish_and_delete_ontology(monkeypatch):
     client = _build_client(monkeypatch)
 
@@ -405,6 +416,13 @@ def test_dictionary_candidate_crud_validate_convert_and_publish(monkeypatch):
     assert validate_body["class_count"] == 1
     assert validate_body["property_count"] == 1
     assert validate_body["ttl_has_ontology"] is True
+
+    candidate_summary = client.get("/ontologies/candidates/dictionaries/cand_123/summary")
+    assert candidate_summary.status_code == 200
+    summary_body = candidate_summary.json()
+    assert summary_body["id"] == "cand_123"
+    assert summary_body["class_count"] == 1
+    assert "publish_ready" in summary_body
 
     convert = client.post("/ontologies/candidates/dictionaries/cand_123/convert")
     assert convert.status_code == 200
