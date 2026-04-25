@@ -10,6 +10,12 @@ from rdflib import RDF, RDFS, Graph, Literal, URIRef
 from rdflib.namespace import OWL, XSD
 
 from app.graphs_and_checks.publisher import fetch_rule_ttl
+from app.lexicon.query_runtime import (
+    LexiconMergedResolutionDataset,
+    LexiconOntologyBundle,
+    LexiconOntologyContext,
+    LexiconQueryRuntime,
+)
 from app.rules.composer import check_ruleset_completeness
 from app.rules.decompiler import decompile_ruleset_ttl
 from app.schemas.lexicon import (
@@ -17,8 +23,6 @@ from app.schemas.lexicon import (
     LexiconCatalogCompareRequest,
     LexiconCatalogCompareResponse,
     LexiconCatalogRelatedTermsResponse,
-    LexiconCatalogResolvedMatch,
-    LexiconCatalogResolvedTerm,
     LexiconCatalogResolveRequest,
     LexiconCatalogResolveResponse,
     LexiconCatalogSimilarityMatrixCell,
@@ -36,7 +40,6 @@ from app.schemas.lexicon import (
     LexiconExecutionProfile,
     LexiconExecutionProfileNode,
     LexiconExecutionTarget,
-    LexiconGraphEvidenceSubjectSummary,
     LexiconGraphEvidenceSummaryRequest,
     LexiconGraphEvidenceSummaryResponse,
     LexiconHandshake,
@@ -71,27 +74,6 @@ ONTOLOGY_META_BELONGS_TO_CLASS_URI = "https://firebim.org/ontology-meta#belongsT
 ONTOLOGY_META_GROUP_OF_PROPERTIES_URI = "https://firebim.org/ontology-meta#groupOfProperties"
 ONTOLOGY_META_UNIT_URI = "https://firebim.org/ontology-meta#unit"
 ONTOLOGY_META_RELATED_PROPERTY_URI = "https://firebim.org/ontology-meta#relatedProperty"
-
-
-@dataclass(frozen=True)
-class LexiconOntologyContext:
-    ontology_family: str
-    country: str
-    version: str
-    canonical_family_uri: str
-    canonical_country_uri: str
-    ontology_uri: str | None
-    version_iri: str | None
-    ontology_ttl: str
-
-
-@dataclass(frozen=True)
-class LexiconOntologyBundle:
-    ontology: LexiconOntologyContext
-    graph: Graph
-    catalog: dict[str, dict[str, Any]]
-    declared_classes: set[str]
-    declared_properties: set[str]
 
 
 @dataclass(frozen=True)
@@ -253,88 +235,26 @@ class LexiconService:
         )
 
     def resolve_catalog_terms(self, payload: LexiconCatalogResolveRequest) -> LexiconCatalogResolveResponse:
-        bundles = [
-            self._resolve_ontology_bundle(
-                ontology_family=selection.ontology_family,
-                country=selection.country,
-                version=selection.version,
-            )
-            for selection in payload.selected_ontologies
-        ]
-        results: list[LexiconCatalogResolvedTerm] = []
-        for input_term in payload.terms:
-            matches: list[LexiconCatalogResolvedMatch] = []
-            seen_uris: set[str] = set()
-            normalized_input = input_term.strip()
-            lowered_input = normalized_input.lower()
-            for bundle in bundles:
-                bundle_matches: list[tuple[int, str, dict[str, Any]]] = []
-                direct_uri = (
-                    normalized_input
-                    if normalized_input.startswith("http://") or normalized_input.startswith("https://")
-                    else None
-                )
-                for term in bundle.catalog.values():
-                    match_type: str | None = None
-                    score = 0
-                    if direct_uri and term["uri"] == direct_uri:
-                        match_type = "exact_uri"
-                        score = 100
-                    elif term["term_id"].lower() == lowered_input:
-                        match_type = "exact_term_id"
-                        score = 95
-                    elif (term["label"] or "").lower() == lowered_input:
-                        match_type = "exact_label"
-                        score = 90
-                    elif lowered_input in term["term_id"].lower():
-                        match_type = "term_id_contains"
-                        score = 75
-                    elif lowered_input in (term["label"] or "").lower():
-                        match_type = "label_contains"
-                        score = 70
-                    elif lowered_input in (term["definition"] or "").lower():
-                        match_type = "definition_contains"
-                        score = 60
-
-                    if match_type is None:
-                        continue
-                    bundle_matches.append((score, match_type, term))
-
-                bundle_matches.sort(key=lambda item: (-item[0], (item[2]["label"] or item[2]["term_id"]).lower()))
-                for score, match_type, term in bundle_matches:
-                    if term["uri"] in seen_uris:
-                        continue
-                    seen_uris.add(term["uri"])
-                    matches.append(
-                        LexiconCatalogResolvedMatch(
-                            input_term=normalized_input,
-                            ontology_family=bundle.ontology.ontology_family,
-                            country=bundle.ontology.country,
-                            version=bundle.ontology.version,
-                            canonical_country_uri=bundle.ontology.canonical_country_uri,
-                            match_type=match_type,
-                            score=score,
-                            term=self._summary_from_catalog_term(term),
-                        )
-                    )
-                    if len(matches) >= payload.limit_per_term:
-                        break
-                if len(matches) >= payload.limit_per_term:
-                    break
-
-            results.append(
-                LexiconCatalogResolvedTerm(
-                    input_term=normalized_input,
-                    count=len(matches),
-                    matches=matches,
-                )
-            )
-
-        return LexiconCatalogResolveResponse(count=len(results), results=results)
+        runtime = self._build_query_runtime(payload.selected_ontologies)
+        return runtime.resolve_terms(terms=payload.terms, limit_per_term=payload.limit_per_term)
 
     def compare_catalog_terms(self, payload: LexiconCatalogCompareRequest) -> LexiconCatalogCompareResponse:
         left_term = self._get_catalog_term_detail_from_reference(payload.left)
         right_term = self._get_catalog_term_detail_from_reference(payload.right)
+        runtime = self._build_query_runtime(
+            [
+                LexiconSelectedOntology(
+                    ontology_family=payload.left.ontology_family,
+                    country=payload.left.country,
+                    version=payload.left.version,
+                ),
+                LexiconSelectedOntology(
+                    ontology_family=payload.right.ontology_family,
+                    country=payload.right.country,
+                    version=payload.right.version,
+                ),
+            ]
+        )
         same_kind = left_term.kind == right_term.kind
         notes: list[str] = []
         if same_kind and left_term.kind == "class":
@@ -347,6 +267,15 @@ class LexiconService:
             notes.append("Property sets are modeled as classes and may need special frontend treatment.")
         if left_term.is_predefined_type or right_term.is_predefined_type:
             notes.append("Predefined types still count as classes for structural validation.")
+        if (
+            same_kind
+            and left_term.kind == "class"
+            and runtime.dataset.evaluator.shared_hierarchy(
+                left_term.uri,
+                right_term.uri,
+            )
+        ):
+            notes.append("The concepts share a class hierarchy in the merged ontology resolution context.")
 
         return LexiconCatalogCompareResponse(
             left_term=self._summary_from_catalog_term(left_term.model_dump()),
@@ -368,7 +297,21 @@ class LexiconService:
     ) -> LexiconCatalogSimilarityResponse:
         left_term = self._get_catalog_term_detail_from_reference(payload.left)
         right_term = self._get_catalog_term_detail_from_reference(payload.right)
-        components = self._similarity_components(left_term, right_term)
+        runtime = self._build_query_runtime(
+            [
+                LexiconSelectedOntology(
+                    ontology_family=payload.left.ontology_family,
+                    country=payload.left.country,
+                    version=payload.left.version,
+                ),
+                LexiconSelectedOntology(
+                    ontology_family=payload.right.ontology_family,
+                    country=payload.right.country,
+                    version=payload.right.version,
+                ),
+            ]
+        )
+        components = self._similarity_components(left_term, right_term, runtime.dataset)
         score = round(sum(item.score for item in components) / len(components), 3) if components else 0.0
         notes = [item.note for item in components if item.note]
         return LexiconCatalogSimilarityResponse(
@@ -503,67 +446,11 @@ class LexiconService:
         graph_uri, ttl = self.building_repo.fetch_graph(payload.graph_id)
         data_graph = Graph()
         data_graph.parse(data=ttl, format="turtle")
-        bundles = [
-            self._resolve_ontology_bundle(
-                ontology_family=selection.ontology_family,
-                country=selection.country,
-                version=selection.version,
-            )
-            for selection in payload.selected_ontologies
-        ]
-        term_lookup = self._catalog_lookup_by_uri(bundles)
-        subject_types: dict[str, set[str]] = defaultdict(set)
-        subject_predicates: dict[str, set[str]] = defaultdict(set)
-
-        for subject, _, object_value in data_graph.triples((None, RDF.type, None)):
-            subject_types[str(subject)].add(str(object_value))
-        for subject, predicate, _ in data_graph:
-            if predicate != RDF.type:
-                subject_predicates[str(subject)].add(str(predicate))
-
-        class_term_ids: set[str] = set()
-        property_term_ids: set[str] = set()
-        property_set_term_ids: set[str] = set()
-        subjects: list[LexiconGraphEvidenceSubjectSummary] = []
-
-        for subject in sorted({str(item) for item in data_graph.subjects()}):
-            matched_classes = [
-                term_lookup[uri]["term_id"] for uri in sorted(subject_types.get(subject, set())) if uri in term_lookup
-            ]
-            matched_properties = [
-                term_lookup[uri]["term_id"]
-                for uri in sorted(subject_predicates.get(subject, set()))
-                if uri in term_lookup and term_lookup[uri]["kind"] == "property"
-            ]
-            matched_property_sets = sorted(
-                {
-                    property_set_id
-                    for uri in sorted(subject_types.get(subject, set()) | subject_predicates.get(subject, set()))
-                    if uri in term_lookup
-                    for property_set_id in term_lookup[uri]["property_set_term_ids"]
-                }
-            )
-            class_term_ids.update(matched_classes)
-            property_term_ids.update(matched_properties)
-            property_set_term_ids.update(matched_property_sets)
-            subjects.append(
-                LexiconGraphEvidenceSubjectSummary(
-                    source_object_ref=subject,
-                    class_term_ids=matched_classes,
-                    property_term_ids=matched_properties,
-                    property_set_term_ids=matched_property_sets,
-                )
-            )
-
-        return LexiconGraphEvidenceSummaryResponse(
+        runtime = self._build_query_runtime(payload.selected_ontologies)
+        return runtime.summarize_graph_evidence(
             graph_id=payload.graph_id,
             graph_uri=graph_uri,
-            triple_count=len(data_graph),
-            object_count=len(subjects),
-            class_term_ids=sorted(class_term_ids),
-            property_term_ids=sorted(property_term_ids),
-            property_set_term_ids=sorted(property_set_term_ids),
-            subjects=subjects,
+            data_graph=data_graph,
         )
 
     def validate_mapping(
@@ -625,13 +512,8 @@ class LexiconService:
         graph_uri, ttl = self.building_repo.fetch_graph(payload.graph_id)
         data_graph = Graph()
         data_graph.parse(data=ttl, format="turtle")
-        subject_types: dict[str, set[str]] = defaultdict(set)
-        subject_predicates: dict[str, set[str]] = defaultdict(set)
-        for subject, _, object_value in data_graph.triples((None, RDF.type, None)):
-            subject_types[str(subject)].add(str(object_value))
-        for subject, predicate, _ in data_graph:
-            if predicate != RDF.type:
-                subject_predicates[str(subject)].add(str(predicate))
+        runtime = self._build_query_runtime(self._selected_ontologies_for_mapping(mapping))
+        subject_types, subject_predicates = runtime.build_subject_indexes(data_graph)
 
         clause_evaluation: LexiconMappingEvaluationClauseResult | None = None
         matched_source_objects: list[str] = []
@@ -640,7 +522,7 @@ class LexiconService:
 
         if mapping.mapping_kind == "class_to_class" and mapping.source_term is not None:
             source_uri = self._resolve_reference_uri(mapping.source_term)
-            matched_subjects = sorted(subject for subject, types in subject_types.items() if source_uri in types)
+            matched_subjects = runtime.dataset.evaluator.subjects_for_target_class(subject_types, source_uri)
             clause_evaluation = LexiconMappingEvaluationClauseResult(
                 clause_type="source_term",
                 matched=bool(matched_subjects),
@@ -659,7 +541,7 @@ class LexiconService:
                 missing_conditions=[] if matched_subjects else [f"Missing property: {mapping.source_term.term_id}"],
             )
         elif mapping.mapping_kind == "semantic_assertion" and mapping.source_pattern is not None:
-            clause_evaluation = self._evaluate_source_pattern(
+            clause_evaluation = runtime.evaluate_source_pattern(
                 pattern=mapping.source_pattern,
                 subject_types=subject_types,
                 subject_predicates=subject_predicates,
@@ -799,6 +681,7 @@ class LexiconService:
             )
             for selection in resolved_selection["selected_ontologies"]
         ]
+        runtime = LexiconQueryRuntime.from_bundles(selected_bundles)
         canonical_selection = resolved_selection["canonical_target_ontology"]
         bundle = self._resolve_ontology_bundle(
             ontology_family=canonical_selection.ontology_family,
@@ -838,7 +721,7 @@ class LexiconService:
             target_class = item.get("target_class")
             property_path = item.get("property_path")
             if target_class:
-                target_matches = self._resolve_profile_term_matches(target_class, selected_bundles)
+                target_matches = self._resolve_profile_term_matches(target_class, runtime)
                 if not target_matches["class_matches"] and target_matches["property_matches"]:
                     ontology_warnings.append(
                         "Rule node "
@@ -857,7 +740,7 @@ class LexiconService:
                         f"{', '.join(sorted(target_matches['class_matches']))}"
                     )
             if property_path:
-                property_matches = self._resolve_profile_term_matches(property_path, selected_bundles)
+                property_matches = self._resolve_profile_term_matches(property_path, runtime)
                 if not property_matches["property_matches"] and property_matches["class_matches"]:
                     ontology_warnings.append(
                         "Rule node "
@@ -940,34 +823,9 @@ class LexiconService:
     def _resolve_profile_term_matches(
         self,
         value: str,
-        bundles: list[LexiconOntologyBundle],
+        runtime: LexiconQueryRuntime,
     ) -> dict[str, Any]:
-        if value.startswith("http://") or value.startswith("https://"):
-            candidate_uris = [value]
-            normalized_uri = value
-        else:
-            candidate_uris = [
-                self._normalize_term_uri(value, bundle.ontology.canonical_country_uri) for bundle in bundles
-            ]
-            normalized_uri = candidate_uris[0]
-
-        class_matches = {
-            candidate_uri
-            for bundle in bundles
-            for candidate_uri in candidate_uris
-            if candidate_uri in bundle.declared_classes
-        }
-        property_matches = {
-            candidate_uri
-            for bundle in bundles
-            for candidate_uri in candidate_uris
-            if candidate_uri in bundle.declared_properties
-        }
-        return {
-            "normalized_uri": normalized_uri,
-            "class_matches": class_matches,
-            "property_matches": property_matches,
-        }
+        return runtime.resolve_term_matches(value)
 
     def reconstruct_graph(
         self,
@@ -1292,10 +1150,64 @@ class LexiconService:
         )
         return response.term
 
+    def _build_query_runtime(
+        self,
+        selections: list[LexiconSelectedOntology],
+    ) -> LexiconQueryRuntime:
+        if not selections:
+            raise ValueError("At least one selected ontology is required to build a lexicon query runtime.")
+        bundles = [
+            self._resolve_ontology_bundle(
+                ontology_family=selection.ontology_family,
+                country=selection.country,
+                version=selection.version,
+            )
+            for selection in selections
+        ]
+        return LexiconQueryRuntime.from_bundles(bundles)
+
+    def _selected_ontologies_for_mapping(
+        self,
+        mapping: LexiconMappingValidationRequest,
+    ) -> list[LexiconSelectedOntology]:
+        selected: list[LexiconSelectedOntology] = []
+        seen: set[tuple[str, str, str]] = set()
+
+        def add_reference(
+            ontology_family: str | None,
+            country: str | None,
+            version: str | None,
+        ) -> None:
+            if not ontology_family or not country or not version:
+                return
+            key = (ontology_family, country, version)
+            if key in seen:
+                return
+            seen.add(key)
+            selected.append(
+                LexiconSelectedOntology(
+                    ontology_family=ontology_family,
+                    country=country,
+                    version=version,
+                )
+            )
+
+        if mapping.source_term is not None:
+            add_reference(mapping.source_term.ontology_family, mapping.source_term.country, mapping.source_term.version)
+        if mapping.target_term is not None:
+            add_reference(mapping.target_term.ontology_family, mapping.target_term.country, mapping.target_term.version)
+        if mapping.source_pattern is not None:
+            for condition in self._iter_source_pattern_conditions(mapping.source_pattern):
+                add_reference(condition.ontology_family, condition.country, condition.version)
+        for assertion in mapping.target_assertions:
+            add_reference(assertion.ontology_family, assertion.country, assertion.version)
+        return selected
+
     def _similarity_components(
         self,
         left_term: LexiconCatalogTermDetail,
         right_term: LexiconCatalogTermDetail,
+        dataset: LexiconMergedResolutionDataset | None = None,
     ) -> list[LexiconSimilarityComponentScore]:
         left_label = (left_term.label or left_term.term_id).strip().lower()
         right_label = (right_term.label or right_term.term_id).strip().lower()
@@ -1330,6 +1242,11 @@ class LexiconService:
         token_score = round(len(shared_tokens) / len(union_tokens), 3) if union_tokens else 0.0
         hierarchy_overlap = set(left_term.parent_term_ids) & set(right_term.parent_term_ids)
         hierarchy_score = 1.0 if hierarchy_overlap else 0.0
+        if dataset is not None and left_term.kind == "class" and right_term.kind == "class":
+            hierarchy_score = max(
+                hierarchy_score,
+                1.0 if dataset.evaluator.shared_hierarchy(left_term.uri, right_term.uri) else 0.0,
+            )
         property_set_overlap = set(left_term.property_set_term_ids) & set(right_term.property_set_term_ids)
         property_set_score = 1.0 if property_set_overlap else 0.0
         class_overlap = set(left_term.belongs_to_class_term_ids) & set(right_term.belongs_to_class_term_ids)
@@ -1374,16 +1291,6 @@ class LexiconService:
             ),
         ]
         return components
-
-    @staticmethod
-    def _catalog_lookup_by_uri(
-        bundles: list[LexiconOntologyBundle],
-    ) -> dict[str, dict[str, Any]]:
-        lookup: dict[str, dict[str, Any]] = {}
-        for bundle in bundles:
-            for uri, term in bundle.catalog.items():
-                lookup.setdefault(uri, term)
-        return lookup
 
     @staticmethod
     def _tokenize_similarity_text(value: str) -> set[str]:
@@ -1625,6 +1532,30 @@ class LexiconService:
             errors.extend(clause_errors)
             warnings.extend(clause_warnings)
         return errors, warnings
+
+    def _iter_source_pattern_conditions(
+        self,
+        pattern: LexiconSourcePattern,
+    ) -> list[LexiconSourceTermCondition]:
+        conditions: list[LexiconSourceTermCondition] = []
+        clauses = pattern.all_of if pattern.all_of else pattern.any_of
+        for clause in clauses:
+            conditions.extend(self._iter_source_clause_conditions(clause))
+        return conditions
+
+    def _iter_source_clause_conditions(
+        self,
+        clause: LexiconSourcePatternClause,
+    ) -> list[LexiconSourceTermCondition]:
+        if clause.term is not None:
+            return [clause.term]
+        if clause.entity is not None:
+            return list(clause.entity.all_of if clause.entity.all_of else clause.entity.any_of)
+
+        conditions: list[LexiconSourceTermCondition] = []
+        for item in clause.all_of if clause.all_of else clause.any_of:
+            conditions.extend(self._iter_source_clause_conditions(item))
+        return conditions
 
     def _validate_source_clause(self, clause: LexiconSourcePatternClause) -> tuple[list[str], list[str]]:
         errors: list[str] = []

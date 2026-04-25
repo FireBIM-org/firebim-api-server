@@ -1298,6 +1298,36 @@ def test_evaluate_mapping_from_repository(monkeypatch):
     assert "https://example.org/buildings/wall-1" in body["matched_source_objects"]
 
 
+def test_evaluate_mapping_matches_subclasses_via_custom_eval(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/mappings/evaluate",
+        json={
+            "graph_id": "demo-graph",
+            "mapping": {
+                "mapping_kind": "class_to_class",
+                "source_term": {
+                    "ontology_family": "ifc",
+                    "country": "global",
+                    "version": "latest",
+                    "term_id": "IfcBuiltElement",
+                },
+                "target_term": {
+                    "ontology_family": "fbo",
+                    "country": "dk",
+                    "version": "latest",
+                    "term_id": "Wall",
+                },
+            },
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["matched"] is True
+    assert "https://example.org/buildings/wall-1" in body["matched_source_objects"]
+    assert "https://example.org/buildings/wall-2" in body["matched_source_objects"]
+
+
 def test_evaluate_semantic_assertion_entity_pattern(monkeypatch):
     client = _build_client(monkeypatch)
     response = client.post(
