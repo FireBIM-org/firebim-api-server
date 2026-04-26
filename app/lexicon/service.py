@@ -52,9 +52,15 @@ from app.schemas.lexicon import (
     LexiconMappingValidationResponse,
     LexiconNeededProperty,
     LexiconNextNeededResponse,
+    LexiconProfileGraphAssociation,
+    LexiconProfileGraphCoverageResponse,
+    LexiconProfileMappingCandidate,
+    LexiconProfileMappingCandidatesResponse,
+    LexiconProfileRulesCoverageResponse,
     LexiconProfileSummaryResponse,
     LexiconPropertyRequirement,
     LexiconReconstructionResponse,
+    LexiconRuleCoverageItem,
     LexiconSelectedOntology,
     LexiconSimilarityComponentScore,
     LexiconSourceEntityPattern,
@@ -352,16 +358,20 @@ class LexiconService:
         selected_ontologies: list[LexiconSelectedOntology] | None = None,
         canonical_target_ontology: LexiconSelectedOntology | None = None,
         rule_id: str | None = None,
+        rule_ids: list[str] | None = None,
         rule: RuleDraft | None = None,
+        rules: list[RuleDraft] | None = None,
     ) -> LexiconProfileSummaryResponse:
-        ontology, profile = self.derive_profile(
+        ontology, profile, _rule_profiles, resolved_rule_ids = self.derive_profile(
             ontology_family=ontology_family,
             country=country,
             version=version,
             selected_ontologies=selected_ontologies,
             canonical_target_ontology=canonical_target_ontology,
             rule_id=rule_id,
+            rule_ids=rule_ids,
             rule=rule,
+            rules=rules,
         )
         resolved = self.resolve_selected_ontologies(
             ontology_family=ontology_family,
@@ -373,6 +383,7 @@ class LexiconService:
         property_requirement_count = sum(len(target.property_requirements) for target in profile.targets)
         return LexiconProfileSummaryResponse(
             rule_id=profile.rule_id,
+            rule_ids=resolved_rule_ids,
             ontology_family=ontology.ontology_family,
             country=ontology.country,
             version=ontology.version,
@@ -451,6 +462,211 @@ class LexiconService:
             graph_id=payload.graph_id,
             graph_uri=graph_uri,
             data_graph=data_graph,
+        )
+
+    def compute_profile_graph_coverage(
+        self,
+        *,
+        profile_id: str,
+        graph_id: str,
+        selected_ontologies: list[LexiconSelectedOntology],
+        expected_profile: LexiconExecutionProfile,
+    ) -> LexiconProfileGraphCoverageResponse:
+        summary = self.summarize_graph_evidence(
+            LexiconGraphEvidenceSummaryRequest(
+                graph_id=graph_id,
+                selected_ontologies=selected_ontologies,
+            )
+        )
+        associations: list[LexiconProfileGraphAssociation] = []
+        covered_target_classes: set[str] = set()
+        covered_property_pairs: set[tuple[str, str]] = set()
+
+        for subject in summary.subjects:
+            matched_targets = [
+                target.target_class
+                for target in expected_profile.targets
+                if target.target_class in subject.class_term_ids
+            ]
+            matched_properties = sorted(
+                {
+                    requirement.property_path
+                    for target in expected_profile.targets
+                    if target.target_class in subject.class_term_ids
+                    for requirement in target.property_requirements
+                    if requirement.property_path in subject.property_term_ids
+                }
+            )
+            for target_class in matched_targets:
+                covered_target_classes.add(target_class)
+                for property_path in matched_properties:
+                    covered_property_pairs.add((target_class, property_path))
+            if matched_targets or matched_properties:
+                associations.append(
+                    LexiconProfileGraphAssociation(
+                        source_object_ref=subject.source_object_ref,
+                        matched_target_classes=sorted(set(matched_targets)),
+                        matched_properties=matched_properties,
+                    )
+                )
+
+        missing_target_classes = sorted(
+            {
+                target.target_class
+                for target in expected_profile.targets
+                if target.target_class not in covered_target_classes
+            }
+        )
+        covered_properties: list[LexiconNeededProperty] = []
+        missing_properties: list[LexiconNeededProperty] = []
+        for target in expected_profile.targets:
+            for requirement in target.property_requirements:
+                needed = LexiconNeededProperty(
+                    target_class=target.target_class,
+                    property_path=requirement.property_path,
+                    node_ids=requirement.node_ids,
+                )
+                if (target.target_class, requirement.property_path) in covered_property_pairs:
+                    covered_properties.append(needed)
+                else:
+                    missing_properties.append(needed)
+
+        return LexiconProfileGraphCoverageResponse(
+            profile_id=profile_id,
+            graph_id=graph_id,
+            graph_uri=summary.graph_uri,
+            complete=not missing_target_classes and not missing_properties,
+            covered_target_classes=sorted(covered_target_classes),
+            missing_target_classes=missing_target_classes,
+            covered_properties=covered_properties,
+            missing_properties=missing_properties,
+            associations=associations,
+        )
+
+    def compute_profile_rules_coverage(
+        self,
+        *,
+        profile_id: str,
+        base_profile: LexiconExecutionProfile,
+        ontology_family: str,
+        country: str,
+        version: str,
+        selected_ontologies: list[LexiconSelectedOntology],
+        canonical_target_ontology: LexiconSelectedOntology | None,
+        rule_id: str | None = None,
+        rule_ids: list[str] | None = None,
+        rule: RuleDraft | None = None,
+        rules: list[RuleDraft] | None = None,
+        default_rule_ids: list[str] | None = None,
+        stored_rule_profiles: list[LexiconExecutionProfile] | None = None,
+    ) -> LexiconProfileRulesCoverageResponse:
+        effective_rule_ids = list(rule_ids or [])
+        if not any([rule_id, effective_rule_ids, rule, rules]) and stored_rule_profiles:
+            rule_profiles = stored_rule_profiles
+            resolved_rule_ids = [item.rule_id for item in stored_rule_profiles]
+        else:
+            if not any([rule_id, effective_rule_ids, rule, rules]):
+                effective_rule_ids = list(default_rule_ids or [])
+            _ontology, aggregate_profile, rule_profiles, resolved_rule_ids = self.derive_profile(
+                ontology_family=ontology_family,
+                country=country,
+                version=version,
+                selected_ontologies=selected_ontologies,
+                canonical_target_ontology=canonical_target_ontology,
+                rule_id=rule_id,
+                rule_ids=effective_rule_ids,
+                rule=rule,
+                rules=rules,
+            )
+            _ = aggregate_profile
+        base_targets = {target.target_class for target in base_profile.targets}
+        base_properties = {
+            (target.target_class, requirement.property_path)
+            for target in base_profile.targets
+            for requirement in target.property_requirements
+        }
+        fully_supported_rule_ids: list[str] = []
+        partially_supported_rules: list[LexiconRuleCoverageItem] = []
+        unsupported_rule_ids: list[str] = []
+
+        for rule_profile in rule_profiles:
+            missing_target_classes = sorted(
+                {target.target_class for target in rule_profile.targets if target.target_class not in base_targets}
+            )
+            missing_properties = [
+                LexiconNeededProperty(
+                    target_class=target.target_class,
+                    property_path=requirement.property_path,
+                    node_ids=requirement.node_ids,
+                )
+                for target in rule_profile.targets
+                for requirement in target.property_requirements
+                if (target.target_class, requirement.property_path) not in base_properties
+            ]
+            supported = not missing_target_classes or not missing_properties
+            complete = not missing_target_classes and not missing_properties
+            if complete:
+                fully_supported_rule_ids.append(rule_profile.rule_id)
+            elif supported:
+                partially_supported_rules.append(
+                    LexiconRuleCoverageItem(
+                        rule_id=rule_profile.rule_id,
+                        supported=True,
+                        complete=False,
+                        missing_target_classes=missing_target_classes,
+                        missing_properties=missing_properties,
+                    )
+                )
+            else:
+                unsupported_rule_ids.append(rule_profile.rule_id)
+
+        return LexiconProfileRulesCoverageResponse(
+            profile_id=profile_id,
+            checked_rule_ids=resolved_rule_ids,
+            fully_supported_rule_ids=fully_supported_rule_ids,
+            partially_supported_rules=partially_supported_rules,
+            unsupported_rule_ids=unsupported_rule_ids,
+        )
+
+    def find_profile_mapping_candidates(
+        self,
+        *,
+        profile_id: str,
+        profile: LexiconExecutionProfile,
+        mappings: list[LexiconMapping],
+    ) -> LexiconProfileMappingCandidatesResponse:
+        relevant_terms = set(profile.target_classes) | set(profile.property_paths)
+        candidates: list[LexiconProfileMappingCandidate] = []
+        for mapping in mappings:
+            matched_terms: set[str] = set()
+            if mapping.source_term and mapping.source_term.term_id in relevant_terms:
+                matched_terms.add(mapping.source_term.term_id)
+            if mapping.target_term and mapping.target_term.term_id in relevant_terms:
+                matched_terms.add(mapping.target_term.term_id)
+            for assertion in mapping.target_assertions:
+                if assertion.term_id in relevant_terms:
+                    matched_terms.add(assertion.term_id)
+            if mapping.source_pattern is not None:
+                for condition in self._iter_source_pattern_conditions(mapping.source_pattern):
+                    if condition.term_id in relevant_terms:
+                        matched_terms.add(condition.term_id)
+            if not matched_terms:
+                continue
+            relevance = "direct" if len(matched_terms) >= 2 else "partial"
+            candidates.append(
+                LexiconProfileMappingCandidate(
+                    mapping_id=mapping.id,
+                    name=mapping.name,
+                    mapping_kind=mapping.mapping_kind,
+                    relevance=relevance,
+                    matched_terms=sorted(matched_terms),
+                )
+            )
+        candidates.sort(key=lambda item: (item.relevance != "direct", item.name.lower(), item.mapping_id))
+        return LexiconProfileMappingCandidatesResponse(
+            profile_id=profile_id,
+            count=len(candidates),
+            mappings=candidates,
         )
 
     def validate_mapping(
@@ -664,8 +880,10 @@ class LexiconService:
         selected_ontologies: list[LexiconSelectedOntology] | None = None,
         canonical_target_ontology: LexiconSelectedOntology | None = None,
         rule_id: str | None = None,
+        rule_ids: list[str] | None = None,
         rule: RuleDraft | None = None,
-    ) -> tuple[LexiconOntologyContext, LexiconExecutionProfile]:
+        rules: list[RuleDraft] | None = None,
+    ) -> tuple[LexiconOntologyContext, LexiconExecutionProfile, list[LexiconExecutionProfile], list[str]]:
         resolved_selection = self.resolve_selected_ontologies(
             ontology_family=ontology_family,
             country=country,
@@ -688,7 +906,16 @@ class LexiconService:
             country=canonical_selection.country,
             version=canonical_selection.version,
         )
-        normalized_rule = self._load_rule(rule_id=rule_id, rule=rule)
+        normalized_rules = self._load_rules(rule_id=rule_id, rule_ids=rule_ids, rule=rule, rules=rules)
+        rule_profiles = [self._derive_profile_from_rule_dict(item, runtime) for item in normalized_rules]
+        aggregate_profile = self._aggregate_rule_profiles(rule_profiles)
+        return bundle.ontology, aggregate_profile, rule_profiles, [item["id"] for item in normalized_rules]
+
+    def _derive_profile_from_rule_dict(
+        self,
+        normalized_rule: dict,
+        runtime: LexiconQueryRuntime,
+    ) -> LexiconExecutionProfile:
         completeness = check_ruleset_completeness(self._to_composer_rule(normalized_rule))
 
         property_requirements_by_target: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
@@ -797,6 +1024,7 @@ class LexiconService:
 
         profile = LexiconExecutionProfile(
             rule_id=normalized_rule["id"],
+            rule_ids=[normalized_rule["id"]],
             entry_node_id=normalized_rule.get("entry"),
             node_count=len(normalized_rule["elements"]),
             complete=bool(completeness["complete"]),
@@ -818,7 +1046,96 @@ class LexiconService:
             ]
             + sorted(set(ontology_warnings)),
         )
-        return bundle.ontology, profile
+        return profile
+
+    def _aggregate_rule_profiles(
+        self,
+        rule_profiles: list[LexiconExecutionProfile],
+    ) -> LexiconExecutionProfile:
+        if not rule_profiles:
+            raise ValueError("At least one rule profile is required")
+        if len(rule_profiles) == 1:
+            return rule_profiles[0]
+
+        aggregated_targets: dict[str, dict[str, Any]] = defaultdict(
+            lambda: {
+                "node_ids": set(),
+                "property_requirements": defaultdict(
+                    lambda: {
+                        "node_ids": set(),
+                        "operators": set(),
+                        "sample_values": set(),
+                    }
+                ),
+            }
+        )
+        aggregated_nodes: list[LexiconExecutionProfileNode] = []
+        warnings: list[str] = []
+
+        for profile in rule_profiles:
+            node_prefix = f"{profile.rule_id}::"
+            for node in profile.nodes:
+                prefixed_node_id = f"{node_prefix}{node.node_id}"
+                branches = [
+                    LexiconBranchReference(
+                        branch=branch.branch,
+                        target_node_id=(f"{node_prefix}{branch.target_node_id}" if branch.target_node_id else None),
+                    )
+                    for branch in node.branches
+                ]
+                aggregated_nodes.append(
+                    LexiconExecutionProfileNode(
+                        node_id=prefixed_node_id,
+                        element_type=node.element_type,
+                        label=node.label,
+                        target_class=node.target_class,
+                        property_path=node.property_path,
+                        operator=node.operator,
+                        value=node.value,
+                        branches=branches,
+                    )
+                )
+            for target in profile.targets:
+                target_bucket = aggregated_targets[target.target_class]
+                target_bucket["node_ids"].update(f"{node_prefix}{node_id}" for node_id in target.node_ids)
+                for requirement in target.property_requirements:
+                    req_bucket = target_bucket["property_requirements"][requirement.property_path]
+                    req_bucket["node_ids"].update(f"{node_prefix}{node_id}" for node_id in requirement.node_ids)
+                    req_bucket["operators"].update(requirement.operators)
+                    req_bucket["sample_values"].update(requirement.sample_values)
+            warnings.extend(profile.warnings)
+
+        return LexiconExecutionProfile(
+            rule_id="multi-rule-profile",
+            rule_ids=[profile.rule_id for profile in rule_profiles],
+            entry_node_id=None,
+            node_count=sum(profile.node_count for profile in rule_profiles),
+            complete=all(profile.complete for profile in rule_profiles),
+            open=any(profile.open for profile in rule_profiles),
+            broken=any(profile.broken for profile in rule_profiles),
+            target_classes=sorted({item for profile in rule_profiles for item in profile.target_classes}),
+            property_paths=sorted({item for profile in rule_profiles for item in profile.property_paths}),
+            relation_paths=sorted({item for profile in rule_profiles for item in profile.relation_paths}),
+            targets=[
+                LexiconExecutionTarget(
+                    target_class=target_class,
+                    node_ids=sorted(bucket["node_ids"]),
+                    property_requirements=[
+                        LexiconPropertyRequirement(
+                            property_path=property_path,
+                            node_ids=sorted(requirement["node_ids"]),
+                            operators=sorted(requirement["operators"]),
+                            sample_values=sorted(requirement["sample_values"]),
+                        )
+                        for property_path, requirement in sorted(bucket["property_requirements"].items())
+                    ],
+                    relation_requirements=[],
+                )
+                for target_class, bucket in sorted(aggregated_targets.items())
+            ],
+            nodes=aggregated_nodes,
+            warnings=list(dict.fromkeys(warnings)),
+        )
 
     def _resolve_profile_term_matches(
         self,
@@ -1083,14 +1400,27 @@ class LexiconService:
         return bundle
 
     @staticmethod
-    def _load_rule(*, rule_id: str | None, rule: RuleDraft | None) -> dict:
+    def _load_rules(
+        *,
+        rule_id: str | None,
+        rule_ids: list[str] | None,
+        rule: RuleDraft | None,
+        rules: list[RuleDraft] | None,
+    ) -> list[dict]:
         if rule_id:
             _graph_uri, ttl = fetch_rule_ttl(rule_id)
             decompiled = decompile_ruleset_ttl(ttl)
-            return LexiconService._normalize_rule_dict(decompiled)
-        if rule is None:
-            raise ValueError("rule payload is required when rule_id is not provided")
-        return LexiconService._normalize_rule_dict(rule.as_internal_dict())
+            return [LexiconService._normalize_rule_dict(decompiled)]
+        if rule_ids:
+            return [
+                LexiconService._normalize_rule_dict(decompile_ruleset_ttl(fetch_rule_ttl(current_rule_id)[1]))
+                for current_rule_id in rule_ids
+            ]
+        if rule is not None:
+            return [LexiconService._normalize_rule_dict(rule.as_internal_dict())]
+        if rules:
+            return [LexiconService._normalize_rule_dict(item.as_internal_dict()) for item in rules]
+        raise ValueError("rule payload is required when no rule identifiers are provided")
 
     @staticmethod
     def _normalize_rule_dict(rule: dict) -> dict:

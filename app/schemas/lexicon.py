@@ -52,6 +52,7 @@ class LexiconExecutionProfileNode(BaseModel):
 
 class LexiconExecutionProfile(BaseModel):
     rule_id: str
+    rule_ids: list[str] = Field(default_factory=list)
     entry_node_id: str | None = None
     node_count: int
     complete: bool
@@ -72,12 +73,17 @@ class LexiconProfileDeriveRequest(BaseModel):
     selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list)
     canonical_target_ontology: LexiconSelectedOntology | None = None
     rule_id: str | None = None
+    rule_ids: list[str] = Field(default_factory=list)
     rule: RuleDraft | None = None
+    rules: list[RuleDraft] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_rule_source(self) -> LexiconProfileDeriveRequest:
-        if bool(self.rule_id) == bool(self.rule):
-            raise ValueError("Provide exactly one of rule_id or rule")
+        active = int(bool(self.rule_id)) + int(bool(self.rule)) + int(bool(self.rule_ids)) + int(bool(self.rules))
+        if active == 0 and getattr(self, "profile", None) is not None:
+            return self
+        if active != 1:
+            raise ValueError("Provide exactly one of rule_id, rule_ids, rule, or rules")
         return self
 
 
@@ -89,11 +95,14 @@ class LexiconProfileDeriveResponse(BaseModel):
     canonical_country_uri: str
     selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list)
     canonical_target_ontology: LexiconSelectedOntology | None = None
+    rule_ids: list[str] = Field(default_factory=list)
+    rule_profiles: list[LexiconExecutionProfile] = Field(default_factory=list)
     profile: LexiconExecutionProfile
 
 
 class LexiconProfileSummaryResponse(BaseModel):
     rule_id: str
+    rule_ids: list[str] = Field(default_factory=list)
     ontology_family: str
     country: str
     version: str
@@ -110,6 +119,151 @@ class LexiconProfileSummaryResponse(BaseModel):
     target_classes: list[str] = Field(default_factory=list)
     property_paths: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+
+
+class LexiconStoredProfile(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    ontology_family: str
+    country: str
+    version: str
+    canonical_family_uri: str
+    canonical_country_uri: str
+    selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list)
+    canonical_target_ontology: LexiconSelectedOntology | None = None
+    rule_ids: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    profile: LexiconExecutionProfile
+    rule_profiles: list[LexiconExecutionProfile] = Field(default_factory=list)
+    created_at: str
+    updated_at: str
+
+
+class LexiconProfileCreateRequest(LexiconProfileDeriveRequest):
+    name: str | None = None
+    description: str | None = None
+    keywords: list[str] = Field(default_factory=list)
+    profile: LexiconExecutionProfile | None = None
+    rule_profiles: list[LexiconExecutionProfile] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_profile_create_shape(self) -> LexiconProfileCreateRequest:
+        derives = int(bool(self.rule_id)) + int(bool(self.rule_ids)) + int(bool(self.rule)) + int(bool(self.rules))
+        has_explicit_profile = self.profile is not None
+        if derives and has_explicit_profile:
+            raise ValueError("Provide either derive inputs or an explicit profile, not both")
+        if not derives and not has_explicit_profile:
+            raise ValueError("Provide derive inputs or an explicit profile")
+        if has_explicit_profile and not self.rule_ids:
+            raise ValueError("Explicit profiles require rule_ids")
+        return self
+
+
+class LexiconProfileUpdateRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    keywords: list[str] | None = None
+    selected_ontologies: list[LexiconSelectedOntology] | None = None
+    canonical_target_ontology: LexiconSelectedOntology | None = None
+    rule_ids: list[str] | None = None
+    profile: LexiconExecutionProfile | None = None
+    rule_profiles: list[LexiconExecutionProfile] | None = None
+
+
+class LexiconProfileResponse(BaseModel):
+    profile_record: LexiconStoredProfile
+
+
+class LexiconProfileSummaryItem(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    ontology_family: str
+    country: str
+    version: str
+    rule_ids: list[str] = Field(default_factory=list)
+    selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    target_count: int
+    property_requirement_count: int
+    updated_at: str
+
+
+class LexiconProfileListResponse(BaseModel):
+    count: int
+    profiles: list[LexiconProfileSummaryItem] = Field(default_factory=list)
+
+
+class LexiconProfileDeleteResponse(BaseModel):
+    deleted: bool
+    profile_id: str
+
+
+class LexiconProfileRulesCoverageRequest(BaseModel):
+    rule_id: str | None = None
+    rule_ids: list[str] = Field(default_factory=list)
+    rule: RuleDraft | None = None
+    rules: list[RuleDraft] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_rule_source(self) -> LexiconProfileRulesCoverageRequest:
+        active = int(bool(self.rule_id)) + int(bool(self.rule_ids)) + int(bool(self.rule)) + int(bool(self.rules))
+        if active not in {0, 1}:
+            raise ValueError("Provide at most one of rule_id, rule_ids, rule, or rules")
+        return self
+
+
+class LexiconRuleCoverageItem(BaseModel):
+    rule_id: str
+    supported: bool
+    complete: bool
+    missing_target_classes: list[str] = Field(default_factory=list)
+    missing_properties: list[LexiconNeededProperty] = Field(default_factory=list)
+
+
+class LexiconProfileRulesCoverageResponse(BaseModel):
+    profile_id: str
+    checked_rule_ids: list[str] = Field(default_factory=list)
+    fully_supported_rule_ids: list[str] = Field(default_factory=list)
+    partially_supported_rules: list[LexiconRuleCoverageItem] = Field(default_factory=list)
+    unsupported_rule_ids: list[str] = Field(default_factory=list)
+
+
+class LexiconProfileGraphCoverageRequest(BaseModel):
+    graph_id: str = Field(..., min_length=1)
+
+
+class LexiconProfileGraphAssociation(BaseModel):
+    source_object_ref: str
+    matched_target_classes: list[str] = Field(default_factory=list)
+    matched_properties: list[str] = Field(default_factory=list)
+
+
+class LexiconProfileGraphCoverageResponse(BaseModel):
+    profile_id: str
+    graph_id: str
+    graph_uri: str
+    complete: bool
+    covered_target_classes: list[str] = Field(default_factory=list)
+    missing_target_classes: list[str] = Field(default_factory=list)
+    covered_properties: list[LexiconNeededProperty] = Field(default_factory=list)
+    missing_properties: list[LexiconNeededProperty] = Field(default_factory=list)
+    associations: list[LexiconProfileGraphAssociation] = Field(default_factory=list)
+
+
+class LexiconProfileMappingCandidate(BaseModel):
+    mapping_id: str
+    name: str
+    mapping_kind: str
+    relevance: str
+    matched_terms: list[str] = Field(default_factory=list)
+
+
+class LexiconProfileMappingCandidatesResponse(BaseModel):
+    profile_id: str
+    count: int
+    mappings: list[LexiconProfileMappingCandidate] = Field(default_factory=list)
 
 
 class LexiconEntityPropertyInput(BaseModel):

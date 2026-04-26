@@ -28,7 +28,9 @@ from app.schemas.lexicon import (
     LexiconHandshakeAcceptedPayload,
     LexiconMapping,
     LexiconMappingSummary,
+    LexiconProfileSummaryItem,
     LexiconPropertyRequirement,
+    LexiconStoredProfile,
 )
 
 FBO_ONTOLOGY_TTL = """
@@ -389,6 +391,200 @@ def _build_client_with_handshake_repo(monkeypatch) -> tuple[TestClient, DummyHan
     return TestClient(app), handshake_repo
 
 
+class DummyProfileRepo:
+    def __init__(self) -> None:
+        self.profile = LexiconStoredProfile(
+            id="prof_123",
+            name="Wall profile",
+            description="Profile for walls",
+            ontology_family="fbo",
+            country="dk",
+            version="2026.04.23",
+            canonical_family_uri="https://firebim.org/ontologies/fbo#",
+            canonical_country_uri="https://firebim.org/ontologies/fbo/dk#",
+            selected_ontologies=[
+                {
+                    "ontology_family": "fbo",
+                    "country": "dk",
+                    "version": "2026.04.23",
+                    "canonical_family_uri": "https://firebim.org/ontologies/fbo#",
+                    "canonical_country_uri": "https://firebim.org/ontologies/fbo/dk#",
+                },
+                {
+                    "ontology_family": "ifc",
+                    "country": "global",
+                    "version": "2026.04.23",
+                    "canonical_family_uri": "https://firebim.org/ontologies/ifc#",
+                    "canonical_country_uri": "https://firebim.org/ontologies/ifc/global#",
+                },
+            ],
+            canonical_target_ontology={
+                "ontology_family": "fbo",
+                "country": "dk",
+                "version": "2026.04.23",
+                "canonical_family_uri": "https://firebim.org/ontologies/fbo#",
+                "canonical_country_uri": "https://firebim.org/ontologies/fbo/dk#",
+            },
+            rule_ids=["wall_rule"],
+            keywords=["wall", "fire"],
+            profile=LexiconExecutionProfile(
+                rule_id="wall_rule",
+                rule_ids=["wall_rule"],
+                entry_node_id="start",
+                node_count=4,
+                complete=True,
+                open=False,
+                broken=False,
+                target_classes=["Wall"],
+                property_paths=["Combustible"],
+                relation_paths=[],
+                targets=[
+                    LexiconExecutionTarget(
+                        target_class="Wall",
+                        node_ids=["start"],
+                        property_requirements=[
+                            LexiconPropertyRequirement(
+                                property_path="Combustible",
+                                node_ids=["start"],
+                                operators=["="],
+                                sample_values=["True"],
+                            )
+                        ],
+                        relation_requirements=[],
+                    )
+                ],
+                nodes=[
+                    LexiconExecutionProfileNode(
+                        node_id="start",
+                        element_type="decision",
+                        label="Check combustibility",
+                        target_class="Wall",
+                        property_path="Combustible",
+                        operator="=",
+                        value=True,
+                        branches=[],
+                    )
+                ],
+                warnings=[],
+            ),
+            rule_profiles=[
+                LexiconExecutionProfile(
+                    rule_id="wall_rule",
+                    rule_ids=["wall_rule"],
+                    entry_node_id="start",
+                    node_count=4,
+                    complete=True,
+                    open=False,
+                    broken=False,
+                    target_classes=["Wall"],
+                    property_paths=["Combustible"],
+                    relation_paths=[],
+                    targets=[
+                        LexiconExecutionTarget(
+                            target_class="Wall",
+                            node_ids=["start"],
+                            property_requirements=[
+                                LexiconPropertyRequirement(
+                                    property_path="Combustible",
+                                    node_ids=["start"],
+                                    operators=["="],
+                                    sample_values=["True"],
+                                )
+                            ],
+                            relation_requirements=[],
+                        )
+                    ],
+                    nodes=[],
+                    warnings=[],
+                )
+            ],
+            created_at="2026-04-23T10:00:00+00:00",
+            updated_at="2026-04-23T10:00:00+00:00",
+        )
+        self.created_payload = None
+        self.updated_profile = None
+        self.deleted_id = None
+
+    def create_profile(
+        self,
+        *,
+        payload,
+        user,
+        canonical_family_uri,
+        canonical_country_uri,
+        rule_ids,
+        profile,
+        rule_profiles,
+        selected_ontologies,
+        canonical_target_ontology,
+    ):
+        _ = user
+        self.created_payload = payload
+        self.profile = self.profile.model_copy(
+            update={
+                "name": payload.name or self.profile.name,
+                "description": payload.description,
+                "canonical_family_uri": canonical_family_uri,
+                "canonical_country_uri": canonical_country_uri,
+                "rule_ids": rule_ids,
+                "profile": profile,
+                "rule_profiles": rule_profiles,
+                "selected_ontologies": selected_ontologies,
+                "canonical_target_ontology": canonical_target_ontology,
+            }
+        )
+        return self.profile
+
+    def update_profile(self, *, profile_id, user, updated):
+        _ = user
+        self.updated_profile = updated
+        self.profile = updated.model_copy(update={"id": profile_id})
+        return self.profile
+
+    def get_profile(self, profile_id, user):
+        _ = user
+        return self.profile.model_copy(update={"id": profile_id})
+
+    def list_profiles(self, user):
+        _ = user
+        return [
+            LexiconProfileSummaryItem(
+                id=self.profile.id,
+                name=self.profile.name,
+                description=self.profile.description,
+                ontology_family=self.profile.ontology_family,
+                country=self.profile.country,
+                version=self.profile.version,
+                rule_ids=self.profile.rule_ids,
+                selected_ontologies=self.profile.selected_ontologies,
+                keywords=self.profile.keywords,
+                target_count=len(self.profile.profile.targets),
+                property_requirement_count=sum(
+                    len(target.property_requirements) for target in self.profile.profile.targets
+                ),
+                updated_at=self.profile.updated_at,
+            )
+        ]
+
+    def delete_profile(self, profile_id, user):
+        _ = user
+        self.deleted_id = profile_id
+
+
+def _build_client_with_profile_repo(monkeypatch) -> tuple[TestClient, DummyProfileRepo]:
+    app = FastAPI()
+    app.include_router(lexicon_api.router)
+    profile_repo = DummyProfileRepo()
+    monkeypatch.setattr(lexicon_api, "service", LexiconService(DummyOntologyRepo(), DummyBuildingRepo()))
+    monkeypatch.setattr(lexicon_api, "profile_repo", profile_repo)
+    monkeypatch.setattr(lexicon_api, "mapping_repo", DummyMappingRepo())
+    app.dependency_overrides[lexicon_api.get_current_active_user] = lambda: SimpleNamespace(
+        id=f"user-{uuid4()}",
+        is_active=True,
+    )
+    return TestClient(app), profile_repo
+
+
 def test_lexicon_health(monkeypatch):
     client = _build_client(monkeypatch)
     response = client.get("/lexicon/health")
@@ -539,6 +735,158 @@ def test_profile_summary(monkeypatch):
     assert body["publish_ready"] is True
 
 
+def test_derive_execution_profile_from_rule_set(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/profiles/derive",
+        json={
+            "ontology_family": "fbo",
+            "country": "dk",
+            "version": "latest",
+            "rules": [
+                {
+                    "id": "wall_rule",
+                    "entry": "start",
+                    "elements": [
+                        {
+                            "id": "start",
+                            "element_type": "decision",
+                            "target_class": "Wall",
+                            "property_path": "Combustible",
+                            "operator": "=",
+                            "value": True,
+                            "true_path": "ok",
+                            "false_path": "fail",
+                            "unknown_path": "unknown",
+                            "label": "Check combustibility",
+                            "config": {},
+                        },
+                        {"id": "ok", "element_type": "end", "label": "Ok", "config": {}},
+                        {"id": "fail", "element_type": "end", "label": "Fail", "config": {}},
+                        {"id": "unknown", "element_type": "end", "label": "Unknown", "config": {}},
+                    ],
+                },
+                {
+                    "id": "wall_rule_2",
+                    "entry": "start_2",
+                    "elements": [
+                        {
+                            "id": "start_2",
+                            "element_type": "decision",
+                            "target_class": "Wall",
+                            "property_path": "Combustible",
+                            "operator": "=",
+                            "value": True,
+                            "true_path": "ok_2",
+                            "false_path": "fail_2",
+                            "unknown_path": "unknown_2",
+                            "label": "Check combustibility again",
+                            "config": {},
+                        },
+                        {"id": "ok_2", "element_type": "end", "label": "Ok", "config": {}},
+                        {"id": "fail_2", "element_type": "end", "label": "Fail", "config": {}},
+                        {"id": "unknown_2", "element_type": "end", "label": "Unknown", "config": {}},
+                    ],
+                },
+            ],
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["rule_ids"] == ["wall_rule", "wall_rule_2"]
+    assert len(body["rule_profiles"]) == 2
+    assert body["profile"]["rule_id"] == "multi-rule-profile"
+
+
+def test_create_list_get_update_and_delete_profile(monkeypatch):
+    client, profile_repo = _build_client_with_profile_repo(monkeypatch)
+
+    create = client.post(
+        "/lexicon/profiles",
+        json={
+            "name": "Wall profile",
+            "ontology_family": "fbo",
+            "country": "dk",
+            "version": "latest",
+            "rule": {
+                "id": "wall_rule",
+                "entry": "start",
+                "elements": [
+                    {
+                        "id": "start",
+                        "element_type": "decision",
+                        "target_class": "Wall",
+                        "property_path": "Combustible",
+                        "operator": "=",
+                        "value": True,
+                        "true_path": "ok",
+                        "false_path": "fail",
+                        "unknown_path": "unknown",
+                        "label": "Check combustibility",
+                        "config": {},
+                    },
+                    {"id": "ok", "element_type": "end", "label": "Ok", "config": {}},
+                    {"id": "fail", "element_type": "end", "label": "Fail", "config": {}},
+                    {"id": "unknown", "element_type": "end", "label": "Unknown", "config": {}},
+                ],
+            },
+            "keywords": ["wall"],
+        },
+    )
+    assert create.status_code == 201
+    assert create.json()["profile_record"]["name"] == "Wall profile"
+    assert profile_repo.created_payload.name == "Wall profile"
+
+    listing = client.get("/lexicon/profiles?search=wall")
+    assert listing.status_code == 200
+    assert listing.json()["count"] == 1
+
+    fetched = client.get("/lexicon/profiles/prof_123")
+    assert fetched.status_code == 200
+    assert fetched.json()["profile_record"]["id"] == "prof_123"
+
+    update = client.put(
+        "/lexicon/profiles/prof_123",
+        json={"description": "Updated profile"},
+    )
+    assert update.status_code == 200
+    assert update.json()["profile_record"]["description"] == "Updated profile"
+
+    delete = client.delete("/lexicon/profiles/prof_123")
+    assert delete.status_code == 200
+    assert delete.json() == {"deleted": True, "profile_id": "prof_123"}
+    assert profile_repo.deleted_id == "prof_123"
+
+
+def test_profile_rules_coverage(monkeypatch):
+    client, _profile_repo = _build_client_with_profile_repo(monkeypatch)
+    response = client.post("/lexicon/profiles/prof_123/rules/coverage", json={})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["profile_id"] == "prof_123"
+    assert body["fully_supported_rule_ids"] == ["wall_rule"]
+
+
+def test_profile_graph_coverage(monkeypatch):
+    client, _profile_repo = _build_client_with_profile_repo(monkeypatch)
+    response = client.post("/lexicon/profiles/prof_123/graph-coverage", json={"graph_id": "demo-graph"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["profile_id"] == "prof_123"
+    assert body["complete"] is False
+    assert body["covered_target_classes"] == []
+    assert body["missing_target_classes"] == ["Wall"]
+
+
+def test_profile_mapping_candidates(monkeypatch):
+    client, _profile_repo = _build_client_with_profile_repo(monkeypatch)
+    response = client.get("/lexicon/profiles/prof_123/mappings/candidates")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["profile_id"] == "prof_123"
+    assert body["count"] >= 1
+
+
 def test_derive_execution_profile_from_published_rule(monkeypatch):
     client = _build_client(monkeypatch)
     monkeypatch.setattr(
@@ -679,7 +1027,7 @@ ex:wall-1 a fbo-dk:Wall ;
 
 def test_check_conformity_reports_profile_gaps(monkeypatch):
     service = LexiconService(DummyOntologyRepo())
-    _ontology, profile = service.derive_profile(
+    _ontology, profile, _rule_profiles, _rule_ids = service.derive_profile(
         ontology_family="fbo",
         country="dk",
         version="latest",

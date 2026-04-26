@@ -38,9 +38,19 @@ from app.schemas.lexicon import (
     LexiconMappingValidationRequest,
     LexiconMappingValidationResponse,
     LexiconNextNeededResponse,
+    LexiconProfileCreateRequest,
+    LexiconProfileDeleteResponse,
     LexiconProfileDeriveRequest,
     LexiconProfileDeriveResponse,
+    LexiconProfileGraphCoverageRequest,
+    LexiconProfileGraphCoverageResponse,
+    LexiconProfileListResponse,
+    LexiconProfileMappingCandidatesResponse,
+    LexiconProfileResponse,
+    LexiconProfileRulesCoverageRequest,
+    LexiconProfileRulesCoverageResponse,
     LexiconProfileSummaryResponse,
+    LexiconProfileUpdateRequest,
     LexiconReconstructionRequest,
     LexiconReconstructionResponse,
 )
@@ -55,6 +65,11 @@ from app.storage.lexicon_mapping_repository import (
     LexiconMappingRepository,
     LexiconMappingRepositoryError,
 )
+from app.storage.lexicon_profile_repository import (
+    LexiconProfileNotFoundError,
+    LexiconProfileRepository,
+    LexiconProfileRepositoryError,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/lexicon", tags=["lexicon"])
@@ -62,6 +77,7 @@ router = APIRouter(prefix="/lexicon", tags=["lexicon"])
 service = LexiconService()
 mapping_repo = LexiconMappingRepository()
 handshake_repo = LexiconHandshakeRepository()
+profile_repo = LexiconProfileRepository()
 
 
 @router.get("/health", response_model=LexiconHealthResponse)
@@ -452,14 +468,16 @@ def create_handshake(
     current_user: User = Depends(get_current_active_user),
 ) -> LexiconHandshakeResponse:
     try:
-        ontology, profile = service.derive_profile(
+        ontology, profile, _rule_profiles, _rule_ids = service.derive_profile(
             ontology_family=payload.ontology_family,
             country=payload.country,
             version=payload.version,
             selected_ontologies=payload.selected_ontologies,
             canonical_target_ontology=payload.canonical_target_ontology,
             rule_id=payload.rule_id,
+            rule_ids=[],
             rule=payload.rule,
+            rules=[],
         )
         selected_ontologies = service.resolve_selected_ontologies(
             ontology_family=payload.ontology_family,
@@ -615,14 +633,16 @@ def check_handshake_conformity(
 @router.post("/profiles/derive", response_model=LexiconProfileDeriveResponse)
 def derive_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconProfileDeriveResponse:
     try:
-        ontology, profile = service.derive_profile(
+        ontology, profile, rule_profiles, rule_ids = service.derive_profile(
             ontology_family=payload.ontology_family,
             country=payload.country,
             version=payload.version,
             selected_ontologies=payload.selected_ontologies,
             canonical_target_ontology=payload.canonical_target_ontology,
             rule_id=payload.rule_id,
+            rule_ids=payload.rule_ids,
             rule=payload.rule,
+            rules=payload.rules,
         )
         selected_ontologies = service.resolve_selected_ontologies(
             ontology_family=payload.ontology_family,
@@ -639,6 +659,8 @@ def derive_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconPro
             canonical_country_uri=ontology.canonical_country_uri,
             selected_ontologies=selected_ontologies["selected_ontologies"],
             canonical_target_ontology=selected_ontologies["canonical_target_ontology"],
+            rule_ids=rule_ids,
+            rule_profiles=rule_profiles,
             profile=profile,
         )
     except (GraphStoreError, GraphStoreNotFoundError) as exc:
@@ -663,7 +685,9 @@ def summarize_execution_profile(payload: LexiconProfileDeriveRequest) -> Lexicon
             selected_ontologies=payload.selected_ontologies,
             canonical_target_ontology=payload.canonical_target_ontology,
             rule_id=payload.rule_id,
+            rule_ids=payload.rule_ids,
             rule=payload.rule,
+            rules=payload.rules,
         )
     except (GraphStoreError, GraphStoreNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -675,6 +699,255 @@ def summarize_execution_profile(payload: LexiconProfileDeriveRequest) -> Lexicon
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to summarize lexicon execution profile",
         ) from exc
+
+
+@router.post("/profiles", response_model=LexiconProfileResponse, status_code=status.HTTP_201_CREATED)
+def create_profile(
+    payload: LexiconProfileCreateRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconProfileResponse:
+    try:
+        if payload.profile is not None:
+            selected = service.resolve_selected_ontologies(
+                ontology_family=payload.ontology_family,
+                country=payload.country,
+                version=payload.version,
+                selected_ontologies=payload.selected_ontologies,
+                canonical_target_ontology=payload.canonical_target_ontology,
+            )
+            ontology = service.resolve_ontology(
+                ontology_family=payload.ontology_family,
+                country=payload.country,
+                version=payload.version,
+            )
+            profile_record = profile_repo.create_profile(
+                payload=payload,
+                user=current_user,
+                canonical_family_uri=ontology.canonical_family_uri,
+                canonical_country_uri=ontology.canonical_country_uri,
+                rule_ids=payload.rule_ids,
+                profile=payload.profile,
+                rule_profiles=payload.rule_profiles or [payload.profile],
+                selected_ontologies=selected["selected_ontologies"],
+                canonical_target_ontology=selected["canonical_target_ontology"],
+            )
+        else:
+            ontology, profile, rule_profiles, rule_ids = service.derive_profile(
+                ontology_family=payload.ontology_family,
+                country=payload.country,
+                version=payload.version,
+                selected_ontologies=payload.selected_ontologies,
+                canonical_target_ontology=payload.canonical_target_ontology,
+                rule_id=payload.rule_id,
+                rule_ids=payload.rule_ids,
+                rule=payload.rule,
+                rules=payload.rules,
+            )
+            selected = service.resolve_selected_ontologies(
+                ontology_family=payload.ontology_family,
+                country=payload.country,
+                version=payload.version,
+                selected_ontologies=payload.selected_ontologies,
+                canonical_target_ontology=payload.canonical_target_ontology,
+            )
+            profile_record = profile_repo.create_profile(
+                payload=payload,
+                user=current_user,
+                canonical_family_uri=ontology.canonical_family_uri,
+                canonical_country_uri=ontology.canonical_country_uri,
+                rule_ids=rule_ids,
+                profile=profile,
+                rule_profiles=rule_profiles,
+                selected_ontologies=selected["selected_ontologies"],
+                canonical_target_ontology=selected["canonical_target_ontology"],
+            )
+        return LexiconProfileResponse(profile_record=profile_record)
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except LexiconProfileRepositoryError as exc:
+        logger.exception("Failed to create lexicon profile", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.get("/profiles", response_model=LexiconProfileListResponse)
+def list_profiles(
+    search: str | None = Query(default=None),
+    ontology_family: str | None = Query(default=None),
+    country: str | None = Query(default=None),
+    rule_id: str | None = Query(default=None),
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconProfileListResponse:
+    try:
+        profiles = profile_repo.list_profiles(current_user)
+        if search:
+            needle = search.strip().lower()
+            profiles = [
+                item
+                for item in profiles
+                if needle in item.name.lower()
+                or needle in (item.description or "").lower()
+                or any(needle in keyword.lower() for keyword in item.keywords)
+                or any(needle in current_rule_id.lower() for current_rule_id in item.rule_ids)
+            ]
+        if ontology_family:
+            profiles = [item for item in profiles if item.ontology_family == ontology_family]
+        if country:
+            profiles = [item for item in profiles if item.country == country]
+        if rule_id:
+            profiles = [item for item in profiles if rule_id in item.rule_ids]
+        return LexiconProfileListResponse(count=len(profiles), profiles=profiles)
+    except LexiconProfileRepositoryError as exc:
+        logger.exception("Failed to list lexicon profiles", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.get("/profiles/{profile_id}", response_model=LexiconProfileResponse)
+def get_profile(profile_id: str, current_user: User = Depends(get_current_active_user)) -> LexiconProfileResponse:
+    try:
+        profile_record = profile_repo.get_profile(profile_id, current_user)
+        return LexiconProfileResponse(profile_record=profile_record)
+    except LexiconProfileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LexiconProfileRepositoryError as exc:
+        logger.exception("Failed to fetch lexicon profile", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.put("/profiles/{profile_id}", response_model=LexiconProfileResponse)
+def update_profile(
+    profile_id: str,
+    payload: LexiconProfileUpdateRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconProfileResponse:
+    try:
+        existing = profile_repo.get_profile(profile_id, current_user)
+        updated = existing.model_copy(
+            update={
+                "name": payload.name if payload.name is not None else existing.name,
+                "description": payload.description if payload.description is not None else existing.description,
+                "keywords": payload.keywords if payload.keywords is not None else existing.keywords,
+                "selected_ontologies": (
+                    payload.selected_ontologies
+                    if payload.selected_ontologies is not None
+                    else existing.selected_ontologies
+                ),
+                "canonical_target_ontology": (
+                    payload.canonical_target_ontology
+                    if payload.canonical_target_ontology is not None
+                    else existing.canonical_target_ontology
+                ),
+                "rule_ids": payload.rule_ids if payload.rule_ids is not None else existing.rule_ids,
+                "profile": payload.profile if payload.profile is not None else existing.profile,
+                "rule_profiles": payload.rule_profiles if payload.rule_profiles is not None else existing.rule_profiles,
+            }
+        )
+        profile_record = profile_repo.update_profile(profile_id=profile_id, user=current_user, updated=updated)
+        return LexiconProfileResponse(profile_record=profile_record)
+    except LexiconProfileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LexiconProfileRepositoryError as exc:
+        logger.exception("Failed to update lexicon profile", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.delete("/profiles/{profile_id}", response_model=LexiconProfileDeleteResponse)
+def delete_profile(
+    profile_id: str,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconProfileDeleteResponse:
+    try:
+        profile_repo.delete_profile(profile_id, current_user)
+        return LexiconProfileDeleteResponse(deleted=True, profile_id=profile_id)
+    except LexiconProfileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LexiconProfileRepositoryError as exc:
+        logger.exception("Failed to delete lexicon profile", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post("/profiles/{profile_id}/rules/coverage", response_model=LexiconProfileRulesCoverageResponse)
+def profile_rules_coverage(
+    profile_id: str,
+    payload: LexiconProfileRulesCoverageRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconProfileRulesCoverageResponse:
+    try:
+        profile_record = profile_repo.get_profile(profile_id, current_user)
+        return service.compute_profile_rules_coverage(
+            profile_id=profile_id,
+            base_profile=profile_record.profile,
+            ontology_family=profile_record.ontology_family,
+            country=profile_record.country,
+            version=profile_record.version,
+            selected_ontologies=profile_record.selected_ontologies,
+            canonical_target_ontology=profile_record.canonical_target_ontology,
+            rule_id=payload.rule_id,
+            rule_ids=payload.rule_ids,
+            rule=payload.rule,
+            rules=payload.rules,
+            default_rule_ids=profile_record.rule_ids,
+            stored_rule_profiles=profile_record.rule_profiles,
+        )
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LexiconProfileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except LexiconProfileRepositoryError as exc:
+        logger.exception("Failed to calculate lexicon profile rules coverage", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post("/profiles/{profile_id}/graph-coverage", response_model=LexiconProfileGraphCoverageResponse)
+def profile_graph_coverage(
+    profile_id: str,
+    payload: LexiconProfileGraphCoverageRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconProfileGraphCoverageResponse:
+    try:
+        profile_record = profile_repo.get_profile(profile_id, current_user)
+        return service.compute_profile_graph_coverage(
+            profile_id=profile_id,
+            graph_id=payload.graph_id,
+            selected_ontologies=profile_record.selected_ontologies,
+            expected_profile=profile_record.profile,
+        )
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LexiconProfileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except LexiconProfileRepositoryError as exc:
+        logger.exception("Failed to calculate lexicon profile graph coverage", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.get("/profiles/{profile_id}/mappings/candidates", response_model=LexiconProfileMappingCandidatesResponse)
+def profile_mapping_candidates(
+    profile_id: str,
+    current_user: User = Depends(get_current_active_user),
+) -> LexiconProfileMappingCandidatesResponse:
+    try:
+        profile_record = profile_repo.get_profile(profile_id, current_user)
+        mapping_summaries = mapping_repo.list_mappings(current_user)
+        mappings = [mapping_repo.get_mapping(item.id, current_user) for item in mapping_summaries]
+        return service.find_profile_mapping_candidates(
+            profile_id=profile_id,
+            profile=profile_record.profile,
+            mappings=mappings,
+        )
+    except LexiconProfileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except LexiconProfileRepositoryError as exc:
+        logger.exception("Failed to find lexicon profile mapping candidates", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except LexiconMappingRepositoryError as exc:
+        logger.exception("Failed to load mappings for lexicon profile candidates", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
 @router.post("/reconstruction", response_model=LexiconReconstructionResponse)
