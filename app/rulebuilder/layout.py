@@ -170,10 +170,7 @@ def _place_end_nodes(
     current_x: float | None = None
     for node_id in ranked_end_ids:
         desired_x = _average(end_desired_x.get(node_id) or [ROOT_X])
-        if current_x is None:
-            final_x = desired_x
-        else:
-            final_x = max(desired_x, current_x + END_MIN_SPACING_X)
+        final_x = desired_x if current_x is None else max(desired_x, current_x + END_MIN_SPACING_X)
         final_x, final_y = _reserve_position(node_id, final_x, bottom_y, positions, occupied_positions)
         positions[node_id] = (final_x, final_y)
         occupied_positions[(final_x, final_y)] = node_id

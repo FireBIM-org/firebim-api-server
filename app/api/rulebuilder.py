@@ -13,8 +13,8 @@ from app.rules.decompiler import decompile_ruleset_ttl
 from app.rules.element_validator import validate_rule_element_payload
 from app.rules.models import fbRuleElement
 from app.rules.publisher import (
-    default_rule_graph_uri,
     default_rule_element_graph_uri,
+    default_rule_graph_uri,
     fetch_graph_ttl,
     publish_graph_ttl,
     remember_rule_element_graph,
@@ -32,12 +32,12 @@ from app.schemas.rulebuilder import (
     RuleBuilderWorkspaceUpdateRequest,
 )
 from app.schemas.rules import RuleDraft, RuleElementPayload
+from app.storage.graph_store import GraphStoreNotFoundError
 from app.storage.rulebuilder_workspace_repository import (
     RuleBuilderWorkspaceNotFoundError,
     RuleBuilderWorkspaceRepository,
     RuleBuilderWorkspaceRepositoryError,
 )
-from app.storage.graph_store import GraphStoreNotFoundError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rulebuilder", tags=["rulebuilder"])
@@ -125,7 +125,11 @@ def create_workspace(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
-@router.post("/rules/{rule_id}/workspace", response_model=RuleBuilderWorkspaceResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/rules/{rule_id}/workspace",
+    response_model=RuleBuilderWorkspaceResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_workspace_from_rule(
     rule_id: str,
     payload: RuleBuilderWorkspaceFromRuleRequest,
