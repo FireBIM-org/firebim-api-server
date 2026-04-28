@@ -1,5 +1,5 @@
-@prefix ifc: <https://firebim.org/ontology/ifc/global/2026.04#> .
-@prefix fbo-dk: <https://firebim.org/ontology/fbo/dk/2026.04#> .
+@prefix ifc: <https://firebim.org/ontologies/ifc/global/2026.04#> .
+@prefix fbo-dk: <https://firebim.org/ontologies/fbo/dk/2026.04#> .
 @prefix ex: <https://firebim.org/examples/buildings/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 

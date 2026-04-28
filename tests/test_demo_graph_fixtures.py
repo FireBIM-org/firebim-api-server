@@ -10,19 +10,19 @@ FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures"
 
 ALLOWED_TARGET_PREFIXES = {
     "building_ifc_only_compliant.ttl": {
-        "https://firebim.org/ontology/ifc/global/2026.04#",
+        "https://firebim.org/ontologies/ifc/global/2026.04#",
     },
     "building_fbo_only_compliant.ttl": {
-        "https://firebim.org/ontology/fbo/dk/2026.04#",
+        "https://firebim.org/ontologies/fbo/dk/2026.04#",
     },
     "building_ifc_fbo_compliant.ttl": {
-        "https://firebim.org/ontology/ifc/global/2026.04#",
-        "https://firebim.org/ontology/fbo/dk/2026.04#",
+        "https://firebim.org/ontologies/ifc/global/2026.04#",
+        "https://firebim.org/ontologies/fbo/dk/2026.04#",
     },
     "building_ifc_rir_fbo_compliant.ttl": {
-        "https://firebim.org/ontology/ifc/global/2026.04#",
-        "https://firebim.org/ontology/fbo/dk/2026.04#",
-        "https://firebim.org/ontology/rir/global/2026.04#",
+        "https://firebim.org/ontologies/ifc/global/2026.04#",
+        "https://firebim.org/ontologies/fbo/dk/2026.04#",
+        "https://firebim.org/ontologies/rir/global/2026.04#",
     },
 }
 
