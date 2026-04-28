@@ -533,6 +533,187 @@ def test_rules_publish_list_fetch_delete_and_ttl(client, sample_rule_payload):
     assert delete.json()["deleted"] is True
 
 
+def test_rule_terms_reports_unique_terms_and_stats(client, monkeypatch):
+    monkeypatch.setattr(
+        rules_api,
+        "_fetch_rule_by_id",
+        lambda rule_id: SimpleNamespace(
+            rule={
+                "id": rule_id,
+                "entry": "check_window",
+                "elements": [
+                    {
+                        "id": "check_window_ifc",
+                        "element_type": "decision",
+                        "target_class": "https://firebim.org/ontologies/ifc/global/2026.04#IfcWindow",
+                        "property_path": "https://firebim.org/ontologies/fbo/dk/2026.04#FireRating",
+                    },
+                    {
+                        "id": "check_window_custom",
+                        "element_type": "decision",
+                        "target_class": "https://firebim.org/ontologies/custom/dk/2026.05#IfcWindow",
+                        "property_path": "https://firebim.org/ontologies/custom/dk/2026.05#FireRating",
+                    },
+                    {
+                        "id": "check_window_ifc_duplicate",
+                        "element_type": "decision",
+                        "target_class": "https://firebim.org/ontologies/ifc/global/2026.04#IfcWindow",
+                        "property_path": "https://firebim.org/ontologies/fbo/dk/2026.04#FireRating",
+                    },
+                    {
+                        "id": "check_property_only",
+                        "element_type": "decision",
+                        "property_path": "https://firebim.org/ontologies/fbo/dk/2026.04#FireExit",
+                    },
+                ],
+            }
+        ),
+    )
+
+    response = client.get("/rules/rule_terms_demo/terms")
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["rule_id"] == "rule_terms_demo"
+    assert body["compact_terms"] is False
+    assert [item["full_iri"] for item in body["target_classes"]] == [
+        "https://firebim.org/ontologies/custom/dk/2026.05#IfcWindow",
+        "https://firebim.org/ontologies/ifc/global/2026.04#IfcWindow",
+    ]
+    assert [item["full_iri"] for item in body["property_paths"]] == [
+        "https://firebim.org/ontologies/custom/dk/2026.05#FireRating",
+        "https://firebim.org/ontologies/fbo/dk/2026.04#FireExit",
+        "https://firebim.org/ontologies/fbo/dk/2026.04#FireRating",
+    ]
+    assert body["stats"]["element_count"] == 4
+    assert body["stats"]["elements_with_target_class"] == 3
+    assert body["stats"]["elements_with_property_path"] == 4
+    assert body["stats"]["elements_with_both"] == 3
+    assert body["stats"]["unique_target_classes"] == 2
+    assert body["stats"]["unique_property_paths"] == 3
+    assert body["stats"]["unique_target_property_pairs"] == 2
+    assert body["stats"]["target_class_local_name_collisions"] == 1
+    assert body["stats"]["property_path_local_name_collisions"] == 1
+    assert body["target_class_local_name_groups"] == [
+        {
+            "local_name": "IfcWindow",
+            "count": 2,
+            "full_iris": [
+                "https://firebim.org/ontologies/custom/dk/2026.05#IfcWindow",
+                "https://firebim.org/ontologies/ifc/global/2026.04#IfcWindow",
+            ],
+            "namespaces": [
+                "https://firebim.org/ontologies/custom/dk/2026.05",
+                "https://firebim.org/ontologies/ifc/global/2026.04",
+            ],
+        }
+    ]
+
+    compact_response = client.get("/rules/rule_terms_demo/terms?compact_terms=true")
+    assert compact_response.status_code == 200
+    compact_body = compact_response.json()
+    assert compact_body["compact_terms"] is True
+    assert [item["value"] for item in compact_body["target_classes"]] == ["IfcWindow", "IfcWindow"]
+    assert [item["value"] for item in compact_body["property_paths"]] == ["FireRating", "FireExit", "FireRating"]
+    assert compact_body["target_property_pairs"][0]["compact_pair"].endswith("IfcWindow::FireRating")
+
+
+def test_rule_terms_aggregate_reports_combined_unique_terms_and_stats(client, monkeypatch):
+    rules = {
+        "rule_a": {
+            "id": "rule_a",
+            "entry": "check_a",
+            "elements": [
+                {
+                    "id": "a1",
+                    "element_type": "decision",
+                    "target_class": "https://firebim.org/ontologies/ifc/global/2026.04#IfcWindow",
+                    "property_path": "https://firebim.org/ontologies/fbo/dk/2026.04#FireRating",
+                },
+                {
+                    "id": "a2",
+                    "element_type": "decision",
+                    "property_path": "https://firebim.org/ontologies/fbo/dk/2026.04#FireExit",
+                },
+            ],
+        },
+        "rule_b": {
+            "id": "rule_b",
+            "entry": "check_b",
+            "elements": [
+                {
+                    "id": "b1",
+                    "element_type": "decision",
+                    "target_class": "https://firebim.org/ontologies/custom/dk/2026.05#IfcWindow",
+                    "property_path": "https://firebim.org/ontologies/custom/dk/2026.05#FireRating",
+                },
+                {
+                    "id": "b2",
+                    "element_type": "decision",
+                    "target_class": "https://firebim.org/ontologies/ifc/global/2026.04#IfcDoor",
+                    "property_path": "https://firebim.org/ontologies/fbo/dk/2026.04#FireRating",
+                },
+            ],
+        },
+    }
+    monkeypatch.setattr(
+        rules_api,
+        "_fetch_rule_by_id",
+        lambda rule_id: SimpleNamespace(rule=rules[rule_id]),
+    )
+
+    response = client.post(
+        "/rules/terms/aggregate",
+        json={"rule_ids": ["rule_a", "rule_b"], "compact_terms": True},
+    )
+    assert response.status_code == 200
+    body = response.json()
+
+    assert body["rule_ids"] == ["rule_a", "rule_b"]
+    assert body["compact_terms"] is True
+    assert [item["full_iri"] for item in body["target_classes"]] == [
+        "https://firebim.org/ontologies/custom/dk/2026.05#IfcWindow",
+        "https://firebim.org/ontologies/ifc/global/2026.04#IfcDoor",
+        "https://firebim.org/ontologies/ifc/global/2026.04#IfcWindow",
+    ]
+    assert body["stats"]["rule_count"] == 2
+    assert body["stats"]["element_count"] == 4
+    assert body["stats"]["rules_with_target_classes"] == 2
+    assert body["stats"]["rules_with_property_paths"] == 2
+    assert body["stats"]["rules_with_both"] == 2
+    assert body["stats"]["unique_target_classes"] == 3
+    assert body["stats"]["unique_property_paths"] == 3
+    assert body["stats"]["unique_target_property_pairs"] == 3
+    assert body["stats"]["target_class_local_name_collisions"] == 1
+    assert body["stats"]["property_path_local_name_collisions"] == 1
+    assert body["target_class_local_name_groups"] == [
+        {
+            "local_name": "IfcDoor",
+            "count": 1,
+            "full_iris": ["https://firebim.org/ontologies/ifc/global/2026.04#IfcDoor"],
+            "namespaces": ["https://firebim.org/ontologies/ifc/global/2026.04"],
+        },
+        {
+            "local_name": "IfcWindow",
+            "count": 2,
+            "full_iris": [
+                "https://firebim.org/ontologies/custom/dk/2026.05#IfcWindow",
+                "https://firebim.org/ontologies/ifc/global/2026.04#IfcWindow",
+            ],
+            "namespaces": [
+                "https://firebim.org/ontologies/custom/dk/2026.05",
+                "https://firebim.org/ontologies/ifc/global/2026.04",
+            ],
+        },
+    ]
+
+
+def test_rule_terms_aggregate_requires_two_rule_ids(client):
+    response = client.post("/rules/terms/aggregate", json={"rule_ids": ["rule_a"]})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "At least two rule_ids are required"
+
+
 def test_rule_elements_publish_list_fetch_derive_delete(client, sample_rule_element_payload):
     publish = client.post("/rules/rule-elements", json=sample_rule_element_payload)
     assert publish.status_code == 200

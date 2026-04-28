@@ -1,6 +1,7 @@
 import logging
+from collections import defaultdict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
@@ -64,6 +65,13 @@ from app.schemas.rules import (
     RuleListResponse,
     RulePublishRequest,
     RulePublishResponse,
+    RuleTermDescriptor,
+    RuleTermLocalNameGroup,
+    RuleTermPairDescriptor,
+    RuleTermsAggregateRequest,
+    RuleTermsAggregateResponse,
+    RuleTermsResponse,
+    RuleTermStats,
     RuleValidateRequest,
     RuleValidateResponse,
 )
@@ -209,6 +217,173 @@ def _fetch_rule_element_by_id(element_id: str) -> RuleElementFetchResponse:
         logger.exception("Rule element fetch succeeded but SHACL decompile failed")
         rule_element = None
     return RuleElementFetchResponse(graph_uri=graph_uri, ttl=ttl, rule_element=rule_element)
+
+
+def _split_term_parts(term: str) -> tuple[str, str]:
+    if "#" in term:
+        namespace, local_name = term.rsplit("#", 1)
+        return namespace, local_name
+    if "/" in term:
+        namespace, local_name = term.rsplit("/", 1)
+        return namespace, local_name
+    return "", term
+
+
+def _term_descriptor(term: str, *, compact_terms: bool) -> RuleTermDescriptor:
+    namespace, local_name = _split_term_parts(term)
+    return RuleTermDescriptor(
+        value=local_name if compact_terms else term,
+        full_iri=term,
+        namespace=namespace,
+        local_name=local_name,
+    )
+
+
+def _local_name_groups(terms: list[str]) -> list[RuleTermLocalNameGroup]:
+    grouped: dict[str, set[str]] = defaultdict(set)
+    namespaces_by_name: dict[str, set[str]] = defaultdict(set)
+    for term in terms:
+        namespace, local_name = _split_term_parts(term)
+        grouped[local_name].add(term)
+        if namespace:
+            namespaces_by_name[local_name].add(namespace)
+
+    return [
+        RuleTermLocalNameGroup(
+            local_name=local_name,
+            count=len(full_iris),
+            full_iris=sorted(full_iris),
+            namespaces=sorted(namespaces_by_name.get(local_name, set())),
+        )
+        for local_name, full_iris in sorted(grouped.items())
+    ]
+
+
+def _collect_rule_term_values(rule: dict) -> dict:
+    elements = rule.get("elements", [])
+    target_classes_raw = [str(item["target_class"]) for item in elements if item.get("target_class")]
+    property_paths_raw = [str(item["property_path"]) for item in elements if item.get("property_path")]
+    pair_keys = {
+        (str(item["target_class"]), str(item["property_path"]))
+        for item in elements
+        if item.get("target_class") and item.get("property_path")
+    }
+    return {
+        "elements": elements,
+        "target_classes_raw": target_classes_raw,
+        "property_paths_raw": property_paths_raw,
+        "pair_keys": pair_keys,
+        "has_target_classes": bool(target_classes_raw),
+        "has_property_paths": bool(property_paths_raw),
+        "has_both": bool(pair_keys),
+    }
+
+
+def _build_rule_term_stats(
+    *,
+    rule_count: int,
+    rules_with_target_classes: int,
+    rules_with_property_paths: int,
+    rules_with_both: int,
+    elements: list[dict],
+    unique_target_classes: list[str],
+    unique_property_paths: list[str],
+    pair_keys: list[tuple[str, str]],
+    target_class_groups: list[RuleTermLocalNameGroup],
+    property_path_groups: list[RuleTermLocalNameGroup],
+) -> RuleTermStats:
+    unique_target_class_namespaces = len({_split_term_parts(term)[0] for term in unique_target_classes if term})
+    unique_target_class_local_names = len({_split_term_parts(term)[1] for term in unique_target_classes if term})
+    unique_property_path_namespaces = len({_split_term_parts(term)[0] for term in unique_property_paths if term})
+    unique_property_path_local_names = len({_split_term_parts(term)[1] for term in unique_property_paths if term})
+    return RuleTermStats(
+        rule_count=rule_count,
+        element_count=len(elements),
+        rules_with_target_classes=rules_with_target_classes,
+        rules_with_property_paths=rules_with_property_paths,
+        rules_with_both=rules_with_both,
+        elements_with_target_class=sum(1 for item in elements if item.get("target_class")),
+        elements_with_property_path=sum(1 for item in elements if item.get("property_path")),
+        elements_with_both=sum(1 for item in elements if item.get("target_class") and item.get("property_path")),
+        unique_target_classes=len(unique_target_classes),
+        unique_target_class_namespaces=unique_target_class_namespaces,
+        unique_target_class_local_names=unique_target_class_local_names,
+        unique_property_paths=len(unique_property_paths),
+        unique_property_path_namespaces=unique_property_path_namespaces,
+        unique_property_path_local_names=unique_property_path_local_names,
+        unique_target_property_pairs=len(pair_keys),
+        target_class_local_name_collisions=sum(1 for group in target_class_groups if group.count > 1),
+        property_path_local_name_collisions=sum(1 for group in property_path_groups if group.count > 1),
+    )
+
+
+def _build_terms_payload(
+    *,
+    compact_terms: bool,
+    elements: list[dict],
+    unique_target_classes: list[str],
+    unique_property_paths: list[str],
+    pair_keys: list[tuple[str, str]],
+) -> dict:
+    target_class_groups = _local_name_groups(unique_target_classes)
+    property_path_groups = _local_name_groups(unique_property_paths)
+    return {
+        "target_classes": [_term_descriptor(term, compact_terms=compact_terms) for term in unique_target_classes],
+        "property_paths": [_term_descriptor(term, compact_terms=compact_terms) for term in unique_property_paths],
+        "target_property_pairs": [
+            RuleTermPairDescriptor(
+                value=(
+                    f"{_term_descriptor(target_class, compact_terms=compact_terms).value}"
+                    f" :: {_term_descriptor(property_path, compact_terms=compact_terms).value}"
+                ),
+                full_pair=f"{target_class}::{property_path}",
+                compact_pair=f"{_split_term_parts(target_class)[1]}::{_split_term_parts(property_path)[1]}",
+                target_class=_term_descriptor(target_class, compact_terms=compact_terms),
+                property_path=_term_descriptor(property_path, compact_terms=compact_terms),
+            )
+            for target_class, property_path in pair_keys
+        ],
+        "target_class_local_name_groups": target_class_groups,
+        "property_path_local_name_groups": property_path_groups,
+        "target_class_groups": target_class_groups,
+        "property_path_groups": property_path_groups,
+    }
+
+
+def _analyze_rule_terms(rule: dict, *, compact_terms: bool) -> RuleTermsResponse:
+    collected = _collect_rule_term_values(rule)
+    unique_target_classes = sorted(set(collected["target_classes_raw"]))
+    unique_property_paths = sorted(set(collected["property_paths_raw"]))
+    pair_keys = sorted(collected["pair_keys"])
+    payload = _build_terms_payload(
+        compact_terms=compact_terms,
+        elements=collected["elements"],
+        unique_target_classes=unique_target_classes,
+        unique_property_paths=unique_property_paths,
+        pair_keys=pair_keys,
+    )
+
+    return RuleTermsResponse(
+        rule_id=str(rule.get("id") or ""),
+        compact_terms=compact_terms,
+        target_classes=payload["target_classes"],
+        property_paths=payload["property_paths"],
+        target_property_pairs=payload["target_property_pairs"],
+        target_class_local_name_groups=payload["target_class_local_name_groups"],
+        property_path_local_name_groups=payload["property_path_local_name_groups"],
+        stats=_build_rule_term_stats(
+            rule_count=1,
+            rules_with_target_classes=1 if collected["has_target_classes"] else 0,
+            rules_with_property_paths=1 if collected["has_property_paths"] else 0,
+            rules_with_both=1 if collected["has_both"] else 0,
+            elements=collected["elements"],
+            unique_target_classes=unique_target_classes,
+            unique_property_paths=unique_property_paths,
+            pair_keys=pair_keys,
+            target_class_groups=payload["target_class_groups"],
+            property_path_groups=payload["property_path_groups"],
+        ),
+    )
 
 
 def _apply_links(rule: dict, links: list) -> dict:
@@ -746,6 +921,160 @@ def get_rule(rule_id: str):
         graph_uri = _resolve_rule_graph_uri(rule_id)
         error_bits = _publish_error_payload("storage_error", "Temporary backend storage issue while fetching rule", exc)
         return RuleFetchResponse(graph_uri=graph_uri, ttl="", rule=None, **error_bits)
+
+
+@router.get("/{rule_id}/terms", response_model=RuleTermsResponse)
+def get_rule_terms(
+    rule_id: str,
+    compact_terms: bool = Query(
+        default=False,
+        description="When true, the primary `value` fields use the local name after # or the final path segment.",
+    ),
+):
+    try:
+        response = _fetch_rule_by_id(rule_id)
+        if response.rule is None:
+            raise HTTPException(status_code=500, detail=f"Rule '{rule_id}' could not be decompiled")
+        return _analyze_rule_terms(response.rule, compact_terms=compact_terms)
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except GraphStoreNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"Rule not found: {rule_id}") from exc
+    except Exception as exc:
+        error_bits = _publish_error_payload("rule_terms_error", "Unexpected error while extracting rule terms", exc)
+        return RuleTermsResponse(
+            rule_id=rule_id,
+            compact_terms=compact_terms,
+            target_classes=[],
+            property_paths=[],
+            target_property_pairs=[],
+            target_class_local_name_groups=[],
+            property_path_local_name_groups=[],
+            stats=RuleTermStats(
+                rule_count=0,
+                element_count=0,
+                rules_with_target_classes=0,
+                rules_with_property_paths=0,
+                rules_with_both=0,
+                elements_with_target_class=0,
+                elements_with_property_path=0,
+                elements_with_both=0,
+                unique_target_classes=0,
+                unique_target_class_namespaces=0,
+                unique_target_class_local_names=0,
+                unique_property_paths=0,
+                unique_property_path_namespaces=0,
+                unique_property_path_local_names=0,
+                unique_target_property_pairs=0,
+                target_class_local_name_collisions=0,
+                property_path_local_name_collisions=0,
+            ),
+            **error_bits,
+        )
+
+
+@router.post("/terms/aggregate", response_model=RuleTermsAggregateResponse)
+def aggregate_rule_terms(payload: RuleTermsAggregateRequest):
+    if len(payload.rule_ids) < 2:
+        raise HTTPException(status_code=400, detail="At least two rule_ids are required")
+
+    try:
+        all_elements: list[dict] = []
+        all_target_classes: list[str] = []
+        all_property_paths: list[str] = []
+        all_pair_keys: set[tuple[str, str]] = set()
+        rules_with_target_classes = 0
+        rules_with_property_paths = 0
+        rules_with_both = 0
+
+        for rule_id in payload.rule_ids:
+            response = _fetch_rule_by_id(rule_id)
+            if response.rule is None:
+                raise HTTPException(status_code=500, detail=f"Rule '{rule_id}' could not be decompiled")
+            collected = _collect_rule_term_values(response.rule)
+            all_elements.extend(collected["elements"])
+            all_target_classes.extend(collected["target_classes_raw"])
+            all_property_paths.extend(collected["property_paths_raw"])
+            all_pair_keys.update(collected["pair_keys"])
+            rules_with_target_classes += 1 if collected["has_target_classes"] else 0
+            rules_with_property_paths += 1 if collected["has_property_paths"] else 0
+            rules_with_both += 1 if collected["has_both"] else 0
+
+        unique_target_classes = sorted(set(all_target_classes))
+        unique_property_paths = sorted(set(all_property_paths))
+        pair_keys = sorted(all_pair_keys)
+        terms_payload = _build_terms_payload(
+            compact_terms=payload.compact_terms,
+            elements=all_elements,
+            unique_target_classes=unique_target_classes,
+            unique_property_paths=unique_property_paths,
+            pair_keys=pair_keys,
+        )
+
+        return RuleTermsAggregateResponse(
+            rule_ids=payload.rule_ids,
+            compact_terms=payload.compact_terms,
+            target_classes=terms_payload["target_classes"],
+            property_paths=terms_payload["property_paths"],
+            target_property_pairs=terms_payload["target_property_pairs"],
+            target_class_local_name_groups=terms_payload["target_class_local_name_groups"],
+            property_path_local_name_groups=terms_payload["property_path_local_name_groups"],
+            stats=_build_rule_term_stats(
+                rule_count=len(payload.rule_ids),
+                rules_with_target_classes=rules_with_target_classes,
+                rules_with_property_paths=rules_with_property_paths,
+                rules_with_both=rules_with_both,
+                elements=all_elements,
+                unique_target_classes=unique_target_classes,
+                unique_property_paths=unique_property_paths,
+                pair_keys=pair_keys,
+                target_class_groups=terms_payload["target_class_groups"],
+                property_path_groups=terms_payload["property_path_groups"],
+            ),
+        )
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except GraphStoreNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        error_bits = _publish_error_payload(
+            "rule_terms_aggregate_error",
+            "Unexpected error while aggregating rule terms",
+            exc,
+        )
+        return RuleTermsAggregateResponse(
+            rule_ids=payload.rule_ids,
+            compact_terms=payload.compact_terms,
+            target_classes=[],
+            property_paths=[],
+            target_property_pairs=[],
+            target_class_local_name_groups=[],
+            property_path_local_name_groups=[],
+            stats=RuleTermStats(
+                rule_count=len(payload.rule_ids),
+                element_count=0,
+                rules_with_target_classes=0,
+                rules_with_property_paths=0,
+                rules_with_both=0,
+                elements_with_target_class=0,
+                elements_with_property_path=0,
+                elements_with_both=0,
+                unique_target_classes=0,
+                unique_target_class_namespaces=0,
+                unique_target_class_local_names=0,
+                unique_property_paths=0,
+                unique_property_path_namespaces=0,
+                unique_property_path_local_names=0,
+                unique_target_property_pairs=0,
+                target_class_local_name_collisions=0,
+                property_path_local_name_collisions=0,
+            ),
+            **error_bits,
+        )
 
 
 @router.get(
