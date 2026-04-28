@@ -7,7 +7,9 @@
 .pytest_cache
 .ruff_cache
 secrets/
-tests/
+tests/*
+!tests/fixtures/
+!tests/fixtures/**
 docs/
 scripts/
 k8s/

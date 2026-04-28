@@ -1,0 +1,57 @@
+@prefix fbo-dk: <https://firebim.org/ontology/fbo/dk/2026.04#> .
+@prefix ex: <https://firebim.org/examples/buildings/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:bffu-admin a fbo-dk:BuildingFunctionalFireUnit ;
+    fbo-dk:AreaBuildingFunctionalFireUnit ex:fc-reception, ex:fc-open-office ;
+    fbo-dk:SystemEvacuationroute ex:route-admin-main ;
+    fbo-dk:UseCategoryAK2 ex:use-ak2-admin .
+
+ex:bffu-meeting a fbo-dk:BuildingFunctionalFireUnit ;
+    fbo-dk:AreaBuildingFunctionalFireUnit ex:fc-meeting, ex:fc-stair ;
+    fbo-dk:SystemIndependentEvacuationRoute ex:route-egress-secondary ;
+    fbo-dk:UseCategoryAK3 ex:use-ak3-meeting .
+
+ex:fc-reception a fbo-dk:FireCompartment ;
+    fbo-dk:AreaFireCompartment "95.0"^^xsd:decimal ;
+    fbo-dk:NumberOccupantsSpaceCompartment "18"^^xsd:integer ;
+    fbo-dk:RoomOccupancy true ;
+    fbo-dk:UseCategory "AK2" ;
+    fbo-dk:RoomfunctionAssemblyrooms true ;
+    fbo-dk:EvacuationRoutePrimary ex:route-admin-main ;
+    fbo-dk:SeparationFire ex:fire-wall-admin-01 ;
+    fbo-dk:DoorIndependentExitdoors ex:exit-door-admin-01 .
+
+ex:fc-open-office a fbo-dk:FireCompartment ;
+    fbo-dk:AreaFireCompartment "132.5"^^xsd:decimal ;
+    fbo-dk:NumberOccupantsSpaceCompartment "26"^^xsd:integer ;
+    fbo-dk:RoomOccupancy true ;
+    fbo-dk:UseCategory "AK2" ;
+    fbo-dk:RoomfunctionOfficespace ex:roomfunction-office ;
+    fbo-dk:EvacuationRoutePrimary ex:route-admin-main ;
+    fbo-dk:SeparationFire ex:fire-wall-admin-02 ;
+    fbo-dk:FireloadDensity "420.0"^^xsd:decimal .
+
+ex:fc-meeting a fbo-dk:FireCompartment ;
+    fbo-dk:AreaFireCompartment "74.0"^^xsd:decimal ;
+    fbo-dk:NumberOccupantsSpaceCompartment "32"^^xsd:integer ;
+    fbo-dk:RoomOccupancy true ;
+    fbo-dk:UseCategory "AK3" ;
+    fbo-dk:RoomfunctionAssemblyrooms true ;
+    fbo-dk:EvacuationRoutePrimary ex:route-meeting-main ;
+    fbo-dk:SeparationFire ex:fire-wall-meeting-01 ;
+    fbo-dk:DistanceBlindEnd "7.5"^^xsd:decimal .
+
+ex:fc-stair a fbo-dk:FireCompartment ;
+    fbo-dk:AreaFireCompartment "28.0"^^xsd:decimal ;
+    fbo-dk:NumberOccupantsSpaceCompartment "6"^^xsd:integer ;
+    fbo-dk:UseCategory "AK3" ;
+    fbo-dk:RoomfunctionEscapestaircase true ;
+    fbo-dk:SystemIndependentEvacuationRoute ex:route-egress-secondary ;
+    fbo-dk:SeparationFire ex:fire-wall-stair-01 ;
+    fbo-dk:FireResistance "EI60" .
+
+ex:warning-system-main a fbo-dk:AutomaticWarningsystem, fbo-dk:ActiveFireProtection .
+ex:warning-system-zonal a fbo-dk:AutomaticWarningsystem, fbo-dk:ActiveFireProtection .
+ex:roomfunction-office a fbo-dk:Roomfunction .
+ex:roomfunction-storage a fbo-dk:Roomfunction .

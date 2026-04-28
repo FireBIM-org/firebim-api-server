@@ -24,6 +24,7 @@ from app.auth.router import router as auth_router
 from app.core.config import settings
 from app.models.database import engine, get_db, init_db
 from app.models.models import CheckResult, IdsFile, IfcModel, User
+from app.storage.demo_content_bootstrap import bootstrap_default_demo_content
 from app.storage.ontology_bootstrap import bootstrap_default_ontologies
 from app.storage.ontology_repository import OntologyRepository
 from app.workers.celery_app import celery_app
@@ -91,6 +92,10 @@ async def startup_event():
 
     seeded_ontologies = bootstrap_default_ontologies(ontologies_repo)
     logger.info("Ontology bootstrap completed", extra={"seeded_ontologies": seeded_ontologies})
+
+    if settings.ENVIRONMENT == "local":
+        seeded_demo_content = bootstrap_default_demo_content()
+        logger.info("Demo content bootstrap completed", extra={"seeded_demo_content": seeded_demo_content})
 
 
 # S3 Configuration
