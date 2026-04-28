@@ -8,10 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.jwt import get_current_active_user
 from app.models.models import User
+from app.rulebuilder.layout import build_workspace_from_rule
+from app.rules.decompiler import decompile_ruleset_ttl
 from app.rules.element_validator import validate_rule_element_payload
 from app.rules.models import fbRuleElement
 from app.rules.publisher import (
+    default_rule_graph_uri,
     default_rule_element_graph_uri,
+    fetch_graph_ttl,
     publish_graph_ttl,
     remember_rule_element_graph,
 )
@@ -22,15 +26,18 @@ from app.schemas.rulebuilder import (
     RuleBuilderWorkspaceBatchDeleteResponse,
     RuleBuilderWorkspaceCreateRequest,
     RuleBuilderWorkspaceDeleteResponse,
+    RuleBuilderWorkspaceFromRuleRequest,
     RuleBuilderWorkspaceListResponse,
     RuleBuilderWorkspaceResponse,
     RuleBuilderWorkspaceUpdateRequest,
 )
+from app.schemas.rules import RuleDraft, RuleElementPayload
 from app.storage.rulebuilder_workspace_repository import (
     RuleBuilderWorkspaceNotFoundError,
     RuleBuilderWorkspaceRepository,
     RuleBuilderWorkspaceRepositoryError,
 )
+from app.storage.graph_store import GraphStoreNotFoundError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rulebuilder", tags=["rulebuilder"])
@@ -70,6 +77,39 @@ def _publish_rule_element_snapshot(node_rule) -> tuple[str, str]:
     return element.id, graph_uri
 
 
+def _normalize_rule_draft(raw_rule: dict | None) -> RuleDraft:
+    if not raw_rule:
+        raise ValueError("Rule could not be decompiled")
+
+    elements = raw_rule.get("elements") or raw_rule.get("nodes") or []
+    return RuleDraft(
+        id=raw_rule["id"],
+        entry=raw_rule["entry"],
+        elements=[
+            RuleElementPayload(
+                id=element["id"],
+                element_type=element.get("element_type") or element.get("node_type") or "decision",
+                target_class=element.get("target_class"),
+                property_path=element.get("property_path"),
+                operator=element.get("operator"),
+                value=element.get("value"),
+                true_path=element.get("true_path"),
+                false_path=element.get("false_path"),
+                unknown_path=element.get("unknown_path"),
+                label=element.get("label"),
+                config=element.get("config") or {},
+            )
+            for element in elements
+        ],
+    )
+
+
+def _load_rule_draft(rule_id: str) -> RuleDraft:
+    graph_uri = default_rule_graph_uri(rule_id)
+    ttl = fetch_graph_ttl(dataset="rulebook", graph_uri=graph_uri)
+    return _normalize_rule_draft(decompile_ruleset_ttl(ttl))
+
+
 @router.post("/workspaces", response_model=RuleBuilderWorkspaceResponse, status_code=status.HTTP_201_CREATED)
 def create_workspace(
     payload: RuleBuilderWorkspaceCreateRequest,
@@ -82,6 +122,30 @@ def create_workspace(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except RuleBuilderWorkspaceRepositoryError as exc:
         logger.exception("Failed to create RuleBuilder workspace", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post("/rules/{rule_id}/workspace", response_model=RuleBuilderWorkspaceResponse, status_code=status.HTTP_201_CREATED)
+def create_workspace_from_rule(
+    rule_id: str,
+    payload: RuleBuilderWorkspaceFromRuleRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> RuleBuilderWorkspaceResponse:
+    try:
+        rule = _load_rule_draft(rule_id)
+        workspace_payload = build_workspace_from_rule(
+            rule,
+            workspace_name=payload.name,
+            viewport=payload.viewport,
+        )
+        workspace = repo.create_workspace(workspace_payload, current_user)
+        return RuleBuilderWorkspaceResponse(workspace=workspace)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except GraphStoreNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except RuleBuilderWorkspaceRepositoryError as exc:
+        logger.exception("Failed to create RuleBuilder workspace from rule", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 

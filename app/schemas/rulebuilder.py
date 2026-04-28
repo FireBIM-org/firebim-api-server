@@ -53,6 +53,11 @@ class RuleBuilderWorkspaceUpdateRequest(RuleBuilderWorkspacePayload):
     pass
 
 
+class RuleBuilderWorkspaceFromRuleRequest(BaseModel):
+    name: str | None = None
+    viewport: RuleBuilderViewport | None = None
+
+
 class RuleBuilderWorkspace(BaseModel):
     id: str
     name: str

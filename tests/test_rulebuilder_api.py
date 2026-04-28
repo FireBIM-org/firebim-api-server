@@ -20,7 +20,9 @@ os.environ.setdefault("CELERY_BROKER_URL", "redis://localhost:6379/0")
 os.environ.setdefault("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
 
 from app.api import rulebuilder as rulebuilder_api
+from app.rulebuilder.layout import build_workspace_from_rule
 from app.schemas.rulebuilder import RuleBuilderWorkspace, RuleBuilderWorkspaceSummary
+from app.schemas.rules import RuleDraft, RuleElementPayload
 
 
 class DummyRepo:
@@ -68,8 +70,9 @@ class DummyRepo:
 
     def create_workspace(self, payload, user):
         _ = user
+        self.last_create_payload = payload
         return RuleBuilderWorkspace(
-            **self.workspace.model_dump(exclude={"id", "created_at", "updated_at"}),
+            **payload.model_dump(),
             id="ws_new",
             created_at=datetime(2026, 4, 23, 10, 0, tzinfo=UTC),
             updated_at=datetime(2026, 4, 23, 10, 0, tzinfo=UTC),
@@ -228,3 +231,109 @@ def test_export_rule_elements(client: TestClient):
             "graph_uri": "https://firebim.org/graphs/rule-elements/check_room_area",
         }
     ]
+
+
+def test_create_workspace_from_rule(client: TestClient, monkeypatch):
+    rule = RuleDraft(
+        id="rule_rooms",
+        entry="start_1",
+        elements=[
+            RuleElementPayload(
+                id="start_1",
+                element_type="start",
+                true_path="decision_root",
+                label="Start",
+            ),
+            RuleElementPayload(
+                id="decision_root",
+                element_type="decision",
+                true_path="decision_true",
+                false_path="decision_false",
+                unknown_path="decision_unknown",
+                label="Root",
+            ),
+            RuleElementPayload(
+                id="decision_true",
+                element_type="decision",
+                true_path="end_pass",
+                false_path="end_fail",
+                unknown_path="end_missing",
+                label="True branch",
+            ),
+            RuleElementPayload(
+                id="decision_false",
+                element_type="decision",
+                true_path="end_pass",
+                false_path="end_fail",
+                unknown_path="end_missing",
+                label="False branch",
+            ),
+            RuleElementPayload(
+                id="decision_unknown",
+                element_type="decision",
+                true_path="end_pass",
+                false_path="end_fail",
+                unknown_path="end_missing",
+                label="Unknown branch",
+            ),
+            RuleElementPayload(id="end_pass", element_type="end", label="Pass"),
+            RuleElementPayload(id="end_fail", element_type="end", label="Fail"),
+            RuleElementPayload(id="end_missing", element_type="end", label="Missing"),
+        ],
+    )
+    monkeypatch.setattr(rulebuilder_api, "_load_rule_draft", lambda rule_id: rule)
+
+    response = client.post(
+        "/rulebuilder/rules/rule_rooms/workspace",
+        json={"name": "Layout from rule"},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    workspace = body["workspace"]
+    assert workspace["name"] == "Layout from rule"
+    assert workspace["entry_node_id"] == "start_1"
+    assert len(workspace["nodes"]) == 8
+    positions = {node["canvas_node_id"]: node["position"] for node in workspace["nodes"]}
+    assert positions["start_1"]["x"] == 800
+    assert positions["start_1"]["y"] == -350
+    assert positions["decision_true"]["x"] < positions["decision_false"]["x"] < positions["decision_unknown"]["x"]
+    assert positions["end_pass"]["y"] == positions["end_fail"]["y"] == positions["end_missing"]["y"]
+    assert positions["end_pass"]["x"] < positions["end_fail"]["x"] < positions["end_missing"]["x"]
+
+
+def test_build_workspace_from_rule_offsets_collisions():
+    rule = RuleDraft(
+        id="rule_collision",
+        entry="start_a",
+        elements=[
+            RuleElementPayload(id="start_a", element_type="start", true_path="decision_a", label="Start"),
+            RuleElementPayload(
+                id="decision_a",
+                element_type="decision",
+                true_path="shared_decision",
+                false_path="shared_decision",
+                unknown_path="shared_decision",
+                label="A",
+            ),
+            RuleElementPayload(
+                id="shared_decision",
+                element_type="decision",
+                true_path="end_a",
+                false_path="end_b",
+                unknown_path="end_c",
+                label="Shared",
+            ),
+            RuleElementPayload(id="end_a", element_type="end", label="A end"),
+            RuleElementPayload(id="end_b", element_type="end", label="B end"),
+            RuleElementPayload(id="end_c", element_type="end", label="C end"),
+        ],
+    )
+
+    workspace = build_workspace_from_rule(rule, workspace_name="Collision test")
+    positions = {node.canvas_node_id: (node.position.x, node.position.y) for node in workspace.nodes}
+
+    assert positions["start_a"] == (800.0, -350.0)
+    assert positions["decision_a"][1] > positions["start_a"][1]
+    assert positions["shared_decision"][1] > positions["decision_a"][1]
+    assert len(set(positions.values())) == len(positions)
