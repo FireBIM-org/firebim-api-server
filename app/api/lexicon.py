@@ -19,6 +19,8 @@ from app.schemas.lexicon import (
     LexiconCatalogSimilarityResponse,
     LexiconCatalogTermResponse,
     LexiconCatalogTermsResponse,
+    LexiconRuleOntologySimilarityRequest,
+    LexiconRuleOntologySimilarityResponse,
     LexiconConformityCheckRequest,
     LexiconConformityCheckResponse,
     LexiconGraphEvidenceSummaryRequest,
@@ -222,6 +224,24 @@ def score_catalog_similarity_matrix(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to score lexicon similarity matrix",
+        ) from exc
+
+
+@router.post("/catalog/rule-ontology-similarity", response_model=LexiconRuleOntologySimilarityResponse)
+def score_rule_ontology_similarity(
+    payload: LexiconRuleOntologySimilarityRequest,
+) -> LexiconRuleOntologySimilarityResponse:
+    try:
+        return service.score_rule_ontology_similarity(payload)
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to score rule ontology similarity", exc_info=exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to score rule ontology similarity",
         ) from exc
 
 

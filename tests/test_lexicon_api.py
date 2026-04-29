@@ -1236,6 +1236,86 @@ def test_catalog_similarity_matrix(monkeypatch):
     assert len(body["cells"]) == 2
 
 
+def test_rule_ontology_similarity_with_multiple_rules_and_ontologies(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/catalog/rule-ontology-similarity",
+        json={
+            "selected_ontologies": [
+                {"ontology_family": "ifc", "country": "global", "version": "latest"},
+                {"ontology_family": "fbo", "country": "dk", "version": "latest"},
+            ],
+            "rules": [
+                {
+                    "id": "ifc_rule",
+                    "entry": "start",
+                    "elements": [
+                        {
+                            "id": "start",
+                            "element_type": "decision",
+                            "target_class": "https://firebim.org/ontologies/ifc/global#IfcWall",
+                            "property_path": "https://firebim.org/ontologies/ifc/global#FireRating",
+                            "operator": "=",
+                            "value": "EI60",
+                            "true_path": "ok",
+                            "false_path": "fail",
+                            "unknown_path": "unknown",
+                            "label": "Check IFC wall",
+                            "config": {},
+                        },
+                        {"id": "ok", "element_type": "end", "label": "Ok", "config": {}},
+                        {"id": "fail", "element_type": "end", "label": "Fail", "config": {}},
+                        {"id": "unknown", "element_type": "end", "label": "Unknown", "config": {}},
+                    ],
+                },
+                {
+                    "id": "fbo_rule",
+                    "entry": "start",
+                    "elements": [
+                        {
+                            "id": "start",
+                            "element_type": "decision",
+                            "target_class": "https://firebim.org/ontologies/fbo/dk#Wall",
+                            "property_path": "https://firebim.org/ontologies/fbo/dk#Combustible",
+                            "operator": "=",
+                            "value": True,
+                            "true_path": "ok",
+                            "false_path": "fail",
+                            "unknown_path": "unknown",
+                            "label": "Check FBO wall",
+                            "config": {},
+                        },
+                        {"id": "ok", "element_type": "end", "label": "Ok", "config": {}},
+                        {"id": "fail", "element_type": "end", "label": "Fail", "config": {}},
+                        {"id": "unknown", "element_type": "end", "label": "Unknown", "config": {}},
+                    ],
+                },
+            ],
+            "limit_per_term": 2,
+            "compact_terms": True,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["rule_ids"] == ["ifc_rule", "fbo_rule"]
+    assert body["limit_per_term"] == 2
+    assert body["compact_terms"] is True
+    assert body["stats"]["rule_count"] == 2
+    assert body["stats"]["ontology_count"] == 2
+    assert body["stats"]["rule_ontology_pairs"] == 4
+    assert len(body["results"]) == 2
+    ifc_rule = next(item for item in body["results"] if item["rule_id"] == "ifc_rule")
+    assert ifc_rule["target_classes"][0]["source_term"]["local_name"] == "IfcWall"
+    assert ifc_rule["target_classes"][0]["source_term"]["value"] == "IfcWall"
+    assert any(match["term_id"] == "IfcWall" for match in ifc_rule["target_classes"][0]["matches"])
+    assert any(match["ontology_family"] == "fbo" for match in ifc_rule["target_classes"][0]["matches"])
+    assert len(body["rule_ontology_summaries"]) == 4
+    assert any(
+        item["rule_id"] == "ifc_rule" and item["ontology_family"] == "ifc"
+        for item in body["rule_ontology_summaries"]
+    )
+
+
 def test_property_and_property_set_related_catalog_endpoints(monkeypatch):
     client = _build_client(monkeypatch)
 

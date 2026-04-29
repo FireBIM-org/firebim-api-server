@@ -495,6 +495,93 @@ class LexiconCatalogSimilarityMatrixResponse(BaseModel):
     cells: list[LexiconCatalogSimilarityMatrixCell] = Field(default_factory=list)
 
 
+class LexiconRuleOntologySimilarityRequest(BaseModel):
+    selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list, min_length=1)
+    rule_id: str | None = None
+    rule_ids: list[str] = Field(default_factory=list)
+    rule: RuleDraft | None = None
+    rules: list[RuleDraft] = Field(default_factory=list)
+    limit_per_term: int = Field(default=3, ge=1, le=25)
+    compact_terms: bool = False
+
+    @model_validator(mode="after")
+    def validate_rule_source(self) -> LexiconRuleOntologySimilarityRequest:
+        active = int(bool(self.rule_id)) + int(bool(self.rule_ids)) + int(bool(self.rule)) + int(bool(self.rules))
+        if active != 1:
+            raise ValueError("Provide exactly one of rule_id, rule_ids, rule, or rules")
+        return self
+
+
+class LexiconRuleSimilaritySourceTerm(BaseModel):
+    term_kind: str
+    value: str
+    full_iri: str
+    namespace: str
+    local_name: str
+    node_ids: list[str] = Field(default_factory=list)
+
+
+class LexiconRuleSimilarityMatch(BaseModel):
+    ontology_family: str
+    country: str
+    version: str
+    term_id: str
+    uri: str
+    kind: str
+    label: str | None = None
+    value: str
+    full_iri: str
+    namespace: str
+    local_name: str
+    score: float = Field(ge=0.0, le=1.0)
+    notes: list[str] = Field(default_factory=list)
+
+
+class LexiconRuleSimilarityTermResult(BaseModel):
+    source_term: LexiconRuleSimilaritySourceTerm
+    match_count: int
+    matches: list[LexiconRuleSimilarityMatch] = Field(default_factory=list)
+
+
+class LexiconRuleOntologySimilarityRuleResult(BaseModel):
+    rule_id: str
+    target_classes: list[LexiconRuleSimilarityTermResult] = Field(default_factory=list)
+    property_paths: list[LexiconRuleSimilarityTermResult] = Field(default_factory=list)
+
+
+class LexiconRuleOntologySimilaritySummary(BaseModel):
+    rule_id: str
+    ontology_family: str
+    country: str
+    version: str
+    source_term_count: int
+    matched_source_terms: int
+    matched_target_classes: int
+    matched_property_paths: int
+    best_score: float = Field(ge=0.0, le=1.0)
+    average_top_score: float = Field(ge=0.0, le=1.0)
+
+
+class LexiconRuleOntologySimilarityStats(BaseModel):
+    rule_count: int
+    ontology_count: int
+    total_target_classes: int
+    total_property_paths: int
+    total_source_terms: int
+    total_matches: int
+    rule_ontology_pairs: int
+
+
+class LexiconRuleOntologySimilarityResponse(BaseModel):
+    rule_ids: list[str] = Field(default_factory=list)
+    selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list)
+    limit_per_term: int
+    compact_terms: bool = False
+    results: list[LexiconRuleOntologySimilarityRuleResult] = Field(default_factory=list)
+    rule_ontology_summaries: list[LexiconRuleOntologySimilaritySummary] = Field(default_factory=list)
+    stats: LexiconRuleOntologySimilarityStats
+
+
 class LexiconMappedTermReference(BaseModel):
     ontology_family: str = Field(..., min_length=1)
     country: str = Field(..., min_length=2)

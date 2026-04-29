@@ -56,10 +56,18 @@ from app.schemas.lexicon import (
     LexiconProfileGraphCoverageResponse,
     LexiconProfileMappingCandidate,
     LexiconProfileMappingCandidatesResponse,
+    LexiconRuleOntologySimilarityRequest,
+    LexiconRuleOntologySimilarityResponse,
+    LexiconRuleOntologySimilarityRuleResult,
+    LexiconRuleOntologySimilarityStats,
+    LexiconRuleOntologySimilaritySummary,
     LexiconProfileRulesCoverageResponse,
     LexiconProfileSummaryResponse,
     LexiconPropertyRequirement,
     LexiconReconstructionResponse,
+    LexiconRuleSimilarityMatch,
+    LexiconRuleSimilaritySourceTerm,
+    LexiconRuleSimilarityTermResult,
     LexiconRuleCoverageItem,
     LexiconSelectedOntology,
     LexiconSimilarityComponentScore,
@@ -347,6 +355,101 @@ class LexiconService:
             left_count=len(payload.left_terms),
             right_count=len(payload.right_terms),
             cells=cells,
+        )
+
+    def score_rule_ontology_similarity(
+        self,
+        payload: LexiconRuleOntologySimilarityRequest,
+    ) -> LexiconRuleOntologySimilarityResponse:
+        normalized_rules = self._load_rules(
+            rule_id=payload.rule_id,
+            rule_ids=payload.rule_ids,
+            rule=payload.rule,
+            rules=payload.rules,
+        )
+        selected_ontologies = self._resolve_similarity_selected_ontologies(payload.selected_ontologies)
+        bundles = [
+            self._resolve_ontology_bundle(
+                ontology_family=selection.ontology_family,
+                country=selection.country,
+                version=selection.version,
+            )
+            for selection in selected_ontologies
+        ]
+        dataset = LexiconQueryRuntime.from_bundles(bundles).dataset
+
+        results: list[LexiconRuleOntologySimilarityRuleResult] = []
+        rule_ontology_summaries: list[LexiconRuleOntologySimilaritySummary] = []
+        total_target_classes = 0
+        total_property_paths = 0
+        total_matches = 0
+
+        for normalized_rule in normalized_rules:
+            target_terms = self._collect_rule_term_occurrences(normalized_rule, field_name="target_class")
+            property_terms = self._collect_rule_term_occurrences(normalized_rule, field_name="property_path")
+            target_class_entries = [
+                self._score_rule_term_against_ontologies(
+                    term_kind="class",
+                    term_value=term_value,
+                    node_ids=node_ids,
+                    bundles=bundles,
+                    dataset=dataset,
+                    limit_per_term=payload.limit_per_term,
+                    compact_terms=payload.compact_terms,
+                )
+                for term_value, node_ids in target_terms
+            ]
+            property_path_entries = [
+                self._score_rule_term_against_ontologies(
+                    term_kind="property",
+                    term_value=term_value,
+                    node_ids=node_ids,
+                    bundles=bundles,
+                    dataset=dataset,
+                    limit_per_term=payload.limit_per_term,
+                    compact_terms=payload.compact_terms,
+                )
+                for term_value, node_ids in property_terms
+            ]
+            target_classes = [item[0] for item in target_class_entries]
+            property_paths = [item[0] for item in property_path_entries]
+            results.append(
+                LexiconRuleOntologySimilarityRuleResult(
+                    rule_id=normalized_rule["id"],
+                    target_classes=target_classes,
+                    property_paths=property_paths,
+                )
+            )
+
+            total_target_classes += len(target_classes)
+            total_property_paths += len(property_paths)
+            total_matches += sum(item.match_count for item in target_classes)
+            total_matches += sum(item.match_count for item in property_paths)
+            rule_ontology_summaries.extend(
+                self._build_rule_ontology_summaries(
+                    rule_id=normalized_rule["id"],
+                    target_class_entries=target_class_entries,
+                    property_path_entries=property_path_entries,
+                    selections=selected_ontologies,
+                )
+            )
+
+        return LexiconRuleOntologySimilarityResponse(
+            rule_ids=[item["id"] for item in normalized_rules],
+            selected_ontologies=selected_ontologies,
+            limit_per_term=payload.limit_per_term,
+            compact_terms=payload.compact_terms,
+            results=results,
+            rule_ontology_summaries=rule_ontology_summaries,
+            stats=LexiconRuleOntologySimilarityStats(
+                rule_count=len(normalized_rules),
+                ontology_count=len(selected_ontologies),
+                total_target_classes=total_target_classes,
+                total_property_paths=total_property_paths,
+                total_source_terms=total_target_classes + total_property_paths,
+                total_matches=total_matches,
+                rule_ontology_pairs=len(normalized_rules) * len(selected_ontologies),
+            ),
         )
 
     def summarize_profile(
@@ -1480,6 +1583,161 @@ class LexiconService:
         )
         return response.term
 
+    def _resolve_similarity_selected_ontologies(
+        self,
+        selections: list[LexiconSelectedOntology],
+    ) -> list[LexiconSelectedOntology]:
+        resolved: list[LexiconSelectedOntology] = []
+        seen: set[tuple[str, str, str]] = set()
+        for selection in selections:
+            ontology = self.resolve_ontology(
+                ontology_family=selection.ontology_family,
+                country=selection.country,
+                version=selection.version,
+            )
+            key = (ontology.ontology_family, ontology.country, ontology.version)
+            if key in seen:
+                continue
+            seen.add(key)
+            resolved.append(
+                LexiconSelectedOntology(
+                    ontology_family=ontology.ontology_family,
+                    country=ontology.country,
+                    version=ontology.version,
+                    canonical_family_uri=ontology.canonical_family_uri,
+                    canonical_country_uri=ontology.canonical_country_uri,
+                )
+            )
+        return resolved
+
+    @staticmethod
+    def _collect_rule_term_occurrences(
+        normalized_rule: dict,
+        *,
+        field_name: str,
+    ) -> list[tuple[str, list[str]]]:
+        occurrences: dict[str, set[str]] = defaultdict(set)
+        for element in normalized_rule.get("elements", []):
+            value = element.get(field_name)
+            if not value:
+                continue
+            occurrences[str(value)].add(str(element.get("id") or ""))
+        return [(term_value, sorted(node_ids)) for term_value, node_ids in sorted(occurrences.items())]
+
+    def _score_rule_term_against_ontologies(
+        self,
+        *,
+        term_kind: str,
+        term_value: str,
+        node_ids: list[str],
+        bundles: list[LexiconOntologyBundle],
+        dataset: LexiconMergedResolutionDataset,
+        limit_per_term: int,
+        compact_terms: bool,
+    ) -> tuple[LexiconRuleSimilarityTermResult, dict[tuple[str, str, str], float]]:
+        source_term = self._build_rule_source_term(
+            term_kind=term_kind,
+            term_value=term_value,
+            node_ids=node_ids,
+            compact_terms=compact_terms,
+        )
+        source_detail = self._resolve_rule_source_term_detail(
+            term_kind=term_kind,
+            term_value=term_value,
+            bundles=bundles,
+        )
+        candidates: list[LexiconRuleSimilarityMatch] = []
+        top_scores_by_ontology: dict[tuple[str, str, str], float] = {}
+
+        for bundle in bundles:
+            for term in bundle.catalog.values():
+                if term["kind"] != term_kind:
+                    continue
+                candidate_detail = self._catalog_term_detail_from_dict(term)
+                components = self._similarity_components(source_detail, candidate_detail, dataset)
+                score = round(sum(item.score for item in components) / len(components), 3) if components else 0.0
+                ontology_key = (
+                    bundle.ontology.ontology_family,
+                    bundle.ontology.country,
+                    bundle.ontology.version,
+                )
+                if score > top_scores_by_ontology.get(ontology_key, -1.0):
+                    top_scores_by_ontology[ontology_key] = score
+                candidates.append(
+                    LexiconRuleSimilarityMatch(
+                        ontology_family=bundle.ontology.ontology_family,
+                        country=bundle.ontology.country,
+                        version=bundle.ontology.version,
+                        term_id=candidate_detail.term_id,
+                        uri=candidate_detail.uri,
+                        kind=candidate_detail.kind,
+                        label=candidate_detail.label,
+                        value=self._term_display_value(candidate_detail.uri, compact_terms=compact_terms),
+                        full_iri=candidate_detail.uri,
+                        namespace=self._term_namespace(candidate_detail.uri),
+                        local_name=self._term_local_name(candidate_detail.uri),
+                        score=score,
+                        notes=[item.note for item in components if item.note],
+                    )
+                )
+
+        candidates.sort(
+            key=lambda item: (
+                -item.score,
+                item.ontology_family,
+                item.country,
+                item.version,
+                item.term_id.lower(),
+            )
+        )
+        matches = candidates[:limit_per_term]
+        return (
+            LexiconRuleSimilarityTermResult(
+                source_term=source_term,
+                match_count=len(matches),
+                matches=matches,
+            ),
+            top_scores_by_ontology,
+        )
+
+    def _build_rule_ontology_summaries(
+        self,
+        *,
+        rule_id: str,
+        target_class_entries: list[tuple[LexiconRuleSimilarityTermResult, dict[tuple[str, str, str], float]]],
+        property_path_entries: list[tuple[LexiconRuleSimilarityTermResult, dict[tuple[str, str, str], float]]],
+        selections: list[LexiconSelectedOntology],
+    ) -> list[LexiconRuleOntologySimilaritySummary]:
+        summaries: list[LexiconRuleOntologySimilaritySummary] = []
+        for selection in selections:
+            scores: list[float] = []
+            matched_target_classes = 0
+            matched_property_paths = 0
+            ontology_key = (selection.ontology_family, selection.country, selection.version)
+            for _term_result, top_scores in target_class_entries:
+                if ontology_key in top_scores:
+                    matched_target_classes += 1
+                    scores.append(top_scores[ontology_key])
+            for _term_result, top_scores in property_path_entries:
+                if ontology_key in top_scores:
+                    matched_property_paths += 1
+                    scores.append(top_scores[ontology_key])
+            summaries.append(
+                LexiconRuleOntologySimilaritySummary(
+                    rule_id=rule_id,
+                    ontology_family=selection.ontology_family,
+                    country=selection.country,
+                    version=selection.version,
+                    source_term_count=len(target_class_entries) + len(property_path_entries),
+                    matched_source_terms=matched_target_classes + matched_property_paths,
+                    matched_target_classes=matched_target_classes,
+                    matched_property_paths=matched_property_paths,
+                    best_score=max(scores) if scores else 0.0,
+                    average_top_score=round(sum(scores) / len(scores), 3) if scores else 0.0,
+                )
+            )
+        return summaries
+
     def _build_query_runtime(
         self,
         selections: list[LexiconSelectedOntology],
@@ -1532,6 +1790,79 @@ class LexiconService:
         for assertion in mapping.target_assertions:
             add_reference(assertion.ontology_family, assertion.country, assertion.version)
         return selected
+
+    def _resolve_rule_source_term_detail(
+        self,
+        *,
+        term_kind: str,
+        term_value: str,
+        bundles: list[LexiconOntologyBundle],
+    ) -> LexiconCatalogTermDetail:
+        if term_value.startswith("http://") or term_value.startswith("https://"):
+            for bundle in bundles:
+                term = bundle.catalog.get(term_value)
+                if term and term["kind"] == term_kind:
+                    return self._catalog_term_detail_from_dict(term)
+        else:
+            for bundle in bundles:
+                for term in bundle.catalog.values():
+                    if term["kind"] == term_kind and term["term_id"] == term_value:
+                        return self._catalog_term_detail_from_dict(term)
+
+        return LexiconCatalogTermDetail(
+            term_id=self._term_local_name(term_value),
+            uri=term_value,
+            kind=term_kind,
+            label=self._term_local_name(term_value),
+            definition=None,
+            description=None,
+            parent_term_ids=[],
+            child_term_ids=[],
+            property_term_ids=[],
+            property_set_term_ids=[],
+            belongs_to_class_term_ids=[],
+            related_property_term_ids=[],
+            unit=None,
+            is_property_set=False,
+            is_predefined_type=False,
+        )
+
+    @staticmethod
+    def _catalog_term_detail_from_dict(term: dict[str, Any]) -> LexiconCatalogTermDetail:
+        return LexiconCatalogTermDetail(
+            term_id=term["term_id"],
+            uri=term["uri"],
+            kind=term["kind"],
+            label=term["label"],
+            definition=term["definition"],
+            description=term["description"],
+            parent_term_ids=term["parent_term_ids"],
+            child_term_ids=term["child_term_ids"],
+            property_term_ids=term["property_term_ids"],
+            property_set_term_ids=term["property_set_term_ids"],
+            belongs_to_class_term_ids=term["belongs_to_class_term_ids"],
+            related_property_term_ids=term["related_property_term_ids"],
+            unit=term["unit"],
+            is_property_set=term["is_property_set"],
+            is_predefined_type=term["is_predefined_type"],
+        )
+
+    def _build_rule_source_term(
+        self,
+        *,
+        term_kind: str,
+        term_value: str,
+        node_ids: list[str],
+        compact_terms: bool,
+    ) -> LexiconRuleSimilaritySourceTerm:
+        return LexiconRuleSimilaritySourceTerm(
+            term_kind=term_kind,
+            value=self._term_display_value(term_value, compact_terms=compact_terms),
+            full_iri=term_value,
+            namespace=self._term_namespace(term_value),
+            local_name=self._term_local_name(term_value),
+            node_ids=node_ids,
+        )
 
     def _similarity_components(
         self,
@@ -2082,6 +2413,26 @@ class LexiconService:
         if "#" in uri:
             return uri.rsplit("#", 1)[1]
         return uri.rstrip("/").rsplit("/", 1)[-1]
+
+    @staticmethod
+    def _term_namespace(value: str) -> str:
+        if "#" in value:
+            return value.rsplit("#", 1)[0]
+        if "/" in value:
+            return value.rsplit("/", 1)[0]
+        return ""
+
+    @staticmethod
+    def _term_local_name(value: str) -> str:
+        if "#" in value:
+            return value.rsplit("#", 1)[1]
+        if "/" in value:
+            return value.rstrip("/").rsplit("/", 1)[-1]
+        return value
+
+    @classmethod
+    def _term_display_value(cls, value: str, *, compact_terms: bool) -> str:
+        return cls._term_local_name(value) if compact_terms else value
 
     @staticmethod
     def _to_literal(value: Any, datatype_uri: str | None, language: str | None) -> Literal:
