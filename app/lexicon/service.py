@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
+import logging
 from threading import RLock
 from time import monotonic
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 from rdflib import RDF, RDFS, Graph, Literal, URIRef
 from rdflib.namespace import OWL, XSD
 
+from app.core.observability import is_request_profiling_enabled, log_event, record_metric
 from app.graphs_and_checks.publisher import fetch_rule_ttl
 from app.lexicon.query_runtime import (
     LexiconMergedResolutionDataset,
@@ -88,6 +90,7 @@ ONTOLOGY_META_BELONGS_TO_CLASS_URI = "https://firebim.org/ontology-meta#belongsT
 ONTOLOGY_META_GROUP_OF_PROPERTIES_URI = "https://firebim.org/ontology-meta#groupOfProperties"
 ONTOLOGY_META_UNIT_URI = "https://firebim.org/ontology-meta#unit"
 ONTOLOGY_META_RELATED_PROPERTY_URI = "https://firebim.org/ontology-meta#relatedProperty"
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -924,6 +927,7 @@ class LexiconService:
         selected_ontologies: list[LexiconSelectedOntology] | None = None,
         canonical_target_ontology: LexiconSelectedOntology | None = None,
     ) -> dict[str, Any]:
+        started_at = monotonic()
         requested = list(selected_ontologies or [])
         if not requested:
             requested = [
@@ -944,22 +948,24 @@ class LexiconService:
         resolved: list[LexiconSelectedOntology] = []
         seen: set[tuple[str, str, str]] = set()
         for selection in requested:
-            ontology = self.resolve_ontology(
-                ontology_family=selection.ontology_family,
-                country=selection.country,
-                version=selection.version,
+            metadata = self.ontology_repo.fetch_version_metadata(
+                selection.ontology_family,
+                selection.country,
+                selection.version,
             )
-            key = (ontology.ontology_family, ontology.country, ontology.version)
+            key = (selection.ontology_family, selection.country, metadata.version)
             if key in seen:
                 continue
             seen.add(key)
             resolved.append(
                 LexiconSelectedOntology(
-                    ontology_family=ontology.ontology_family,
-                    country=ontology.country,
-                    version=ontology.version,
-                    canonical_family_uri=ontology.canonical_family_uri,
-                    canonical_country_uri=ontology.canonical_country_uri,
+                    ontology_family=selection.ontology_family,
+                    country=selection.country,
+                    version=metadata.version,
+                    canonical_family_uri=self.ontology_repo.canonical_family_uri(selection.ontology_family),
+                    canonical_country_uri=self.ontology_repo.canonical_country_uri(
+                        selection.ontology_family, selection.country
+                    ),
                 )
             )
 
@@ -969,6 +975,15 @@ class LexiconService:
             if item.ontology_family == canonical_target_ontology.ontology_family
             and item.country == canonical_target_ontology.country
         )
+        duration_ms = round((monotonic() - started_at) * 1000, 3)
+        record_metric("lexicon.resolve_selected_ontologies_ms", duration_ms, append=True)
+        if is_request_profiling_enabled():
+            log_event(
+                logger,
+                "lexicon.resolve_selected_ontologies",
+                count=len(resolved),
+                duration_ms=duration_ms,
+            )
         return {
             "selected_ontologies": resolved,
             "canonical_target_ontology": resolved_canonical,
@@ -987,6 +1002,7 @@ class LexiconService:
         rule: RuleDraft | None = None,
         rules: list[RuleDraft] | None = None,
     ) -> tuple[LexiconOntologyContext, LexiconExecutionProfile, list[LexiconExecutionProfile], list[str]]:
+        started_at = monotonic()
         resolved_selection = self.resolve_selected_ontologies(
             ontology_family=ontology_family,
             country=country,
@@ -1012,6 +1028,16 @@ class LexiconService:
         normalized_rules = self._load_rules(rule_id=rule_id, rule_ids=rule_ids, rule=rule, rules=rules)
         rule_profiles = [self._derive_profile_from_rule_dict(item, runtime) for item in normalized_rules]
         aggregate_profile = self._aggregate_rule_profiles(rule_profiles)
+        duration_ms = round((monotonic() - started_at) * 1000, 3)
+        record_metric("lexicon.derive_profile_ms", duration_ms, append=True)
+        if is_request_profiling_enabled():
+            log_event(
+                logger,
+                "lexicon.derive_profile",
+                duration_ms=duration_ms,
+                rule_count=len(normalized_rules),
+                selected_ontology_count=len(resolved_selection["selected_ontologies"]),
+            )
         return bundle.ontology, aggregate_profile, rule_profiles, [item["id"] for item in normalized_rules]
 
     def _derive_profile_from_rule_dict(
@@ -1446,7 +1472,20 @@ class LexiconService:
         country: str,
         version: str,
     ) -> LexiconOntologyContext:
+        started_at = monotonic()
         fetched = self.ontology_repo.fetch_version(ontology_family, country, version)
+        duration_ms = round((monotonic() - started_at) * 1000, 3)
+        record_metric("lexicon.resolve_ontology_ms", duration_ms, append=True)
+        if is_request_profiling_enabled():
+            log_event(
+                logger,
+                "lexicon.resolve_ontology",
+                ontology_family=ontology_family,
+                country=country,
+                requested_version=version,
+                resolved_version=fetched.version.version,
+                duration_ms=duration_ms,
+            )
         return LexiconOntologyContext(
             ontology_family=ontology_family,
             country=country,
@@ -1482,20 +1521,45 @@ class LexiconService:
         cache_key = (ontology_family, country, version)
         cached = self._get_cached_bundle(cache_key)
         if cached is not None:
+            record_metric(
+                "lexicon.ontology_bundle_cache_hit",
+                {"ontology_family": ontology_family, "country": country, "version": version},
+                append=True,
+            )
+            if is_request_profiling_enabled():
+                log_event(
+                    logger,
+                    "lexicon.ontology_bundle.cache_hit",
+                    ontology_family=ontology_family,
+                    country=country,
+                    version=version,
+                )
             return cached
 
+        started_at = monotonic()
         ontology = self.resolve_ontology(
             ontology_family=ontology_family,
             country=country,
             version=version,
         )
         graph = Graph()
+        parse_started_at = monotonic()
         graph.parse(data=ontology.ontology_ttl, format="turtle")
+        parse_duration_ms = round((monotonic() - parse_started_at) * 1000, 3)
+        record_metric("lexicon.ontology_bundle_parse_ms", parse_duration_ms, append=True)
+
+        declared_started_at = monotonic()
         declared_classes, declared_properties = self._collect_declared_terms(graph)
+        declared_duration_ms = round((monotonic() - declared_started_at) * 1000, 3)
+        record_metric("lexicon.ontology_declared_terms_ms", declared_duration_ms, append=True)
+
+        catalog_started_at = monotonic()
         catalog = self._build_catalog(graph)
         catalog = self._add_catalog_term_aliases(catalog, ontology=ontology)
         declared_classes = self._add_term_uri_aliases(declared_classes, ontology=ontology)
         declared_properties = self._add_term_uri_aliases(declared_properties, ontology=ontology)
+        catalog_duration_ms = round((monotonic() - catalog_started_at) * 1000, 3)
+        record_metric("lexicon.ontology_catalog_build_ms", catalog_duration_ms, append=True)
         bundle = LexiconOntologyBundle(
             ontology=ontology,
             graph=graph,
@@ -1504,6 +1568,24 @@ class LexiconService:
             declared_properties=declared_properties,
         )
         self._store_cached_bundle(cache_key, bundle)
+        total_duration_ms = round((monotonic() - started_at) * 1000, 3)
+        record_metric("lexicon.ontology_bundle_build_ms", total_duration_ms, append=True)
+        if is_request_profiling_enabled():
+            log_event(
+                logger,
+                "lexicon.ontology_bundle.cache_miss",
+                ontology_family=ontology_family,
+                country=country,
+                requested_version=version,
+                resolved_version=ontology.version,
+                parse_ms=parse_duration_ms,
+                declared_terms_ms=declared_duration_ms,
+                catalog_build_ms=catalog_duration_ms,
+                total_ms=total_duration_ms,
+                triple_count=len(graph),
+                class_count=len(declared_classes),
+                property_count=len(declared_properties),
+            )
         return bundle
 
     @staticmethod

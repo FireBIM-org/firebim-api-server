@@ -4,11 +4,14 @@ import hashlib
 import json
 from datetime import UTC, date, datetime
 from pathlib import Path
+import logging
+from time import monotonic
 
 from botocore.exceptions import BotoCoreError, ClientError
 from rdflib import Graph, URIRef
 from rdflib.namespace import OWL, RDF, RDFS
 
+from app.core.observability import is_request_profiling_enabled, log_event, record_metric
 from app.schemas.ontologies import (
     OntologyPublishRequest,
     OntologyReleaseStatus,
@@ -26,6 +29,7 @@ LOCAL_RESOURCE_DIRECTORIES = (
     Path(__file__).resolve().parents[1] / "ontologies" / "resources",
     Path(__file__).resolve().parents[1] / "lexicon" / "resources",
 )
+logger = logging.getLogger(__name__)
 
 
 class OntologyManifestNotFoundError(GraphStoreNotFoundError):
@@ -86,6 +90,7 @@ class OntologyRepository:
         }
 
     def fetch_version(self, ontology_family: str, country: str, version: str) -> OntologyVersionFetchResponse:
+        started_at = monotonic()
         manifest = self._load_manifest(ontology_family, country)
         resolved_version = self._resolve_version_token(version, manifest.get("versions", []))
         entry = self._find_version_entry(manifest.get("versions", []), resolved_version)
@@ -94,6 +99,19 @@ class OntologyRepository:
         ttl = self.client.get_graph_ttl(self.dataset, entry["graph_uri"])
         versions = self._version_models_from_manifest(manifest, ontology_family, country)
         current = next(item for item in versions if item.version == resolved_version)
+        duration_ms = round((monotonic() - started_at) * 1000, 3)
+        record_metric("ontology_repo.fetch_version_ms", duration_ms, append=True)
+        if is_request_profiling_enabled():
+            log_event(
+                logger,
+                "ontology_repo.fetch_version",
+                ontology_family=ontology_family,
+                country=country,
+                requested_version=version,
+                resolved_version=resolved_version,
+                duration_ms=duration_ms,
+                byte_size=current.byte_size,
+            )
         return OntologyVersionFetchResponse(
             ontology_family=ontology_family,
             country=country,
@@ -104,12 +122,25 @@ class OntologyRepository:
         )
 
     def fetch_version_metadata(self, ontology_family: str, country: str, version: str) -> OntologyVersionMetadata:
+        started_at = monotonic()
         manifest = self._load_manifest(ontology_family, country)
         resolved_version = self._resolve_version_token(version, manifest.get("versions", []))
         versions = self._version_models_from_manifest(manifest, ontology_family, country)
         current = next((item for item in versions if item.version == resolved_version), None)
         if current is None:
             raise GraphStoreNotFoundError(f"Ontology version not found: {ontology_family}/{country}/{resolved_version}")
+        duration_ms = round((monotonic() - started_at) * 1000, 3)
+        record_metric("ontology_repo.fetch_version_metadata_ms", duration_ms, append=True)
+        if is_request_profiling_enabled():
+            log_event(
+                logger,
+                "ontology_repo.fetch_version_metadata",
+                ontology_family=ontology_family,
+                country=country,
+                requested_version=version,
+                resolved_version=resolved_version,
+                duration_ms=duration_ms,
+            )
         return current
 
     def publish_version(self, payload: OntologyPublishRequest) -> dict:

@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import json
 import logging
+from time import monotonic
+from typing import TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, ValidationError
 
 from app.auth.jwt import get_current_active_user
+from app.core.observability import is_request_profiling_enabled, log_event, record_metric
 from app.lexicon.service import LexiconService
 from app.models.models import User
 from app.schemas.lexicon import (
@@ -80,6 +86,32 @@ service = LexiconService()
 mapping_repo = LexiconMappingRepository()
 handshake_repo = LexiconHandshakeRepository()
 profile_repo = LexiconProfileRepository()
+ModelT = TypeVar("ModelT", bound=BaseModel)
+
+
+async def _parse_request_model(request: Request, model_type: type[ModelT], *, metric_prefix: str) -> ModelT:
+    body_started_at = monotonic()
+    raw_body = await request.body()
+    body_read_ms = round((monotonic() - body_started_at) * 1000, 3)
+    record_metric(f"{metric_prefix}.body_read_ms", body_read_ms)
+    record_metric(f"{metric_prefix}.body_bytes", len(raw_body))
+
+    json_started_at = monotonic()
+    try:
+        payload_data = json.loads(raw_body.decode("utf-8") or "{}")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid JSON body: {exc.msg}") from exc
+    json_parse_ms = round((monotonic() - json_started_at) * 1000, 3)
+    record_metric(f"{metric_prefix}.body_json_parse_ms", json_parse_ms)
+
+    validation_started_at = monotonic()
+    try:
+        payload = model_type.model_validate(payload_data)
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors()) from exc
+    validation_ms = round((monotonic() - validation_started_at) * 1000, 3)
+    record_metric(f"{metric_prefix}.body_model_validate_ms", validation_ms)
+    return payload
 
 
 @router.get("/health", response_model=LexiconHealthResponse)
@@ -722,12 +754,15 @@ def summarize_execution_profile(payload: LexiconProfileDeriveRequest) -> Lexicon
 
 
 @router.post("/profiles", response_model=LexiconProfileResponse, status_code=status.HTTP_201_CREATED)
-def create_profile(
-    payload: LexiconProfileCreateRequest,
+async def create_profile(
+    request: Request,
     current_user: User = Depends(get_current_active_user),
 ) -> LexiconProfileResponse:
     try:
+        payload = await _parse_request_model(request, LexiconProfileCreateRequest, metric_prefix="lexicon.profile_create")
+        logic_started_at = monotonic()
         if payload.profile is not None:
+            selection_started_at = monotonic()
             selected = service.resolve_selected_ontologies(
                 ontology_family=payload.ontology_family,
                 country=payload.country,
@@ -735,23 +770,28 @@ def create_profile(
                 selected_ontologies=payload.selected_ontologies,
                 canonical_target_ontology=payload.canonical_target_ontology,
             )
-            ontology = service.resolve_ontology(
-                ontology_family=payload.ontology_family,
-                country=payload.country,
-                version=payload.version,
-            )
+            selection_duration_ms = round((monotonic() - selection_started_at) * 1000, 3)
+            record_metric("lexicon.profile_create.resolve_selected_ontologies_ms", selection_duration_ms)
+            canonical = selected["canonical_target_ontology"]
+
+            write_started_at = monotonic()
             profile_record = profile_repo.create_profile(
                 payload=payload,
                 user=current_user,
-                canonical_family_uri=ontology.canonical_family_uri,
-                canonical_country_uri=ontology.canonical_country_uri,
+                canonical_family_uri=canonical.canonical_family_uri or "",
+                canonical_country_uri=canonical.canonical_country_uri or "",
                 rule_ids=payload.rule_ids,
                 profile=payload.profile,
                 rule_profiles=payload.rule_profiles or [payload.profile],
                 selected_ontologies=selected["selected_ontologies"],
                 canonical_target_ontology=selected["canonical_target_ontology"],
             )
+            record_metric(
+                "lexicon.profile_create.persist_ms",
+                round((monotonic() - write_started_at) * 1000, 3),
+            )
         else:
+            derive_started_at = monotonic()
             ontology, profile, rule_profiles, rule_ids = service.derive_profile(
                 ontology_family=payload.ontology_family,
                 country=payload.country,
@@ -763,6 +803,9 @@ def create_profile(
                 rule=payload.rule,
                 rules=payload.rules,
             )
+            record_metric("lexicon.profile_create.derive_ms", round((monotonic() - derive_started_at) * 1000, 3))
+
+            selection_started_at = monotonic()
             selected = service.resolve_selected_ontologies(
                 ontology_family=payload.ontology_family,
                 country=payload.country,
@@ -770,6 +813,12 @@ def create_profile(
                 selected_ontologies=payload.selected_ontologies,
                 canonical_target_ontology=payload.canonical_target_ontology,
             )
+            record_metric(
+                "lexicon.profile_create.resolve_selected_ontologies_ms",
+                round((monotonic() - selection_started_at) * 1000, 3),
+            )
+
+            write_started_at = monotonic()
             profile_record = profile_repo.create_profile(
                 payload=payload,
                 user=current_user,
@@ -780,6 +829,22 @@ def create_profile(
                 rule_profiles=rule_profiles,
                 selected_ontologies=selected["selected_ontologies"],
                 canonical_target_ontology=selected["canonical_target_ontology"],
+            )
+            record_metric(
+                "lexicon.profile_create.persist_ms",
+                round((monotonic() - write_started_at) * 1000, 3),
+            )
+        logic_duration_ms = round((monotonic() - logic_started_at) * 1000, 3)
+        record_metric("lexicon.profile_create.logic_ms", logic_duration_ms)
+        request.state.handler_completed_at = monotonic()
+        if is_request_profiling_enabled():
+            log_event(
+                logger,
+                "lexicon.profile_create.completed",
+                has_explicit_profile=payload.profile is not None,
+                selected_ontology_count=len(profile_record.selected_ontologies),
+                rule_count=len(profile_record.rule_ids),
+                duration_ms=logic_duration_ms,
             )
         return LexiconProfileResponse(profile_record=profile_record)
     except (GraphStoreError, GraphStoreNotFoundError) as exc:
@@ -836,13 +901,18 @@ def get_profile(profile_id: str, current_user: User = Depends(get_current_active
 
 
 @router.put("/profiles/{profile_id}", response_model=LexiconProfileResponse)
-def update_profile(
+async def update_profile(
     profile_id: str,
-    payload: LexiconProfileUpdateRequest,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
 ) -> LexiconProfileResponse:
     try:
+        payload = await _parse_request_model(request, LexiconProfileUpdateRequest, metric_prefix="lexicon.profile_update")
+        logic_started_at = monotonic()
+        read_started_at = monotonic()
         existing = profile_repo.get_profile(profile_id, current_user)
+        record_metric("lexicon.profile_update.read_existing_ms", round((monotonic() - read_started_at) * 1000, 3))
+        merge_started_at = monotonic()
         updated = existing.model_copy(
             update={
                 "name": payload.name if payload.name is not None else existing.name,
@@ -863,7 +933,22 @@ def update_profile(
                 "rule_profiles": payload.rule_profiles if payload.rule_profiles is not None else existing.rule_profiles,
             }
         )
+        record_metric("lexicon.profile_update.merge_ms", round((monotonic() - merge_started_at) * 1000, 3))
+        write_started_at = monotonic()
         profile_record = profile_repo.update_profile(profile_id=profile_id, user=current_user, updated=updated)
+        record_metric("lexicon.profile_update.persist_ms", round((monotonic() - write_started_at) * 1000, 3))
+        logic_duration_ms = round((monotonic() - logic_started_at) * 1000, 3)
+        record_metric("lexicon.profile_update.logic_ms", logic_duration_ms)
+        request.state.handler_completed_at = monotonic()
+        if is_request_profiling_enabled():
+            log_event(
+                logger,
+                "lexicon.profile_update.completed",
+                profile_id=profile_id,
+                selected_ontology_count=len(profile_record.selected_ontologies),
+                rule_count=len(profile_record.rule_ids),
+                duration_ms=logic_duration_ms,
+            )
         return LexiconProfileResponse(profile_record=profile_record)
     except LexiconProfileNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
@@ -873,12 +958,19 @@ def update_profile(
 
 
 @router.delete("/profiles/{profile_id}", response_model=LexiconProfileDeleteResponse)
-def delete_profile(
+async def delete_profile(
     profile_id: str,
+    request: Request,
     current_user: User = Depends(get_current_active_user),
 ) -> LexiconProfileDeleteResponse:
     try:
+        delete_started_at = monotonic()
         profile_repo.delete_profile(profile_id, current_user)
+        delete_duration_ms = round((monotonic() - delete_started_at) * 1000, 3)
+        record_metric("lexicon.profile_delete.logic_ms", delete_duration_ms)
+        request.state.handler_completed_at = monotonic()
+        if is_request_profiling_enabled():
+            log_event(logger, "lexicon.profile_delete.completed", profile_id=profile_id, duration_ms=delete_duration_ms)
         return LexiconProfileDeleteResponse(deleted=True, profile_id=profile_id)
     except LexiconProfileNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
