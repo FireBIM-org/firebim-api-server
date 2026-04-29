@@ -9,6 +9,7 @@ from app.auth.jwt import get_current_active_user
 from app.core.config import settings
 from app.ontologies.service import (
     build_dictionary_conversion,
+    build_version_summary_from_metadata,
     build_version_summary_response,
     resolve_candidate_dictionary_json,
     validation_report_model,
@@ -493,8 +494,39 @@ def fetch_ontology_version_summary(
     country: str,
     version: str,
 ) -> OntologyVersionSummaryResponse:
-    response = _fetch_ontology_version(ontology_family, country, version)
-    return build_version_summary_response(response)
+    ontology_family = ontology_family.strip().lower()
+    country = country.strip().lower()
+    version = version.strip()
+    try:
+        metadata = repo.fetch_version_metadata(ontology_family, country, version)
+        if any(
+            (
+                metadata.class_count,
+                metadata.property_count,
+                metadata.property_set_count,
+                metadata.subclass_count,
+                metadata.class_property_link_count,
+            )
+        ):
+            return build_version_summary_from_metadata(
+                ontology_family=ontology_family,
+                country=country,
+                metadata=metadata,
+            )
+        response = fetch_ontology_version_data(
+            repo,
+            ontology_family=ontology_family,
+            country=country,
+            version=version,
+        )
+        return build_version_summary_response(response)
+    except GraphStoreNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except GraphStoreError as exc:
+        logger.exception("Failed to fetch ontology version summary", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
 @router.get(

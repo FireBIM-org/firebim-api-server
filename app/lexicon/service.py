@@ -154,7 +154,7 @@ class LexiconService:
                 parent_term_ids=term["parent_term_ids"],
                 is_predefined_type=term["is_predefined_type"],
             )
-            for term in bundle.catalog.values()
+            for term in self._unique_catalog_terms(bundle.catalog)
             if (normalized_kind is None or term["kind"] == normalized_kind)
             and (
                 normalized_parent_uri is None
@@ -1492,10 +1492,14 @@ class LexiconService:
         graph = Graph()
         graph.parse(data=ontology.ontology_ttl, format="turtle")
         declared_classes, declared_properties = self._collect_declared_terms(graph)
+        catalog = self._build_catalog(graph)
+        catalog = self._add_catalog_term_aliases(catalog, ontology=ontology)
+        declared_classes = self._add_term_uri_aliases(declared_classes, ontology=ontology)
+        declared_properties = self._add_term_uri_aliases(declared_properties, ontology=ontology)
         bundle = LexiconOntologyBundle(
             ontology=ontology,
             graph=graph,
-            catalog=self._build_catalog(graph),
+            catalog=catalog,
             declared_classes=declared_classes,
             declared_properties=declared_properties,
         )
@@ -1558,6 +1562,57 @@ class LexiconService:
         if value.startswith("http://") or value.startswith("https://"):
             return value
         return f"{canonical_country_uri}{value}"
+
+    @staticmethod
+    def _unique_catalog_terms(catalog: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+        unique_terms: list[dict[str, Any]] = []
+        seen_uris: set[str] = set()
+        for term in catalog.values():
+            uri = str(term["uri"])
+            if uri in seen_uris:
+                continue
+            seen_uris.add(uri)
+            unique_terms.append(term)
+        return unique_terms
+
+    @staticmethod
+    def _add_catalog_term_aliases(
+        catalog: dict[str, dict[str, Any]],
+        *,
+        ontology: LexiconOntologyContext,
+    ) -> dict[str, dict[str, Any]]:
+        expanded = dict(catalog)
+        for uri, term in list(catalog.items()):
+            for alias in LexiconService._term_uri_aliases(uri, ontology=ontology):
+                expanded.setdefault(alias, term)
+        return expanded
+
+    @staticmethod
+    def _add_term_uri_aliases(
+        values: set[str],
+        *,
+        ontology: LexiconOntologyContext,
+    ) -> set[str]:
+        expanded = set(values)
+        for uri in list(values):
+            expanded.update(LexiconService._term_uri_aliases(uri, ontology=ontology))
+        return expanded
+
+    @staticmethod
+    def _term_uri_aliases(
+        uri: str,
+        *,
+        ontology: LexiconOntologyContext,
+    ) -> set[str]:
+        aliases: set[str] = set()
+        if "#" not in uri:
+            return aliases
+        local_name = uri.split("#", 1)[1]
+        if ontology.version_iri and uri.startswith(ontology.version_iri):
+            aliases.add(f"{ontology.canonical_country_uri}{local_name}")
+        if ontology.ontology_uri and ontology.version_iri and uri.startswith(ontology.ontology_uri):
+            aliases.add(f"{ontology.version_iri}{local_name}")
+        return aliases
 
     def _resolve_mapping_term_kind(self, term: LexiconMappedTermReference) -> str:
         bundle = self._resolve_ontology_bundle(
@@ -1650,7 +1705,7 @@ class LexiconService:
         top_scores_by_ontology: dict[tuple[str, str, str], float] = {}
 
         for bundle in bundles:
-            for term in bundle.catalog.values():
+            for term in self._unique_catalog_terms(bundle.catalog):
                 if term["kind"] != term_kind:
                     continue
                 candidate_detail = self._catalog_term_detail_from_dict(term)
@@ -1690,7 +1745,57 @@ class LexiconService:
                 item.term_id.lower(),
             )
         )
-        matches = candidates[:limit_per_term]
+        matches: list[LexiconRuleSimilarityMatch] = []
+        seen_match_keys: set[tuple[str, str, str, str]] = set()
+
+        for bundle in bundles:
+            ontology_key = (
+                bundle.ontology.ontology_family,
+                bundle.ontology.country,
+                bundle.ontology.version,
+            )
+            best_match = next(
+                (
+                    item
+                    for item in candidates
+                    if (
+                        item.ontology_family,
+                        item.country,
+                        item.version,
+                    )
+                    == ontology_key
+                ),
+                None,
+            )
+            if best_match is None:
+                continue
+            match_key = (
+                best_match.ontology_family,
+                best_match.country,
+                best_match.version,
+                best_match.uri,
+            )
+            if match_key in seen_match_keys:
+                continue
+            seen_match_keys.add(match_key)
+            matches.append(best_match)
+            if len(matches) >= limit_per_term:
+                break
+
+        if len(matches) < limit_per_term:
+            for candidate in candidates:
+                match_key = (
+                    candidate.ontology_family,
+                    candidate.country,
+                    candidate.version,
+                    candidate.uri,
+                )
+                if match_key in seen_match_keys:
+                    continue
+                seen_match_keys.add(match_key)
+                matches.append(candidate)
+                if len(matches) >= limit_per_term:
+                    break
         return (
             LexiconRuleSimilarityTermResult(
                 source_term=source_term,

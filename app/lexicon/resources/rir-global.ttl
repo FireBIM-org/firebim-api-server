@@ -1,14 +1,14 @@
 @prefix meta: <https://firebim.org/ontology-meta#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix rir: <https://firebim.org/ontologies/rir/global#> .
+@prefix rir: <https://firebim.org/ontologies/rir/global/2026.03.25#> .
 @prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-rir: a owl:Ontology ;
+<https://firebim.org/ontologies/rir/global#> a owl:Ontology ;
     rdfs:label "Regulatory Information Requirements" ;
     rdfs:comment "Regulatory Information Requirements ontology projection generated from JSON." ;
-    owl:versionIRI <https://firebim.org/ontologies/rir/global/2026.03.25#> ;
+    owl:versionIRI rir: ;
     owl:versionInfo "1.0" ;
     meta:dictionaryCode "rir" ;
     meta:moreInfoUrl "https://www.buildingsmart.org/standards/domains/regulatory/" ;

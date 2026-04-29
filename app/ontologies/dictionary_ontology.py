@@ -192,9 +192,9 @@ def _build_dictionary_graph(
     graph = Graph()
     base_uri = f"https://firebim.org/ontologies/{ontology_family}/{country}#"
     version_uri = f"https://firebim.org/ontologies/{ontology_family}/{country}/{version}#"
-    ns = Namespace(base_uri)
+    versioned_ns = Namespace(version_uri)
 
-    graph.bind(ontology_family, ns)
+    graph.bind(ontology_family, versioned_ns)
     graph.bind("owl", OWL)
     graph.bind("rdfs", RDFS)
     graph.bind("skos", SKOS)
@@ -227,7 +227,7 @@ def _build_dictionary_graph(
     object_property_count = 0
     for index, item in enumerate(properties):
         code = _property_term_code(item, fallback=f"property_{index + 1}")
-        subject = ns[_slug(code)]
+        subject = versioned_ns[_slug(code)]
         property_subjects[index] = subject
         property_type = _property_rdf_type(item)
         graph.add((subject, RDF.type, property_type))
@@ -271,7 +271,7 @@ def _build_dictionary_graph(
 
     for index, item in enumerate(classes):
         code = _class_term_code(item, fallback=f"class_{index + 1}")
-        subject = ns[_slug(code)]
+        subject = versioned_ns[_slug(code)]
         class_type = str(item.get("ClassType") or "Class")
         graph.add((subject, RDF.type, OWL.Class))
         if class_type == "GroupOfProperties":
@@ -293,7 +293,7 @@ def _build_dictionary_graph(
 
         parent_class_code = item.get("ParentClassCode")
         if parent_class_code:
-            parent_subject = ns[_slug(str(parent_class_code))]
+            parent_subject = versioned_ns[_slug(str(parent_class_code))]
             graph.add((subject, RDFS.subClassOf, parent_subject))
             subclass_pairs.add((subject, parent_subject))
 
@@ -302,7 +302,7 @@ def _build_dictionary_graph(
             related_class_code = relation.get("RelatedClassCode")
             related_uri = relation.get("RelatedClassUri")
             if related_class_code:
-                related_object = ns[_slug(str(related_class_code))]
+                related_object = versioned_ns[_slug(str(related_class_code))]
             elif related_uri:
                 related_object = URIRef(str(related_uri))
             else:

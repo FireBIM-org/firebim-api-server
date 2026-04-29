@@ -88,7 +88,17 @@ def _bootstrap_single_ontology(repo: OntologyRepository, spec: OntologyBootstrap
             same_payload = existing_entry.get("sha256") == metadata["sha256"]
             same_default = manifest.get("default_version") == spec.version
             same_status = existing_entry.get("status") == spec.status.value
-            if same_payload and same_default and same_status:
+            has_summary_metadata = all(
+                key in existing_entry
+                for key in (
+                    "class_count",
+                    "property_count",
+                    "property_set_count",
+                    "subclass_count",
+                    "class_property_link_count",
+                )
+            )
+            if same_payload and same_default and same_status and has_summary_metadata:
                 return {
                     "ontology_family": spec.ontology_family,
                     "country": spec.country,

@@ -38,9 +38,9 @@ def test_rir_dictionary_items_are_converted_as_classes_and_properties():
     graph = Graph()
     graph.parse(data=conversion.ttl, format="turtle")
 
-    compartment = URIRef("https://firebim.org/ontologies/rir/global#FireCompartment")
-    property_group = URIRef("https://firebim.org/ontologies/rir/global#CompartmentProperties")
-    area = URIRef("https://firebim.org/ontologies/rir/global#AreaFireCompartment")
+    compartment = URIRef("https://firebim.org/ontologies/rir/global/2026.03.25#FireCompartment")
+    property_group = URIRef("https://firebim.org/ontologies/rir/global/2026.03.25#CompartmentProperties")
+    area = URIRef("https://firebim.org/ontologies/rir/global/2026.03.25#AreaFireCompartment")
 
     assert (compartment, RDF.type, OWL.Class) in graph
     assert (property_group, RDF.type, OWL.Class) in graph
@@ -85,9 +85,9 @@ def test_ifc_parent_class_code_becomes_subclass_relationship():
     graph = Graph()
     graph.parse(data=conversion.ttl, format="turtle")
 
-    wall = URIRef("https://firebim.org/ontologies/ifc/global#IfcWall")
-    built_element = URIRef("https://firebim.org/ontologies/ifc/global#IfcBuiltElement")
-    position_history = URIRef("https://firebim.org/ontologies/ifc/global#PositionHistory")
+    wall = URIRef("https://firebim.org/ontologies/ifc/global/2026.04.23#IfcWall")
+    built_element = URIRef("https://firebim.org/ontologies/ifc/global/2026.04.23#IfcBuiltElement")
+    position_history = URIRef("https://firebim.org/ontologies/ifc/global/2026.04.23#PositionHistory")
 
     assert (wall, RDF.type, OWL.Class) in graph
     assert (wall, RDFS.subClassOf, built_element) in graph
@@ -145,8 +145,8 @@ def test_dictionary_conversion_resolves_class_properties_and_reports_metrics():
     graph = Graph()
     graph.parse(data=conversion.ttl, format="turtle")
 
-    wall = URIRef("https://firebim.org/ontologies/cand/global#WallClass")
-    combustible = URIRef("https://firebim.org/ontologies/cand/global#Combustible")
+    wall = URIRef("https://firebim.org/ontologies/cand/global/2026.04.24#WallClass")
+    combustible = URIRef("https://firebim.org/ontologies/cand/global/2026.04.24#Combustible")
     has_property = URIRef("https://firebim.org/ontology-meta#hasProperty")
     belongs_to_class = URIRef("https://firebim.org/ontology-meta#belongsToClass")
 

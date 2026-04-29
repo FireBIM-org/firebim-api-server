@@ -64,6 +64,11 @@ class DummyBootstrapRepo:
     def _extract_ttl_metadata(self, ttl: str) -> dict:
         return {
             "sha256": f"hash:{ttl}",
+            "class_count": 1,
+            "property_count": 0,
+            "property_set_count": 0,
+            "subclass_count": 0,
+            "class_property_link_count": 0,
         }
 
     def extract_ttl_metadata(self, ttl: str) -> dict:
@@ -133,6 +138,11 @@ def test_bootstrap_skips_current_release():
                     "hash:@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
                     "<https://firebim.org/ontologies/fbo/be#> a owl:Ontology .\n"
                 ),
+                "class_count": 1,
+                "property_count": 0,
+                "property_set_count": 0,
+                "subclass_count": 0,
+                "class_property_link_count": 0,
             }
         ],
     }

@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from botocore.exceptions import BotoCoreError, ClientError
-from rdflib import Graph
+from rdflib import Graph, URIRef
 from rdflib.namespace import OWL, RDF, RDFS
 
 from app.schemas.ontologies import (
@@ -103,6 +103,15 @@ class OntologyRepository:
             ttl=ttl,
         )
 
+    def fetch_version_metadata(self, ontology_family: str, country: str, version: str) -> OntologyVersionMetadata:
+        manifest = self._load_manifest(ontology_family, country)
+        resolved_version = self._resolve_version_token(version, manifest.get("versions", []))
+        versions = self._version_models_from_manifest(manifest, ontology_family, country)
+        current = next((item for item in versions if item.version == resolved_version), None)
+        if current is None:
+            raise GraphStoreNotFoundError(f"Ontology version not found: {ontology_family}/{country}/{resolved_version}")
+        return current
+
     def publish_version(self, payload: OntologyPublishRequest) -> dict:
         ttl, resource_filename = self._resolve_ttl_payload(payload)
         metadata = self._extract_ttl_metadata(ttl)
@@ -120,6 +129,11 @@ class OntologyRepository:
             "label": metadata["label"],
             "description": metadata["description"],
             "triple_count": metadata["triple_count"],
+            "class_count": metadata["class_count"],
+            "property_count": metadata["property_count"],
+            "property_set_count": metadata["property_set_count"],
+            "subclass_count": metadata["subclass_count"],
+            "class_property_link_count": metadata["class_property_link_count"],
             "byte_size": metadata["byte_size"],
             "sha256": metadata["sha256"],
             "imports": metadata["imports"],
@@ -268,6 +282,11 @@ class OntologyRepository:
         label = None
         description = None
         imports: list[str] = []
+        class_uris: set[str] = set()
+        property_uris: set[str] = set()
+        property_set_count = 0
+        subclass_count = 0
+        class_property_link_count = 0
 
         ontology_subjects = list(graph.subjects(RDF.type, OWL.Ontology))
         if ontology_subjects:
@@ -284,6 +303,24 @@ class OntologyRepository:
                 description = str(description_value)
             imports = sorted({str(item) for item in graph.objects(subject, OWL.imports)})
 
+        class_uris = {str(subject) for subject in graph.subjects(RDF.type, OWL.Class)} | {
+            str(subject) for subject in graph.subjects(RDF.type, RDFS.Class)
+        }
+        property_uris = (
+            {str(subject) for subject in graph.subjects(RDF.type, RDF.Property)}
+            | {str(subject) for subject in graph.subjects(RDF.type, OWL.ObjectProperty)}
+            | {str(subject) for subject in graph.subjects(RDF.type, OWL.DatatypeProperty)}
+        )
+        group_predicate = URIRef("https://firebim.org/ontology-meta#groupOfProperties")
+        has_property_predicate = URIRef("https://firebim.org/ontology-meta#hasProperty")
+        property_set_count = sum(
+            1
+            for class_uri in class_uris
+            if str(graph.value(URIRef(class_uri), group_predicate, default="")).strip().lower() == "true"
+        )
+        subclass_count = sum(1 for _ in graph.triples((None, RDFS.subClassOf, None)))
+        class_property_link_count = sum(1 for _ in graph.triples((None, has_property_predicate, None)))
+
         encoded = ttl.encode("utf-8")
         return {
             "ontology_uri": ontology_uri,
@@ -292,6 +329,11 @@ class OntologyRepository:
             "description": description,
             "imports": imports,
             "triple_count": len(graph),
+            "class_count": len(class_uris),
+            "property_count": len(property_uris),
+            "property_set_count": property_set_count,
+            "subclass_count": subclass_count,
+            "class_property_link_count": class_property_link_count,
             "byte_size": len(encoded),
             "sha256": hashlib.sha256(encoded).hexdigest(),
         }
@@ -324,6 +366,11 @@ class OntologyRepository:
                     label=entry.get("label"),
                     description=entry.get("description"),
                     triple_count=int(entry.get("triple_count", 0)),
+                    class_count=int(entry.get("class_count", 0)),
+                    property_count=int(entry.get("property_count", 0)),
+                    property_set_count=int(entry.get("property_set_count", 0)),
+                    subclass_count=int(entry.get("subclass_count", 0)),
+                    class_property_link_count=int(entry.get("class_property_link_count", 0)),
                     byte_size=int(entry.get("byte_size", 0)),
                     sha256=str(entry.get("sha256", "")),
                     imports=[str(item) for item in entry.get("imports", [])],

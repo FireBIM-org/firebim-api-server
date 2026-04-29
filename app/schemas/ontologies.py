@@ -373,6 +373,11 @@ class OntologyVersionMetadata(BaseModel):
     label: str | None = None
     description: str | None = None
     triple_count: int
+    class_count: int = 0
+    property_count: int = 0
+    property_set_count: int = 0
+    subclass_count: int = 0
+    class_property_link_count: int = 0
     byte_size: int
     sha256: str
     imports: list[str] = Field(default_factory=list)

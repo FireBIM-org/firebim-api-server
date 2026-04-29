@@ -12,6 +12,7 @@ from app.ontologies.dictionary_ontology import (
     normalize_dictionary_json,
 )
 from app.schemas.ontologies import (
+    OntologyVersionMetadata,
     OntologyDictionaryCandidateCreateRequest,
     OntologyDictionaryConversionRequest,
     OntologyDictionaryFieldIssue,
@@ -137,7 +138,15 @@ def summarize_ontology_ttl(ttl: str) -> dict[str, int]:
 
 
 def build_version_summary_response(response: OntologyVersionFetchResponse) -> OntologyVersionSummaryResponse:
-    summary = summarize_ontology_ttl(response.ttl)
+    summary = {
+        "class_count": response.version.class_count,
+        "property_count": response.version.property_count,
+        "property_set_count": response.version.property_set_count,
+        "subclass_count": response.version.subclass_count,
+        "class_property_link_count": response.version.class_property_link_count,
+    }
+    if not any(summary.values()):
+        summary = summarize_ontology_ttl(response.ttl)
     warnings: list[str] = []
     if summary["class_count"] == 0:
         warnings.append("Ontology has no declared classes.")
@@ -163,6 +172,41 @@ def build_version_summary_response(response: OntologyVersionFetchResponse) -> On
         subclass_count=summary["subclass_count"],
         class_property_link_count=summary["class_property_link_count"],
         publish_ready=summary["class_count"] > 0 and summary["property_count"] > 0,
+        warnings=warnings,
+    )
+
+
+def build_version_summary_from_metadata(
+    *,
+    ontology_family: str,
+    country: str,
+    metadata: OntologyVersionMetadata,
+) -> OntologyVersionSummaryResponse:
+    warnings: list[str] = []
+    if metadata.class_count == 0:
+        warnings.append("Ontology has no declared classes.")
+    if metadata.property_count == 0:
+        warnings.append("Ontology has no declared properties.")
+    if metadata.triple_count <= 0:
+        warnings.append("Ontology version has no triples.")
+    return OntologyVersionSummaryResponse(
+        ontology_family=ontology_family,
+        country=country,
+        version=metadata.version,
+        ontology_uri=metadata.ontology_uri,
+        version_iri=metadata.version_iri,
+        title=(
+            metadata.label
+            or f"{ontology_family.upper()} {country.upper()} {metadata.version}"
+        ),
+        description=metadata.description,
+        status=metadata.status,
+        class_count=metadata.class_count,
+        property_count=metadata.property_count,
+        property_set_count=metadata.property_set_count,
+        subclass_count=metadata.subclass_count,
+        class_property_link_count=metadata.class_property_link_count,
+        publish_ready=metadata.class_count > 0 and metadata.property_count > 0,
         warnings=warnings,
     )
 
