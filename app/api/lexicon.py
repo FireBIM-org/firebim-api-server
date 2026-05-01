@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 from time import monotonic
-from typing import TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -25,8 +24,6 @@ from app.schemas.lexicon import (
     LexiconCatalogSimilarityResponse,
     LexiconCatalogTermResponse,
     LexiconCatalogTermsResponse,
-    LexiconRuleOntologySimilarityRequest,
-    LexiconRuleOntologySimilarityResponse,
     LexiconConformityCheckRequest,
     LexiconConformityCheckResponse,
     LexiconGraphEvidenceSummaryRequest,
@@ -61,6 +58,8 @@ from app.schemas.lexicon import (
     LexiconProfileUpdateRequest,
     LexiconReconstructionRequest,
     LexiconReconstructionResponse,
+    LexiconRuleOntologySimilarityRequest,
+    LexiconRuleOntologySimilarityResponse,
 )
 from app.storage.graph_store import GraphStoreError, GraphStoreNotFoundError
 from app.storage.lexicon_handshake_repository import (
@@ -86,10 +85,14 @@ service = LexiconService()
 mapping_repo = LexiconMappingRepository()
 handshake_repo = LexiconHandshakeRepository()
 profile_repo = LexiconProfileRepository()
-ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
-async def _parse_request_model(request: Request, model_type: type[ModelT], *, metric_prefix: str) -> ModelT:
+async def _parse_request_model[ModelT: BaseModel](
+    request: Request,
+    model_type: type[ModelT],
+    *,
+    metric_prefix: str,
+) -> ModelT:
     body_started_at = monotonic()
     raw_body = await request.body()
     body_read_ms = round((monotonic() - body_started_at) * 1000, 3)
@@ -759,7 +762,11 @@ async def create_profile(
     current_user: User = Depends(get_current_active_user),
 ) -> LexiconProfileResponse:
     try:
-        payload = await _parse_request_model(request, LexiconProfileCreateRequest, metric_prefix="lexicon.profile_create")
+        payload = await _parse_request_model(
+            request,
+            LexiconProfileCreateRequest,
+            metric_prefix="lexicon.profile_create",
+        )
         logic_started_at = monotonic()
         if payload.profile is not None:
             selection_started_at = monotonic()
@@ -907,7 +914,11 @@ async def update_profile(
     current_user: User = Depends(get_current_active_user),
 ) -> LexiconProfileResponse:
     try:
-        payload = await _parse_request_model(request, LexiconProfileUpdateRequest, metric_prefix="lexicon.profile_update")
+        payload = await _parse_request_model(
+            request,
+            LexiconProfileUpdateRequest,
+            metric_prefix="lexicon.profile_update",
+        )
         logic_started_at = monotonic()
         read_started_at = monotonic()
         existing = profile_repo.get_profile(profile_id, current_user)

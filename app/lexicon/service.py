@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import logging
 from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
-import logging
 from threading import RLock
 from time import monotonic
 from typing import Any
@@ -58,19 +58,19 @@ from app.schemas.lexicon import (
     LexiconProfileGraphCoverageResponse,
     LexiconProfileMappingCandidate,
     LexiconProfileMappingCandidatesResponse,
+    LexiconProfileRulesCoverageResponse,
+    LexiconProfileSummaryResponse,
+    LexiconPropertyRequirement,
+    LexiconReconstructionResponse,
+    LexiconRuleCoverageItem,
     LexiconRuleOntologySimilarityRequest,
     LexiconRuleOntologySimilarityResponse,
     LexiconRuleOntologySimilarityRuleResult,
     LexiconRuleOntologySimilarityStats,
     LexiconRuleOntologySimilaritySummary,
-    LexiconProfileRulesCoverageResponse,
-    LexiconProfileSummaryResponse,
-    LexiconPropertyRequirement,
-    LexiconReconstructionResponse,
     LexiconRuleSimilarityMatch,
     LexiconRuleSimilaritySourceTerm,
     LexiconRuleSimilarityTermResult,
-    LexiconRuleCoverageItem,
     LexiconSelectedOntology,
     LexiconSimilarityComponentScore,
     LexiconSourceEntityPattern,

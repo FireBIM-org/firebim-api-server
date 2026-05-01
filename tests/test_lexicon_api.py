@@ -109,6 +109,15 @@ class DummyOntologyRepo:
             ),
         )
 
+    def fetch_version_metadata(self, ontology_family: str, country: str, version: str):
+        return self.fetch_version(ontology_family, country, version).version
+
+    def canonical_family_uri(self, ontology_family: str) -> str:
+        return f"https://firebim.org/ontologies/{ontology_family}#"
+
+    def canonical_country_uri(self, ontology_family: str, country: str) -> str:
+        return f"https://firebim.org/ontologies/{ontology_family}/{country}#"
+
 
 class DummyBuildingRepo:
     def fetch_graph(self, graph_id: str):
@@ -1311,8 +1320,7 @@ def test_rule_ontology_similarity_with_multiple_rules_and_ontologies(monkeypatch
     assert any(match["ontology_family"] == "fbo" for match in ifc_rule["target_classes"][0]["matches"])
     assert len(body["rule_ontology_summaries"]) == 4
     assert any(
-        item["rule_id"] == "ifc_rule" and item["ontology_family"] == "ifc"
-        for item in body["rule_ontology_summaries"]
+        item["rule_id"] == "ifc_rule" and item["ontology_family"] == "ifc" for item in body["rule_ontology_summaries"]
     )
 
 

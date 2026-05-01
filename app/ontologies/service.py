@@ -12,12 +12,12 @@ from app.ontologies.dictionary_ontology import (
     normalize_dictionary_json,
 )
 from app.schemas.ontologies import (
-    OntologyVersionMetadata,
     OntologyDictionaryCandidateCreateRequest,
     OntologyDictionaryConversionRequest,
     OntologyDictionaryFieldIssue,
     OntologyDictionaryLinkIssue,
     OntologyVersionFetchResponse,
+    OntologyVersionMetadata,
     OntologyVersionSummaryResponse,
 )
 from app.schemas.ontologies import (
@@ -195,10 +195,7 @@ def build_version_summary_from_metadata(
         version=metadata.version,
         ontology_uri=metadata.ontology_uri,
         version_iri=metadata.version_iri,
-        title=(
-            metadata.label
-            or f"{ontology_family.upper()} {country.upper()} {metadata.version}"
-        ),
+        title=(metadata.label or f"{ontology_family.upper()} {country.upper()} {metadata.version}"),
         description=metadata.description,
         status=metadata.status,
         class_count=metadata.class_count,
