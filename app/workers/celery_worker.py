@@ -3,26 +3,14 @@ import os
 import tempfile
 import uuid
 
-import boto3
 import ifcopenshell
 import ifctester
 import ifctester.reporter
 
-from app.core.config import settings
+from app.core.s3 import BUCKET_NAME, s3_client
 from app.models.database import get_db
 from app.models.models import IfcModel
 from app.workers.celery_app import celery_app
-
-# S3 Configuration
-s3_client = boto3.client(
-    "s3",
-    endpoint_url=settings.S3_ENDPOINT_URL,
-    aws_access_key_id=settings.S3_ACCESS_KEY_ID,
-    aws_secret_access_key=settings.S3_SECRET_ACCESS_KEY.get_secret_value(),
-    region_name=settings.S3_REGION,
-)
-
-BUCKET_NAME = settings.S3_BUCKET_NAME
 
 
 @celery_app.task(name="process_model")

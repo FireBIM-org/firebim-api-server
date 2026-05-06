@@ -32,6 +32,7 @@ dev = [
     "pytest-asyncio>=0.25",
     "aiosqlite>=0.20",
     "pytest-cov>=6.0",
+    "py-pglite>=0.5.3",
 ]
 worker = [
     "ifcopenshell==0.8.1.post1",
