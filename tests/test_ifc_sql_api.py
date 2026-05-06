@@ -1,6 +1,8 @@
 import pytest
 from sqlmodel import Session, select
-from app.models.models import IfcModel, User, IfcEntity, IfcProperty, IfcRelationship
+
+from app.models.models import IfcEntity, IfcModel, IfcProperty, IfcRelationship, User
+
 
 @pytest.mark.integration
 def test_upload_ifc_sql_data(client, session: Session, test_user: User):
@@ -10,7 +12,7 @@ def test_upload_ifc_sql_data(client, session: Session, test_user: User):
         filename="test.ifc",
         s3_key="models/test/test.ifc",
         user_id=test_user.id,
-        processing_status="completed"
+        processing_status="completed",
     )
     session.add(model)
     session.commit()
@@ -23,7 +25,7 @@ def test_upload_ifc_sql_data(client, session: Session, test_user: User):
                 "type": "IfcWall",
                 "globalId": "3$d$7$9$b$d$f$h$j$l$n$p$r$t$v$x$z",
                 "name": "Wall 1",
-                "attributes": {"OverallHeight": 3000}
+                "attributes": {"OverallHeight": 3000},
             }
         ],
         "properties": [
@@ -32,16 +34,16 @@ def test_upload_ifc_sql_data(client, session: Session, test_user: User):
                 "property_set_name": "Pset_WallCommon",
                 "property_name": "IsExternal",
                 "value": "TRUE",
-                "value_type": "IfcBoolean"
+                "value_type": "IfcBoolean",
             }
         ],
         "relationships": [
             {
                 "type": "IfcRelAggregates",
-                "relating_id": "0", # Assuming project or similar
-                "related_id": "1"
+                "relating_id": "0",  # Assuming project or similar
+                "related_id": "1",
             }
-        ]
+        ],
     }
 
     # 3. Call the endpoint
@@ -83,7 +85,7 @@ def test_upload_ifc_sql_data_bulk(client, session: Session, test_user: User):
         filename="bulk.ifc",
         s3_key="models/test/bulk.ifc",
         user_id=test_user.id,
-        processing_status="completed"
+        processing_status="completed",
     )
     session.add(model)
     session.commit()
@@ -97,8 +99,9 @@ def test_upload_ifc_sql_data_bulk(client, session: Session, test_user: User):
                 "type": "IfcWall",
                 "globalId": f"global-id-{i}",
                 "name": f"Wall {i}",
-                "attributes": {"height": 3000}
-            } for i in range(num_entities)
+                "attributes": {"height": 3000},
+            }
+            for i in range(num_entities)
         ],
         "properties": [
             {
@@ -106,16 +109,13 @@ def test_upload_ifc_sql_data_bulk(client, session: Session, test_user: User):
                 "property_set_name": "Pset_WallCommon",
                 "property_name": "IsExternal",
                 "value": "TRUE",
-                "value_type": "IfcBoolean"
-            } for i in range(num_entities)
+                "value_type": "IfcBoolean",
+            }
+            for i in range(num_entities)
         ],
         "relationships": [
-            {
-                "type": "IfcRelAggregates",
-                "relating_id": "0",
-                "related_id": str(i)
-            } for i in range(num_entities)
-        ]
+            {"type": "IfcRelAggregates", "relating_id": "0", "related_id": str(i)} for i in range(num_entities)
+        ],
     }
 
     # Call the endpoint
@@ -132,8 +132,7 @@ def test_upload_ifc_sql_data_bulk(client, session: Session, test_user: User):
     entities_count = session.exec(select(IfcEntity).where(IfcEntity.model_id == model_id)).all()
     assert len(entities_count) == num_entities
 
-    properties_count = session.exec(select(IfcProperty)).all()
-    # Note: might have other properties from previous tests if session is not cleared, 
+    # Note: might have other properties from previous tests if session is not cleared,
     # but the fixture usually handles it. Assuming fresh session or filtering by entity_ids.
     # Better filter by entity_id
     all_entity_ids = [str(i) for i in range(num_entities)]
@@ -150,32 +149,24 @@ def test_upload_ifc_sql_data_integrity(client, session: Session, test_user: User
         filename="integrity.ifc",
         s3_key="models/test/integrity.ifc",
         user_id=test_user.id,
-        processing_status="completed"
+        processing_status="completed",
     )
     session.add(model)
     session.commit()
 
     # Payload with invalid entity_id in properties (Foreign Key violation)
     payload = {
-        "entities": [
-            {
-                "id": "valid-ent",
-                "type": "IfcWall",
-                "globalId": "gid-1",
-                "name": "Wall 1",
-                "attributes": {}
-            }
-        ],
+        "entities": [{"id": "valid-ent", "type": "IfcWall", "globalId": "gid-1", "name": "Wall 1", "attributes": {}}],
         "properties": [
             {
-                "entity_id": "non-existent-ent", # This should cause FK error
+                "entity_id": "non-existent-ent",  # This should cause FK error
                 "property_set_name": "Pset",
                 "property_name": "Prop",
                 "value": "Val",
-                "value_type": "Str"
+                "value_type": "Str",
             }
         ],
-        "relationships": []
+        "relationships": [],
     }
 
     # Call the endpoint
@@ -187,6 +178,6 @@ def test_upload_ifc_sql_data_integrity(client, session: Session, test_user: User
 
     # Verify DB state: "valid-ent" should NOT be in the DB due to rollback
     # We need a new session or refresh because the original session might be in error state
-    session.rollback() # Clear state if needed, though 'session' fixture usually handles it
+    session.rollback()  # Clear state if needed, though 'session' fixture usually handles it
     entity = session.exec(select(IfcEntity).where(IfcEntity.id == "valid-ent")).first()
     assert entity is None

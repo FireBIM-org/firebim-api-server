@@ -44,10 +44,12 @@ worker = [
 [tool.ruff]
 line-length = 120
 target-version = "py312"
+exclude = ["alembic"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 ignore = ["B008"]  # Allow function calls in FastAPI default arguments
+
 
 [tool.pytest.ini_options]
 markers = [
