@@ -2,12 +2,14 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from sqlalchemy import insert
 from sqlmodel import Session, select
 
 from app.auth.jwt import get_current_active_user
 from app.core.s3 import BUCKET_NAME, s3_client
 from app.models.database import get_db
-from app.models.models import IfcModel, User
+from app.models.models import IfcEntity, IfcModel, IfcProperty, IfcRelationship, User
+from app.schemas.models import IfcSqlDataUpload
 from app.workers.celery_app import celery_app
 
 router = APIRouter(prefix="/ifc-models", tags=["ifc-models"])
@@ -113,3 +115,74 @@ async def download_model(id: str, db: Session = Depends(get_db), current_user: U
     s3_client.download_file(Bucket=BUCKET_NAME, Key=model.s3_key, Filename=local_path)
 
     return FileResponse(path=local_path, filename=model.filename, media_type="application/octet-stream")
+
+
+@router.post("/{id}/sql-data", status_code=201)
+async def upload_sql_data(
+    id: str,
+    data: IfcSqlDataUpload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Bulk upload IFC model data (entities, properties, relationships) into SQL tables.
+    """
+    # 1. Verify model exists and belongs to user
+    model = db.exec(select(IfcModel).where(IfcModel.id == id)).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    if model.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this model")
+
+    # 2. Insert Entities
+    if data.entities:
+        entities_to_insert = [
+            {
+                "id": ent.id,
+                "model_id": id,
+                "type": ent.type,
+                "global_id": ent.globalId,
+                "name": ent.name,
+                "attributes": ent.attributes,
+            }
+            for ent in data.entities
+        ]
+        db.execute(insert(IfcEntity), entities_to_insert)
+
+    # 3. Insert Properties
+    if data.properties:
+        properties_to_insert = [
+            {
+                "id": str(uuid.uuid4()),
+                "entity_id": prop.entity_id,
+                "property_set_name": prop.property_set_name,
+                "property_name": prop.property_name,
+                "value": prop.value,
+                "value_type": prop.value_type,
+            }
+            for prop in data.properties
+        ]
+        db.execute(insert(IfcProperty), properties_to_insert)
+
+    # 4. Insert Relationships
+    if data.relationships:
+        relationships_to_insert = [
+            {
+                "id": str(uuid.uuid4()),
+                "model_id": id,
+                "type": rel.type,
+                "relating_id": rel.relating_id,
+                "related_id": rel.related_id,
+            }
+            for rel in data.relationships
+        ]
+        db.execute(insert(IfcRelationship), relationships_to_insert)
+
+    db.commit()
+
+    return {
+        "message": "Data uploaded successfully",
+        "entity_count": len(data.entities),
+        "property_count": len(data.properties),
+        "relationship_count": len(data.relationships),
+    }

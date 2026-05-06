@@ -1,6 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
+from sqlalchemy import JSON
 from sqlmodel import Column, DateTime, Field, SQLModel
 
 
@@ -62,3 +63,35 @@ class CheckResult(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
     )
     updated_at: datetime = Field(sa_column=Column(DateTime(timezone=True), onupdate=lambda: datetime.now(UTC)))
+
+
+class IfcEntity(SQLModel, table=True):
+    __tablename__ = "ifc_entities"
+
+    id: str = Field(primary_key=True)
+    model_id: str = Field(foreign_key="ifc_models.id", nullable=False, index=True)
+    type: str = Field(nullable=False, index=True)
+    global_id: str = Field(nullable=False, index=True)
+    name: str | None = Field(default=None, nullable=True)
+    attributes: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False, server_default="{}"))
+
+
+class IfcProperty(SQLModel, table=True):
+    __tablename__ = "ifc_properties"
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    entity_id: str = Field(foreign_key="ifc_entities.id", nullable=False, index=True)
+    property_set_name: str = Field(nullable=False, index=True)
+    property_name: str = Field(nullable=False, index=True)
+    value: str = Field(nullable=False)
+    value_type: str = Field(nullable=False)
+
+
+class IfcRelationship(SQLModel, table=True):
+    __tablename__ = "ifc_relationships"
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    model_id: str = Field(foreign_key="ifc_models.id", nullable=False, index=True)
+    type: str = Field(nullable=False, index=True)
+    relating_id: str = Field(nullable=False, index=True)
+    related_id: str = Field(nullable=False, index=True)
