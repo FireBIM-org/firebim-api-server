@@ -6,6 +6,7 @@ import uuid
 import ifcopenshell
 import ifctester
 import ifctester.reporter
+from sqlmodel import select
 
 from app.core.s3 import BUCKET_NAME, s3_client
 from app.models.database import get_db
@@ -45,7 +46,7 @@ def process_model(model_id, s3_key):
 
         # Update database with result information
         db = next(get_db())
-        ifc_model = db.query(IfcModel).filter(IfcModel.id == model_id).first()
+        ifc_model = db.exec(select(IfcModel).where(IfcModel.id == model_id)).first()
         if ifc_model:
             ifc_model.processed = True
             ifc_model.result_key = result_key

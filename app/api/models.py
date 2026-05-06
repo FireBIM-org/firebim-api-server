@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.auth.jwt import get_current_active_user
 from app.core.s3 import BUCKET_NAME, s3_client
@@ -56,7 +56,7 @@ async def get_model(id: str, db: Session = Depends(get_db), current_user: User =
     Get metadata for an IFC model by its ID.
     """
     # Get model from DB
-    model = db.query(IfcModel).filter(IfcModel.id == id).first()
+    model = db.exec(select(IfcModel).where(IfcModel.id == id)).first()
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
 
@@ -80,7 +80,7 @@ async def get_models(db: Session = Depends(get_db), current_user: User = Depends
     """
     Get all IFC models belonging to the current user.
     """
-    models = db.query(IfcModel).filter(IfcModel.user_id == current_user.id).all()
+    models = db.exec(select(IfcModel).where(IfcModel.user_id == current_user.id)).all()
 
     return [
         {
@@ -100,7 +100,7 @@ async def download_model(id: str, db: Session = Depends(get_db), current_user: U
     Download an IFC-STEP file by its ID.
     """
     # Get model from DB
-    model = db.query(IfcModel).filter(IfcModel.id == id).first()
+    model = db.exec(select(IfcModel).where(IfcModel.id == id)).first()
     if not model:
         raise HTTPException(status_code=404, detail="Model not found")
 

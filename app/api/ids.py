@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.auth.jwt import get_current_active_user
 from app.core.s3 import BUCKET_NAME, s3_client
@@ -47,7 +47,7 @@ async def get_ids(id: str, db: Session = Depends(get_db), current_user: User = D
     Get metadata for an IDS file by its ID.
     """
     # Get IDS file from DB
-    ids_file = db.query(IdsFile).filter(IdsFile.id == id).first()
+    ids_file = db.exec(select(IdsFile).where(IdsFile.id == id)).first()
     if not ids_file:
         raise HTTPException(status_code=404, detail="IDS file not found")
 
@@ -69,7 +69,7 @@ async def get_ids_files(db: Session = Depends(get_db), current_user: User = Depe
     """
     Get all IDS files belonging to the current user.
     """
-    ids_files = db.query(IdsFile).filter(IdsFile.user_id == current_user.id).all()
+    ids_files = db.exec(select(IdsFile).where(IdsFile.user_id == current_user.id)).all()
 
     return [
         {
@@ -88,7 +88,7 @@ async def download_ids(id: str, db: Session = Depends(get_db), current_user: Use
     Download an IDS file by its ID.
     """
     # Get IDS file from DB
-    ids_file = db.query(IdsFile).filter(IdsFile.id == id).first()
+    ids_file = db.exec(select(IdsFile).where(IdsFile.id == id)).first()
     if not ids_file:
         raise HTTPException(status_code=404, detail="IDS file not found")
 

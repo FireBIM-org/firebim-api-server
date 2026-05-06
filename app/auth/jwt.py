@@ -2,7 +2,7 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.models.database import get_db
@@ -57,7 +57,7 @@ async def get_current_user(
         raise credentials_exception from None
 
     # Find or auto-provision user based on Authentik subject
-    user = db.query(User).filter(User.authentik_sub == sub).first()
+    user = db.exec(select(User).where(User.authentik_sub == sub)).first()
 
     if user is None:
         email = payload.get("email", "")
