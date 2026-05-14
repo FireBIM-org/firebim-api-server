@@ -7,6 +7,7 @@ from app.checks.caching import CheckExecutionCache, accumulate_timing, get_defau
 from app.checks.compiler import RuleCompiler
 from app.checks.evaluator_base import AtomicEvaluator
 from app.checks.evaluator_hybrid import HybridAtomicEvaluator
+from app.checks.evaluator_sparql import SparqlAtomicEvaluator
 from app.checks.result_models import CheckRunResult, CompiledRuleSet, GraphRef, RuleRunResult, RunOptions
 from app.checks.runtime import CheckRuntime
 from app.checks.targeting import TargetResolver
@@ -23,9 +24,18 @@ class CheckEngine:
         runtime: CheckRuntime | None = None,
         solver_mode: str = "standard",
     ) -> None:
+        from app.core.config import settings
+
         self.cache = cache or get_default_execution_cache()
         self.compiler = compiler or RuleCompiler(cache=self.cache)
-        self.evaluator = evaluator or HybridAtomicEvaluator()
+
+        if evaluator is None:
+            if settings.CHECKS_EVALUATOR == "sparql":
+                evaluator = SparqlAtomicEvaluator(endpoint_url=settings.ONTOP_SPARQL_ENDPOINT)
+            else:
+                evaluator = HybridAtomicEvaluator()
+        self.evaluator = evaluator
+
         self.target_resolver = target_resolver or TargetResolver(cache=self.cache)
         self.runtime = runtime or CheckRuntime(
             evaluator=self.evaluator,

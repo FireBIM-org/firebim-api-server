@@ -131,6 +131,8 @@ class Settings(BaseSettings):
         return self
 
     CHECKS_SOLVER: str = "standard"
+    CHECKS_EVALUATOR: Literal["hybrid", "sparql"] = "hybrid"
+    ONTOP_SPARQL_ENDPOINT: str = "http://ontop:8080/sparql"
 
 
 settings = Settings()

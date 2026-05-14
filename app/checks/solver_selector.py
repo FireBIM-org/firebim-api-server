@@ -8,6 +8,7 @@ from app.checks.compiler import RuleCompiler
 from app.checks.engine import CheckEngine
 from app.checks.evaluator_base import AtomicEvaluator
 from app.checks.evaluator_hybrid import HybridAtomicEvaluator
+from app.checks.evaluator_sparql import SparqlAtomicEvaluator
 from app.checks.runtime import CheckRuntime
 from app.checks.runtime_horizontal_layered import HorizontalLayeredCheckRuntime
 from app.checks.runtime_vertical_pathway import VerticalPathwayCheckRuntime
@@ -115,9 +116,17 @@ class CheckSolverSelector:
         evaluator: AtomicEvaluator | None = None,
         target_resolver: TargetResolver | None = None,
     ) -> CheckEngine:
+        from app.core.config import settings
+
         mode = self.resolve_mode(requested_mode)
         compiler = compiler or RuleCompiler(cache=self.cache)
-        evaluator = evaluator or HybridAtomicEvaluator()
+
+        if evaluator is None:
+            if settings.CHECKS_EVALUATOR == "sparql":
+                evaluator = SparqlAtomicEvaluator(endpoint_url=settings.ONTOP_SPARQL_ENDPOINT)
+            else:
+                evaluator = HybridAtomicEvaluator()
+
         target_resolver = target_resolver or TargetResolver(cache=self.cache)
 
         if mode == "standard":
