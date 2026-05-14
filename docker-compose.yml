@@ -98,6 +98,17 @@ services:
       timeout: 5s
       retries: 5
 
+  ontop:
+    image: ontop/ontop:5.1.0
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./ontop:/opt/ontop/input
+    command: endpoint --ontology /opt/ontop/input/fbo.ttl --mapping /opt/ontop/input/mapping.obda --properties /opt/ontop/input/ontop.properties --portal /opt/ontop/input/portal.toml
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"

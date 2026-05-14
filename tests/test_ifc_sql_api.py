@@ -47,7 +47,7 @@ def test_upload_ifc_sql_data(client, session: Session, test_user: User):
     }
 
     # 3. Call the endpoint
-    response = client.post(f"/ifc-models/{model.id}/sql-data", json=payload)
+    response = client.post(f"/ifc-models/{model.id}/data-payload", json=payload)
 
     # 4. Assertions
     assert response.status_code == 201
@@ -119,7 +119,7 @@ def test_upload_ifc_sql_data_bulk(client, session: Session, test_user: User):
     }
 
     # Call the endpoint
-    response = client.post(f"/ifc-models/{model_id}/sql-data", json=payload)
+    response = client.post(f"/ifc-models/{model_id}/data-payload", json=payload)
 
     # Assertions
     assert response.status_code == 201
@@ -170,7 +170,7 @@ def test_upload_ifc_sql_data_integrity(client, session: Session, test_user: User
     }
 
     # Call the endpoint
-    response = client.post(f"/ifc-models/{model_id}/sql-data", json=payload)
+    response = client.post(f"/ifc-models/{model_id}/data-payload", json=payload)
 
     # Assertions: Should fail (Internal Server Error due to FK violation)
     # Depending on how the app handles DB errors, it might be 500 or something else.

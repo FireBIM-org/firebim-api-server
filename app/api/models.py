@@ -117,8 +117,8 @@ async def download_model(id: str, db: Session = Depends(get_db), current_user: U
     return FileResponse(path=local_path, filename=model.filename, media_type="application/octet-stream")
 
 
-@router.post("/{id}/sql-data", status_code=201)
-async def upload_sql_data(
+@router.post("/{id}/data-payload", status_code=201)
+async def upload_data_payload(
     id: str,
     data: IfcSqlDataUpload,
     db: Session = Depends(get_db),
