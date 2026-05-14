@@ -17,7 +17,15 @@ updates:
 
   # Docker base images
   - package-ecosystem: "docker"
-    directory: "/"
+    directory: "/docker/api"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  - package-ecosystem: "docker"
+    directory: "/docker/worker"
     schedule:
       interval: "weekly"
     labels:
