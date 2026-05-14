@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from app.checks.evaluator_sparql import SparqlAtomicEvaluator
 from app.checks.result_models import DecisionNode, EvalContext, GraphRef
+
 
 @pytest.fixture
 def evaluator():
