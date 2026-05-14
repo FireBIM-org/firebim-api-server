@@ -7,7 +7,16 @@ xsd:		http://www.w3.org/2001/XMLSchema#
 rdfs:		http://www.w3.org/2000/01/rdf-schema#
 
 [MappingDeclaration] @collection [[
-mappingId	ifc-walls
-target		:wall/{id} a :IfcWall ; :name {name}^^xsd:string ; :globalId {global_id}^^xsd:string .
-source		SELECT id, name, global_id FROM ifc_entities WHERE type = 'IfcWall'
+mappingId	ifc-entities
+target		:entity/{id} a :{type} ; :name {name}^^xsd:string ; :globalId {global_id}^^xsd:string .
+source		SELECT id, name, global_id, type FROM ifc_entities
+
+mappingId	ifc-properties
+target		:entity/{entity_id} :hasProperty :property/{id} . 
+			:property/{id} a :Property ; :propertyName {property_name}^^xsd:string ; :propertySetName {property_set_name}^^xsd:string ; :value {value}^^xsd:string ; :valueType {value_type}^^xsd:string .
+source		SELECT id, entity_id, property_name, property_set_name, value, value_type FROM ifc_properties
+
+mappingId	ifc-relationships
+target		:rel/{id} a :{type} ; :relatingElement :entity/{relating_id} ; :relatedElement :entity/{related_id} .
+source		SELECT id, type, relating_id, related_id FROM ifc_relationships
 ]]
