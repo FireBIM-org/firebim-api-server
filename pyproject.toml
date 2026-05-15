@@ -16,7 +16,7 @@ dependencies = [
     "alembic==1.13.1",
     "httpx==0.27.0",
     "uuid==1.30",
-    "pyjwt[crypto]>=2.12.0",
+    "pyjwt[crypto]>=2.12.1",
     "email-validator==2.1.0",
     "pydantic-settings",
     "celery==5.3.6",
