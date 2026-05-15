@@ -48,7 +48,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -59,7 +59,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Scan image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.IMAGE_BASE }}/${{ matrix.name }}@${{ steps.build.outputs.digest }}
           exit-code: '1'

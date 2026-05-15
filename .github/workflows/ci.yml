@@ -3,8 +3,20 @@ name: CI
 on:
   pull_request:
     branches: [main, 'release/*']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
   push:
-    branches: [main, 'release/*', 'feature/*']
+    branches: [main, 'release/*']
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -15,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv run ruff check .
@@ -23,6 +35,7 @@ jobs:
 
   test:
     name: Test
+    needs: [lint]
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -35,7 +48,7 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - uses: actions/checkout@v6
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync
@@ -58,6 +71,7 @@ jobs:
 
   build:
     name: Build (${{ matrix.name }})
+    needs: [lint, test]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -69,7 +83,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: docker/setup-buildx-action@v4
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ matrix.dockerfile }}
@@ -79,10 +93,11 @@ jobs:
 
   security-scan:
     name: Security scan
+    needs: [lint]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: aquasecurity/trivy-action@master
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
