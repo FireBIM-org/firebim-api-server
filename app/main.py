@@ -5,6 +5,7 @@ from botocore.exceptions import ClientError
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.build_info import router as build_info_router
 from app.api.checks import router as checks_router
 from app.api.graphs import router as graph_router
 from app.api.health import router as health_router
@@ -46,6 +47,7 @@ app = FastAPI(title="FireBIM API", lifespan=lifespan)
 
 # Include auth router
 app.include_router(auth_router)
+app.include_router(build_info_router)
 app.include_router(graph_router)
 app.include_router(models_router)
 app.include_router(ids_router)
