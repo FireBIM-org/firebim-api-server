@@ -32,6 +32,13 @@ RUN addgroup --system --gid 1001 appgroup && \
 
 ENV PATH="/app/.venv/bin:$PATH"
 
+ARG GIT_BRANCH=unknown
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+ENV GIT_BRANCH=$GIT_BRANCH \
+    GIT_COMMIT=$GIT_COMMIT \
+    BUILD_TIME=$BUILD_TIME
+
 # Switch to non-root user
 USER appuser
 
