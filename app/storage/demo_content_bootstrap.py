@@ -8,7 +8,7 @@ from app.rules.ruleset import Rule
 from app.rules.shacl_builder import SHACLBuilder
 from app.storage.building_repository import BuildingRepository
 
-FIXTURE_DIR = Path(__file__).resolve().parents[2] / "tests" / "fixtures"
+FIXTURE_DIR = Path(__file__).resolve().parent / "demo_fixtures"
 IFC = "https://firebim.org/ontologies/ifc/global/2026.04#"
 FBO_DK = "https://firebim.org/ontologies/fbo/dk/2026.04#"
 RIR = "https://firebim.org/ontologies/rir/global/2026.04#"

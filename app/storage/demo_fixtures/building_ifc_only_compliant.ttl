@@ -1,0 +1,176 @@
+@prefix ifc: <https://firebim.org/ontologies/ifc/global/2026.04#> .
+@prefix ex: <https://firebim.org/examples/buildings/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:site-ifc-only a ifc:IfcSite ;
+    ifc:Name "IFC Only Demo Site" ;
+    ifc:Description "Campus site for the ontology-compliant IFC demo graph." ;
+    ifc:GlobalId "ifc-site-demo-001" ;
+    ifc:RefElevation "12.5"^^xsd:decimal .
+
+ex:building-ifc-only a ifc:IfcBuilding ;
+    ifc:Name "IFC Only Demo Building" ;
+    ifc:Description "Primary building on the IFC-only demo site." ;
+    ifc:GlobalId "ifc-building-demo-001" ;
+    ifc:BuildingID "B-IFC-001" .
+
+ex:storey-ifc-only-00 a ifc:IfcBuildingStorey ;
+    ifc:Name "Basement Level" ;
+    ifc:Description "Basement storey in the IFC-only demo building." ;
+    ifc:GlobalId "ifc-storey-demo-000" ;
+    ifc:AboveGround false .
+
+ex:storey-ifc-only-01 a ifc:IfcBuildingStorey ;
+    ifc:Name "Ground Floor" ;
+    ifc:Description "Ground floor storey in the IFC-only demo building." ;
+    ifc:GlobalId "ifc-storey-demo-001" ;
+    ifc:AboveGround true .
+
+ex:storey-ifc-only-02 a ifc:IfcBuildingStorey ;
+    ifc:Name "First Floor" ;
+    ifc:Description "First floor storey in the IFC-only demo building." ;
+    ifc:GlobalId "ifc-storey-demo-002" ;
+    ifc:AboveGround true .
+
+ex:zone-ifc-only-core a ifc:IfcSpatialZone ;
+    ifc:Name "Core Zone" ;
+    ifc:Description "Main circulation and stair core." ;
+    ifc:GlobalId "ifc-zone-demo-core" ;
+    ifc:LongName "Core circulation zone" ;
+    ifc:CompositionType "ELEMENT" .
+
+ex:zone-ifc-only-office a ifc:IfcSpatialZone ;
+    ifc:Name "Office Zone" ;
+    ifc:Description "Office-oriented spatial zone." ;
+    ifc:GlobalId "ifc-zone-demo-office" ;
+    ifc:LongName "Office use zone" ;
+    ifc:CompositionType "ELEMENT" .
+
+ex:zone-ifc-only-meeting a ifc:IfcSpatialZone ;
+    ifc:Name "Meeting Zone" ;
+    ifc:Description "Meeting and collaboration zone." ;
+    ifc:GlobalId "ifc-zone-demo-meeting" ;
+    ifc:LongName "Meeting zone" ;
+    ifc:CompositionType "ELEMENT" .
+
+ex:space-ifc-only-001 a ifc:IfcSpace ;
+    ifc:Name "Reception" ;
+    ifc:Description "Reception space associated with the ground floor." ;
+    ifc:GlobalId "ifc-space-demo-001" ;
+    ifc:LongName "Reception area" ;
+    ifc:CompositionType "ELEMENT" ;
+    ifc:Area "56.2"^^xsd:decimal .
+
+ex:space-ifc-only-002 a ifc:IfcSpace ;
+    ifc:Name "Open Office" ;
+    ifc:Description "Open office space on the ground floor." ;
+    ifc:GlobalId "ifc-space-demo-002" ;
+    ifc:LongName "Open office area" ;
+    ifc:CompositionType "ELEMENT" ;
+    ifc:Area "84.5"^^xsd:decimal .
+
+ex:space-ifc-only-101 a ifc:IfcSpace ;
+    ifc:Name "Meeting Room 101" ;
+    ifc:Description "Meeting room on the first floor." ;
+    ifc:GlobalId "ifc-space-demo-101" ;
+    ifc:LongName "Main meeting room" ;
+    ifc:CompositionType "ELEMENT" ;
+    ifc:Area "32.0"^^xsd:decimal .
+
+ex:space-ifc-only-102 a ifc:IfcSpace ;
+    ifc:Name "Archive" ;
+    ifc:Description "Archive room in the basement." ;
+    ifc:GlobalId "ifc-space-demo-102" ;
+    ifc:LongName "Archive storage room" ;
+    ifc:CompositionType "ELEMENT" ;
+    ifc:Area "21.7"^^xsd:decimal .
+
+ex:wall-ifc-only-001 a ifc:IfcWall ;
+    ifc:Name "Exterior Wall North" ;
+    ifc:Description "North-facing external wall." ;
+    ifc:GlobalId "ifc-wall-demo-001" ;
+    ifc:FireRating "EI60" ;
+    ifc:LoadBearing true ;
+    ifc:AcousticRating "Rw48" ;
+    ifc:IsExternal true .
+
+ex:wall-ifc-only-002 a ifc:IfcWall ;
+    ifc:Name "Exterior Wall South" ;
+    ifc:Description "South-facing external wall." ;
+    ifc:GlobalId "ifc-wall-demo-002" ;
+    ifc:FireRating "EI60" ;
+    ifc:LoadBearing true ;
+    ifc:AcousticRating "Rw48" ;
+    ifc:IsExternal true .
+
+ex:wall-ifc-only-003 a ifc:IfcWall ;
+    ifc:Name "Core Wall East" ;
+    ifc:Description "East wall enclosing the core zone." ;
+    ifc:GlobalId "ifc-wall-demo-003" ;
+    ifc:FireRating "EI90" ;
+    ifc:LoadBearing true ;
+    ifc:AcousticRating "Rw52" ;
+    ifc:IsExternal false .
+
+ex:wall-ifc-only-004 a ifc:IfcWall ;
+    ifc:Name "Core Wall West" ;
+    ifc:Description "West wall enclosing the core zone." ;
+    ifc:GlobalId "ifc-wall-demo-004" ;
+    ifc:FireRating "EI90" ;
+    ifc:LoadBearing true ;
+    ifc:AcousticRating "Rw52" ;
+    ifc:IsExternal false .
+
+ex:wall-ifc-only-005 a ifc:IfcWall ;
+    ifc:Name "Meeting Room Partition" ;
+    ifc:Description "Partition around the first-floor meeting room." ;
+    ifc:GlobalId "ifc-wall-demo-005" ;
+    ifc:FireRating "EI30" ;
+    ifc:LoadBearing false ;
+    ifc:AcousticRating "Rw42" ;
+    ifc:IsExternal false .
+
+ex:window-ifc-only-001 a ifc:IfcWindow ;
+    ifc:Name "North Window 01" ;
+    ifc:Description "Window facing north from the reception area." ;
+    ifc:GlobalId "ifc-window-demo-001" ;
+    ifc:FireRating "E30" ;
+    ifc:Area "3.8"^^xsd:decimal ;
+    ifc:IsExternal true ;
+    ifc:ThermalTransmittance "1.1"^^xsd:decimal .
+
+ex:window-ifc-only-002 a ifc:IfcWindow ;
+    ifc:Name "North Window 02" ;
+    ifc:Description "Window facing north from the open office." ;
+    ifc:GlobalId "ifc-window-demo-002" ;
+    ifc:FireRating "E30" ;
+    ifc:Area "4.2"^^xsd:decimal ;
+    ifc:IsExternal true ;
+    ifc:ThermalTransmittance "1.1"^^xsd:decimal .
+
+ex:window-ifc-only-003 a ifc:IfcWindow ;
+    ifc:Name "South Window 01" ;
+    ifc:Description "South-facing meeting room window." ;
+    ifc:GlobalId "ifc-window-demo-003" ;
+    ifc:FireRating "E30" ;
+    ifc:Area "2.9"^^xsd:decimal ;
+    ifc:IsExternal true ;
+    ifc:ThermalTransmittance "1.0"^^xsd:decimal .
+
+ex:window-ifc-only-004 a ifc:IfcWindow ;
+    ifc:Name "Archive Window" ;
+    ifc:Description "Small basement archive window." ;
+    ifc:GlobalId "ifc-window-demo-004" ;
+    ifc:FireRating "E15" ;
+    ifc:Area "1.4"^^xsd:decimal ;
+    ifc:IsExternal true ;
+    ifc:ThermalTransmittance "1.3"^^xsd:decimal .
+
+ex:window-ifc-only-005 a ifc:IfcWindow ;
+    ifc:Name "Core Vent Window" ;
+    ifc:Description "Ventilation window adjacent to the core zone." ;
+    ifc:GlobalId "ifc-window-demo-005" ;
+    ifc:FireRating "E30" ;
+    ifc:Area "1.9"^^xsd:decimal ;
+    ifc:IsExternal false ;
+    ifc:ThermalTransmittance "1.4"^^xsd:decimal .

@@ -25,7 +25,6 @@ COPY --from=builder /app/.venv /app/.venv
 
 # Copy application code
 COPY app/ /app/app/
-COPY tests/fixtures/ /app/tests/fixtures/
 
 # Add a non-root user to run the app
 RUN addgroup --system --gid 1001 appgroup && \
