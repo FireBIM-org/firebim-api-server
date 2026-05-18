@@ -1,0 +1,1637 @@
+@prefix fbo: <http://example.org/fbo/1.0/> .
+@prefix ex: <https://firebim.org/examples/buildings/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:site-large a fbo:Site ;
+    fbo:Name "Large Test Site" ;
+    fbo:FireExit true ;
+    fbo:hasBuilding ex:building-large-1, ex:building-large-2, ex:building-large-3, ex:building-large-4 .
+
+ex:building-large-1 a fbo:Building ;
+    fbo:Name "Large Building 1" ;
+    fbo:FireRating "R90" ;
+    fbo:BuildingHeight "24.0"^^xsd:decimal ;
+    fbo:hasStorey ex:storey-large-1-01, ex:storey-large-1-02, ex:storey-large-1-03, ex:storey-large-1-04 .
+
+ex:storey-large-1-01 a fbo:Storey ;
+    fbo:Name "Building 1 Storey 1" ;
+    fbo:StoreyNumber 1 ;
+    fbo:hasZone ex:zone-large-1-01-a, ex:zone-large-1-01-b ;
+    fbo:hasStair ex:stair-large-1-main, ex:stair-large-1-escape ;
+    fbo:hasRoom ex:room-large-1-01-01, ex:room-large-1-01-02, ex:room-large-1-01-03, ex:room-large-1-01-04 .
+
+ex:zone-large-1-01-a a fbo:Zone ;
+    fbo:Name "Office Zone B1S1A" ;
+    fbo:FireCompartmentId "LB1-S1-ZA" ;
+    fbo:hasRoom ex:room-large-1-01-01, ex:room-large-1-01-02 ;
+    fbo:adjacentToZone ex:zone-large-1-02-a .
+
+ex:zone-large-1-01-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B1S1B" ;
+    fbo:FireCompartmentId "LB1-S1-ZB" ;
+    fbo:hasRoom ex:room-large-1-01-03, ex:room-large-1-01-04 .
+
+ex:room-large-1-01-01 a fbo:Room ;
+    fbo:Name "Room B1S1R1" ;
+    fbo:roomArea "27.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-1-01 ;
+    fbo:boundedByWall ex:wall-large-1-01-01-a, ex:wall-large-1-01-01-b ;
+    fbo:hasWindow ex:window-large-1-01-01-a, ex:window-large-1-01-01-b ;
+    fbo:hasFloor ex:floor-large-1-01-01 ;
+    fbo:hasCeiling ex:ceiling-large-1-01-01 ;
+    fbo:containsSensor ex:sensor-large-1-01-01 .
+
+ex:wall-large-1-01-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-1-01-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-1-01-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-1-01-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-01-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-01-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-01-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-1-01-02 a fbo:Room ;
+    fbo:Name "Room B1S1R2" ;
+    fbo:roomArea "34.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-1-01 ;
+    fbo:boundedByWall ex:wall-large-1-01-02-a, ex:wall-large-1-01-02-b ;
+    fbo:hasWindow ex:window-large-1-01-02-a, ex:window-large-1-01-02-b ;
+    fbo:hasFloor ex:floor-large-1-01-02 ;
+    fbo:hasCeiling ex:ceiling-large-1-01-02 ;
+    fbo:containsSensor ex:sensor-large-1-01-02 .
+
+ex:wall-large-1-01-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-1-01-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-1-01-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-1-01-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-01-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-01-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-01-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-1-01-03 a fbo:Room ;
+    fbo:Name "Room B1S1R3" ;
+    fbo:roomArea "41.5"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-1-01 ;
+    fbo:boundedByWall ex:wall-large-1-01-03-a, ex:wall-large-1-01-03-b ;
+    fbo:hasWindow ex:window-large-1-01-03-a, ex:window-large-1-01-03-b ;
+    fbo:hasFloor ex:floor-large-1-01-03 ;
+    fbo:hasCeiling ex:ceiling-large-1-01-03 ;
+    fbo:containsSensor ex:sensor-large-1-01-03 .
+
+ex:wall-large-1-01-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-1-01-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-1-01-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-1-01-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-01-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-01-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-01-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-1-01-04 a fbo:Room ;
+    fbo:Name "Room B1S1R4" ;
+    fbo:roomArea "48.5"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-1-01 ;
+    fbo:boundedByWall ex:wall-large-1-01-04-a, ex:wall-large-1-01-04-b ;
+    fbo:hasWindow ex:window-large-1-01-04-a, ex:window-large-1-01-04-b ;
+    fbo:hasFloor ex:floor-large-1-01-04 ;
+    fbo:hasCeiling ex:ceiling-large-1-01-04 ;
+    fbo:containsSensor ex:sensor-large-1-01-04 .
+
+ex:wall-large-1-01-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-1-01-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-1-01-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-1-01-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-01-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-01-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-01-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:storey-large-1-02 a fbo:Storey ;
+    fbo:Name "Building 1 Storey 2" ;
+    fbo:StoreyNumber 2 ;
+    fbo:hasZone ex:zone-large-1-02-a, ex:zone-large-1-02-b ;
+    fbo:hasStair ex:stair-large-1-main, ex:stair-large-1-escape ;
+    fbo:hasRoom ex:room-large-1-02-01, ex:room-large-1-02-02, ex:room-large-1-02-03, ex:room-large-1-02-04 .
+
+ex:zone-large-1-02-a a fbo:Zone ;
+    fbo:Name "Office Zone B1S2A" ;
+    fbo:FireCompartmentId "LB1-S2-ZA" ;
+    fbo:hasRoom ex:room-large-1-02-01, ex:room-large-1-02-02 ;
+    fbo:adjacentToZone ex:zone-large-1-03-a .
+
+ex:zone-large-1-02-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B1S2B" ;
+    fbo:FireCompartmentId "LB1-S2-ZB" ;
+    fbo:hasRoom ex:room-large-1-02-03, ex:room-large-1-02-04 .
+
+ex:room-large-1-02-01 a fbo:Room ;
+    fbo:Name "Room B1S2R1" ;
+    fbo:roomArea "29.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-1-02 ;
+    fbo:boundedByWall ex:wall-large-1-02-01-a, ex:wall-large-1-02-01-b ;
+    fbo:hasWindow ex:window-large-1-02-01-a, ex:window-large-1-02-01-b ;
+    fbo:hasFloor ex:floor-large-1-02-01 ;
+    fbo:hasCeiling ex:ceiling-large-1-02-01 ;
+    fbo:containsSensor ex:sensor-large-1-02-01 .
+
+ex:wall-large-1-02-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-1-02-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-1-02-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-1-02-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-02-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-02-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-02-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-1-02-02 a fbo:Room ;
+    fbo:Name "Room B1S2R2" ;
+    fbo:roomArea "36.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-1-02 ;
+    fbo:boundedByWall ex:wall-large-1-02-02-a, ex:wall-large-1-02-02-b ;
+    fbo:hasWindow ex:window-large-1-02-02-a, ex:window-large-1-02-02-b ;
+    fbo:hasFloor ex:floor-large-1-02-02 ;
+    fbo:hasCeiling ex:ceiling-large-1-02-02 ;
+    fbo:containsSensor ex:sensor-large-1-02-02 .
+
+ex:wall-large-1-02-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-1-02-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-1-02-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-1-02-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-02-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-02-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-02-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-1-02-03 a fbo:Room ;
+    fbo:Name "Room B1S2R3" ;
+    fbo:roomArea "43.0"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-1-02 ;
+    fbo:boundedByWall ex:wall-large-1-02-03-a, ex:wall-large-1-02-03-b ;
+    fbo:hasWindow ex:window-large-1-02-03-a, ex:window-large-1-02-03-b ;
+    fbo:hasFloor ex:floor-large-1-02-03 ;
+    fbo:hasCeiling ex:ceiling-large-1-02-03 ;
+    fbo:containsSensor ex:sensor-large-1-02-03 .
+
+ex:wall-large-1-02-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-1-02-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-1-02-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-1-02-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-02-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-02-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-02-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-1-02-04 a fbo:Room ;
+    fbo:Name "Room B1S2R4" ;
+    fbo:roomArea "50.0"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-1-02 ;
+    fbo:boundedByWall ex:wall-large-1-02-04-a, ex:wall-large-1-02-04-b ;
+    fbo:hasWindow ex:window-large-1-02-04-a, ex:window-large-1-02-04-b ;
+    fbo:hasFloor ex:floor-large-1-02-04 ;
+    fbo:hasCeiling ex:ceiling-large-1-02-04 ;
+    fbo:containsSensor ex:sensor-large-1-02-04 .
+
+ex:wall-large-1-02-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-1-02-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-1-02-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-1-02-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-02-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-02-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-02-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:storey-large-1-03 a fbo:Storey ;
+    fbo:Name "Building 1 Storey 3" ;
+    fbo:StoreyNumber 3 ;
+    fbo:hasZone ex:zone-large-1-03-a, ex:zone-large-1-03-b ;
+    fbo:hasStair ex:stair-large-1-main, ex:stair-large-1-escape ;
+    fbo:hasRoom ex:room-large-1-03-01, ex:room-large-1-03-02, ex:room-large-1-03-03, ex:room-large-1-03-04 .
+
+ex:zone-large-1-03-a a fbo:Zone ;
+    fbo:Name "Office Zone B1S3A" ;
+    fbo:FireCompartmentId "LB1-S3-ZA" ;
+    fbo:hasRoom ex:room-large-1-03-01, ex:room-large-1-03-02 ;
+    fbo:adjacentToZone ex:zone-large-1-04-a .
+
+ex:zone-large-1-03-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B1S3B" ;
+    fbo:FireCompartmentId "LB1-S3-ZB" ;
+    fbo:hasRoom ex:room-large-1-03-03, ex:room-large-1-03-04 .
+
+ex:room-large-1-03-01 a fbo:Room ;
+    fbo:Name "Room B1S3R1" ;
+    fbo:roomArea "30.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-1-03 ;
+    fbo:boundedByWall ex:wall-large-1-03-01-a, ex:wall-large-1-03-01-b ;
+    fbo:hasWindow ex:window-large-1-03-01-a, ex:window-large-1-03-01-b ;
+    fbo:hasFloor ex:floor-large-1-03-01 ;
+    fbo:hasCeiling ex:ceiling-large-1-03-01 ;
+    fbo:containsSensor ex:sensor-large-1-03-01 .
+
+ex:wall-large-1-03-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-1-03-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-1-03-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-1-03-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-03-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-03-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-03-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-1-03-02 a fbo:Room ;
+    fbo:Name "Room B1S3R2" ;
+    fbo:roomArea "37.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-1-03 ;
+    fbo:boundedByWall ex:wall-large-1-03-02-a, ex:wall-large-1-03-02-b ;
+    fbo:hasWindow ex:window-large-1-03-02-a, ex:window-large-1-03-02-b ;
+    fbo:hasFloor ex:floor-large-1-03-02 ;
+    fbo:hasCeiling ex:ceiling-large-1-03-02 ;
+    fbo:containsSensor ex:sensor-large-1-03-02 .
+
+ex:wall-large-1-03-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-1-03-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-1-03-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-1-03-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-03-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-03-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-03-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-1-03-03 a fbo:Room ;
+    fbo:Name "Room B1S3R3" ;
+    fbo:roomArea "44.5"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-1-03 ;
+    fbo:boundedByWall ex:wall-large-1-03-03-a, ex:wall-large-1-03-03-b ;
+    fbo:hasWindow ex:window-large-1-03-03-a, ex:window-large-1-03-03-b ;
+    fbo:hasFloor ex:floor-large-1-03-03 ;
+    fbo:hasCeiling ex:ceiling-large-1-03-03 ;
+    fbo:containsSensor ex:sensor-large-1-03-03 .
+
+ex:wall-large-1-03-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-1-03-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-1-03-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-1-03-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-03-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-03-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-03-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-1-03-04 a fbo:Room ;
+    fbo:Name "Room B1S3R4" ;
+    fbo:roomArea "51.5"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-1-03 ;
+    fbo:boundedByWall ex:wall-large-1-03-04-a, ex:wall-large-1-03-04-b ;
+    fbo:hasWindow ex:window-large-1-03-04-a, ex:window-large-1-03-04-b ;
+    fbo:hasFloor ex:floor-large-1-03-04 ;
+    fbo:hasCeiling ex:ceiling-large-1-03-04 ;
+    fbo:containsSensor ex:sensor-large-1-03-04 .
+
+ex:wall-large-1-03-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-1-03-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-1-03-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-1-03-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-03-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-03-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-03-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:storey-large-1-04 a fbo:Storey ;
+    fbo:Name "Building 1 Storey 4" ;
+    fbo:StoreyNumber 4 ;
+    fbo:hasZone ex:zone-large-1-04-a, ex:zone-large-1-04-b ;
+    fbo:hasStair ex:stair-large-1-main, ex:stair-large-1-escape ;
+    fbo:hasRoom ex:room-large-1-04-01, ex:room-large-1-04-02, ex:room-large-1-04-03, ex:room-large-1-04-04 .
+
+ex:zone-large-1-04-a a fbo:Zone ;
+    fbo:Name "Office Zone B1S4A" ;
+    fbo:FireCompartmentId "LB1-S4-ZA" ;
+    fbo:hasRoom ex:room-large-1-04-01, ex:room-large-1-04-02 .
+
+ex:zone-large-1-04-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B1S4B" ;
+    fbo:FireCompartmentId "LB1-S4-ZB" ;
+    fbo:hasRoom ex:room-large-1-04-03, ex:room-large-1-04-04 .
+
+ex:room-large-1-04-01 a fbo:Room ;
+    fbo:Name "Room B1S4R1" ;
+    fbo:roomArea "32.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-1-04 ;
+    fbo:boundedByWall ex:wall-large-1-04-01-a, ex:wall-large-1-04-01-b ;
+    fbo:hasWindow ex:window-large-1-04-01-a, ex:window-large-1-04-01-b ;
+    fbo:hasFloor ex:floor-large-1-04-01 ;
+    fbo:hasCeiling ex:ceiling-large-1-04-01 ;
+    fbo:containsSensor ex:sensor-large-1-04-01 .
+
+ex:wall-large-1-04-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-1-04-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-1-04-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-1-04-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-04-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-04-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-04-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-1-04-02 a fbo:Room ;
+    fbo:Name "Room B1S4R2" ;
+    fbo:roomArea "39.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-1-04 ;
+    fbo:boundedByWall ex:wall-large-1-04-02-a, ex:wall-large-1-04-02-b ;
+    fbo:hasWindow ex:window-large-1-04-02-a, ex:window-large-1-04-02-b ;
+    fbo:hasFloor ex:floor-large-1-04-02 ;
+    fbo:hasCeiling ex:ceiling-large-1-04-02 ;
+    fbo:containsSensor ex:sensor-large-1-04-02 .
+
+ex:wall-large-1-04-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-1-04-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-1-04-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-1-04-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-04-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-04-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-04-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-1-04-03 a fbo:Room ;
+    fbo:Name "Room B1S4R3" ;
+    fbo:roomArea "46.0"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-1-04 ;
+    fbo:boundedByWall ex:wall-large-1-04-03-a, ex:wall-large-1-04-03-b ;
+    fbo:hasWindow ex:window-large-1-04-03-a, ex:window-large-1-04-03-b ;
+    fbo:hasFloor ex:floor-large-1-04-03 ;
+    fbo:hasCeiling ex:ceiling-large-1-04-03 ;
+    fbo:containsSensor ex:sensor-large-1-04-03 .
+
+ex:wall-large-1-04-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-1-04-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-1-04-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-1-04-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-04-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-04-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-04-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-1-04-04 a fbo:Room ;
+    fbo:Name "Room B1S4R4" ;
+    fbo:roomArea "53.0"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-1-04 ;
+    fbo:boundedByWall ex:wall-large-1-04-04-a, ex:wall-large-1-04-04-b ;
+    fbo:hasWindow ex:window-large-1-04-04-a, ex:window-large-1-04-04-b ;
+    fbo:hasFloor ex:floor-large-1-04-04 ;
+    fbo:hasCeiling ex:ceiling-large-1-04-04 ;
+    fbo:containsSensor ex:sensor-large-1-04-04 .
+
+ex:wall-large-1-04-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-1-04-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-1-04-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-1-04-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-1-04-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-1-04-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-1-04-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:stair-large-1-main a fbo:Stair ;
+    fbo:Name "Main Stair Building 1" ;
+    fbo:FireExit true ;
+    fbo:spansStorey ex:storey-large-1-01, ex:storey-large-1-02, ex:storey-large-1-03, ex:storey-large-1-04 .
+
+ex:stair-large-1-escape a fbo:Stair ;
+    fbo:Name "Escape Stair Building 1" ;
+    fbo:FireExit true ;
+    fbo:spansStorey ex:storey-large-1-01, ex:storey-large-1-02, ex:storey-large-1-03, ex:storey-large-1-04 .
+
+ex:building-large-2 a fbo:Building ;
+    fbo:Name "Large Building 2" ;
+    fbo:FireRating "R90" ;
+    fbo:BuildingHeight "30.0"^^xsd:decimal ;
+    fbo:hasStorey ex:storey-large-2-01, ex:storey-large-2-02, ex:storey-large-2-03, ex:storey-large-2-04 .
+
+ex:storey-large-2-01 a fbo:Storey ;
+    fbo:Name "Building 2 Storey 1" ;
+    fbo:StoreyNumber 1 ;
+    fbo:hasZone ex:zone-large-2-01-a, ex:zone-large-2-01-b ;
+    fbo:hasStair ex:stair-large-2-main, ex:stair-large-2-escape ;
+    fbo:hasRoom ex:room-large-2-01-01, ex:room-large-2-01-02, ex:room-large-2-01-03, ex:room-large-2-01-04 .
+
+ex:zone-large-2-01-a a fbo:Zone ;
+    fbo:Name "Office Zone B2S1A" ;
+    fbo:FireCompartmentId "LB2-S1-ZA" ;
+    fbo:hasRoom ex:room-large-2-01-01, ex:room-large-2-01-02 ;
+    fbo:adjacentToZone ex:zone-large-2-02-a .
+
+ex:zone-large-2-01-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B2S1B" ;
+    fbo:FireCompartmentId "LB2-S1-ZB" ;
+    fbo:hasRoom ex:room-large-2-01-03, ex:room-large-2-01-04 .
+
+ex:room-large-2-01-01 a fbo:Room ;
+    fbo:Name "Room B2S1R1" ;
+    fbo:roomArea "28.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-2-01 ;
+    fbo:boundedByWall ex:wall-large-2-01-01-a, ex:wall-large-2-01-01-b ;
+    fbo:hasWindow ex:window-large-2-01-01-a, ex:window-large-2-01-01-b ;
+    fbo:hasFloor ex:floor-large-2-01-01 ;
+    fbo:hasCeiling ex:ceiling-large-2-01-01 ;
+    fbo:containsSensor ex:sensor-large-2-01-01 .
+
+ex:wall-large-2-01-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-2-01-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-2-01-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-2-01-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-01-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-01-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-01-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-2-01-02 a fbo:Room ;
+    fbo:Name "Room B2S1R2" ;
+    fbo:roomArea "35.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-2-01 ;
+    fbo:boundedByWall ex:wall-large-2-01-02-a, ex:wall-large-2-01-02-b ;
+    fbo:hasWindow ex:window-large-2-01-02-a, ex:window-large-2-01-02-b ;
+    fbo:hasFloor ex:floor-large-2-01-02 ;
+    fbo:hasCeiling ex:ceiling-large-2-01-02 ;
+    fbo:containsSensor ex:sensor-large-2-01-02 .
+
+ex:wall-large-2-01-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-2-01-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-2-01-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-2-01-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-01-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-01-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-01-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-2-01-03 a fbo:Room ;
+    fbo:Name "Room B2S1R3" ;
+    fbo:roomArea "42.5"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-2-01 ;
+    fbo:boundedByWall ex:wall-large-2-01-03-a, ex:wall-large-2-01-03-b ;
+    fbo:hasWindow ex:window-large-2-01-03-a, ex:window-large-2-01-03-b ;
+    fbo:hasFloor ex:floor-large-2-01-03 ;
+    fbo:hasCeiling ex:ceiling-large-2-01-03 ;
+    fbo:containsSensor ex:sensor-large-2-01-03 .
+
+ex:wall-large-2-01-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-2-01-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-2-01-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-2-01-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-01-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-01-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-01-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-2-01-04 a fbo:Room ;
+    fbo:Name "Room B2S1R4" ;
+    fbo:roomArea "49.5"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-2-01 ;
+    fbo:boundedByWall ex:wall-large-2-01-04-a, ex:wall-large-2-01-04-b ;
+    fbo:hasWindow ex:window-large-2-01-04-a, ex:window-large-2-01-04-b ;
+    fbo:hasFloor ex:floor-large-2-01-04 ;
+    fbo:hasCeiling ex:ceiling-large-2-01-04 ;
+    fbo:containsSensor ex:sensor-large-2-01-04 .
+
+ex:wall-large-2-01-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-2-01-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-2-01-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-2-01-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-01-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-01-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-01-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:storey-large-2-02 a fbo:Storey ;
+    fbo:Name "Building 2 Storey 2" ;
+    fbo:StoreyNumber 2 ;
+    fbo:hasZone ex:zone-large-2-02-a, ex:zone-large-2-02-b ;
+    fbo:hasStair ex:stair-large-2-main, ex:stair-large-2-escape ;
+    fbo:hasRoom ex:room-large-2-02-01, ex:room-large-2-02-02, ex:room-large-2-02-03, ex:room-large-2-02-04 .
+
+ex:zone-large-2-02-a a fbo:Zone ;
+    fbo:Name "Office Zone B2S2A" ;
+    fbo:FireCompartmentId "LB2-S2-ZA" ;
+    fbo:hasRoom ex:room-large-2-02-01, ex:room-large-2-02-02 ;
+    fbo:adjacentToZone ex:zone-large-2-03-a .
+
+ex:zone-large-2-02-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B2S2B" ;
+    fbo:FireCompartmentId "LB2-S2-ZB" ;
+    fbo:hasRoom ex:room-large-2-02-03, ex:room-large-2-02-04 .
+
+ex:room-large-2-02-01 a fbo:Room ;
+    fbo:Name "Room B2S2R1" ;
+    fbo:roomArea "30.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-2-02 ;
+    fbo:boundedByWall ex:wall-large-2-02-01-a, ex:wall-large-2-02-01-b ;
+    fbo:hasWindow ex:window-large-2-02-01-a, ex:window-large-2-02-01-b ;
+    fbo:hasFloor ex:floor-large-2-02-01 ;
+    fbo:hasCeiling ex:ceiling-large-2-02-01 ;
+    fbo:containsSensor ex:sensor-large-2-02-01 .
+
+ex:wall-large-2-02-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-2-02-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-2-02-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-2-02-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-02-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-02-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-02-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-2-02-02 a fbo:Room ;
+    fbo:Name "Room B2S2R2" ;
+    fbo:roomArea "37.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-2-02 ;
+    fbo:boundedByWall ex:wall-large-2-02-02-a, ex:wall-large-2-02-02-b ;
+    fbo:hasWindow ex:window-large-2-02-02-a, ex:window-large-2-02-02-b ;
+    fbo:hasFloor ex:floor-large-2-02-02 ;
+    fbo:hasCeiling ex:ceiling-large-2-02-02 ;
+    fbo:containsSensor ex:sensor-large-2-02-02 .
+
+ex:wall-large-2-02-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-2-02-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-2-02-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-2-02-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-02-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-02-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-02-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-2-02-03 a fbo:Room ;
+    fbo:Name "Room B2S2R3" ;
+    fbo:roomArea "44.0"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-2-02 ;
+    fbo:boundedByWall ex:wall-large-2-02-03-a, ex:wall-large-2-02-03-b ;
+    fbo:hasWindow ex:window-large-2-02-03-a, ex:window-large-2-02-03-b ;
+    fbo:hasFloor ex:floor-large-2-02-03 ;
+    fbo:hasCeiling ex:ceiling-large-2-02-03 ;
+    fbo:containsSensor ex:sensor-large-2-02-03 .
+
+ex:wall-large-2-02-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-2-02-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-2-02-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-2-02-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-02-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-02-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-02-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-2-02-04 a fbo:Room ;
+    fbo:Name "Room B2S2R4" ;
+    fbo:roomArea "51.0"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-2-02 ;
+    fbo:boundedByWall ex:wall-large-2-02-04-a, ex:wall-large-2-02-04-b ;
+    fbo:hasWindow ex:window-large-2-02-04-a, ex:window-large-2-02-04-b ;
+    fbo:hasFloor ex:floor-large-2-02-04 ;
+    fbo:hasCeiling ex:ceiling-large-2-02-04 ;
+    fbo:containsSensor ex:sensor-large-2-02-04 .
+
+ex:wall-large-2-02-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-2-02-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-2-02-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-2-02-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-02-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-02-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-02-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:storey-large-2-03 a fbo:Storey ;
+    fbo:Name "Building 2 Storey 3" ;
+    fbo:StoreyNumber 3 ;
+    fbo:hasZone ex:zone-large-2-03-a, ex:zone-large-2-03-b ;
+    fbo:hasStair ex:stair-large-2-main, ex:stair-large-2-escape ;
+    fbo:hasRoom ex:room-large-2-03-01, ex:room-large-2-03-02, ex:room-large-2-03-03, ex:room-large-2-03-04 .
+
+ex:zone-large-2-03-a a fbo:Zone ;
+    fbo:Name "Office Zone B2S3A" ;
+    fbo:FireCompartmentId "LB2-S3-ZA" ;
+    fbo:hasRoom ex:room-large-2-03-01, ex:room-large-2-03-02 ;
+    fbo:adjacentToZone ex:zone-large-2-04-a .
+
+ex:zone-large-2-03-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B2S3B" ;
+    fbo:FireCompartmentId "LB2-S3-ZB" ;
+    fbo:hasRoom ex:room-large-2-03-03, ex:room-large-2-03-04 .
+
+ex:room-large-2-03-01 a fbo:Room ;
+    fbo:Name "Room B2S3R1" ;
+    fbo:roomArea "31.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-2-03 ;
+    fbo:boundedByWall ex:wall-large-2-03-01-a, ex:wall-large-2-03-01-b ;
+    fbo:hasWindow ex:window-large-2-03-01-a, ex:window-large-2-03-01-b ;
+    fbo:hasFloor ex:floor-large-2-03-01 ;
+    fbo:hasCeiling ex:ceiling-large-2-03-01 ;
+    fbo:containsSensor ex:sensor-large-2-03-01 .
+
+ex:wall-large-2-03-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-2-03-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-2-03-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-2-03-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-03-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-03-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-03-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-2-03-02 a fbo:Room ;
+    fbo:Name "Room B2S3R2" ;
+    fbo:roomArea "38.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-2-03 ;
+    fbo:boundedByWall ex:wall-large-2-03-02-a, ex:wall-large-2-03-02-b ;
+    fbo:hasWindow ex:window-large-2-03-02-a, ex:window-large-2-03-02-b ;
+    fbo:hasFloor ex:floor-large-2-03-02 ;
+    fbo:hasCeiling ex:ceiling-large-2-03-02 ;
+    fbo:containsSensor ex:sensor-large-2-03-02 .
+
+ex:wall-large-2-03-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-2-03-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-2-03-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-2-03-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-03-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-03-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-03-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-2-03-03 a fbo:Room ;
+    fbo:Name "Room B2S3R3" ;
+    fbo:roomArea "45.5"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-2-03 ;
+    fbo:boundedByWall ex:wall-large-2-03-03-a, ex:wall-large-2-03-03-b ;
+    fbo:hasWindow ex:window-large-2-03-03-a, ex:window-large-2-03-03-b ;
+    fbo:hasFloor ex:floor-large-2-03-03 ;
+    fbo:hasCeiling ex:ceiling-large-2-03-03 ;
+    fbo:containsSensor ex:sensor-large-2-03-03 .
+
+ex:wall-large-2-03-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-2-03-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-2-03-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-2-03-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-03-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-03-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-03-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-2-03-04 a fbo:Room ;
+    fbo:Name "Room B2S3R4" ;
+    fbo:roomArea "52.5"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-2-03 ;
+    fbo:boundedByWall ex:wall-large-2-03-04-a, ex:wall-large-2-03-04-b ;
+    fbo:hasWindow ex:window-large-2-03-04-a, ex:window-large-2-03-04-b ;
+    fbo:hasFloor ex:floor-large-2-03-04 ;
+    fbo:hasCeiling ex:ceiling-large-2-03-04 ;
+    fbo:containsSensor ex:sensor-large-2-03-04 .
+
+ex:wall-large-2-03-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-2-03-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-2-03-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-2-03-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-03-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-03-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-03-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:storey-large-2-04 a fbo:Storey ;
+    fbo:Name "Building 2 Storey 4" ;
+    fbo:StoreyNumber 4 ;
+    fbo:hasZone ex:zone-large-2-04-a, ex:zone-large-2-04-b ;
+    fbo:hasStair ex:stair-large-2-main, ex:stair-large-2-escape ;
+    fbo:hasRoom ex:room-large-2-04-01, ex:room-large-2-04-02, ex:room-large-2-04-03, ex:room-large-2-04-04 .
+
+ex:zone-large-2-04-a a fbo:Zone ;
+    fbo:Name "Office Zone B2S4A" ;
+    fbo:FireCompartmentId "LB2-S4-ZA" ;
+    fbo:hasRoom ex:room-large-2-04-01, ex:room-large-2-04-02 .
+
+ex:zone-large-2-04-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B2S4B" ;
+    fbo:FireCompartmentId "LB2-S4-ZB" ;
+    fbo:hasRoom ex:room-large-2-04-03, ex:room-large-2-04-04 .
+
+ex:room-large-2-04-01 a fbo:Room ;
+    fbo:Name "Room B2S4R1" ;
+    fbo:roomArea "33.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-2-04 ;
+    fbo:boundedByWall ex:wall-large-2-04-01-a, ex:wall-large-2-04-01-b ;
+    fbo:hasWindow ex:window-large-2-04-01-a, ex:window-large-2-04-01-b ;
+    fbo:hasFloor ex:floor-large-2-04-01 ;
+    fbo:hasCeiling ex:ceiling-large-2-04-01 ;
+    fbo:containsSensor ex:sensor-large-2-04-01 .
+
+ex:wall-large-2-04-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-2-04-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-2-04-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-2-04-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-04-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-04-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-04-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-2-04-02 a fbo:Room ;
+    fbo:Name "Room B2S4R2" ;
+    fbo:roomArea "40.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-2-04 ;
+    fbo:boundedByWall ex:wall-large-2-04-02-a, ex:wall-large-2-04-02-b ;
+    fbo:hasWindow ex:window-large-2-04-02-a, ex:window-large-2-04-02-b ;
+    fbo:hasFloor ex:floor-large-2-04-02 ;
+    fbo:hasCeiling ex:ceiling-large-2-04-02 ;
+    fbo:containsSensor ex:sensor-large-2-04-02 .
+
+ex:wall-large-2-04-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-2-04-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-2-04-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-2-04-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-04-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-04-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-04-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-2-04-03 a fbo:Room ;
+    fbo:Name "Room B2S4R3" ;
+    fbo:roomArea "47.0"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-2-04 ;
+    fbo:boundedByWall ex:wall-large-2-04-03-a, ex:wall-large-2-04-03-b ;
+    fbo:hasWindow ex:window-large-2-04-03-a, ex:window-large-2-04-03-b ;
+    fbo:hasFloor ex:floor-large-2-04-03 ;
+    fbo:hasCeiling ex:ceiling-large-2-04-03 ;
+    fbo:containsSensor ex:sensor-large-2-04-03 .
+
+ex:wall-large-2-04-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-2-04-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-2-04-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-2-04-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-04-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-04-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-04-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-2-04-04 a fbo:Room ;
+    fbo:Name "Room B2S4R4" ;
+    fbo:roomArea "54.0"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-2-04 ;
+    fbo:boundedByWall ex:wall-large-2-04-04-a, ex:wall-large-2-04-04-b ;
+    fbo:hasWindow ex:window-large-2-04-04-a, ex:window-large-2-04-04-b ;
+    fbo:hasFloor ex:floor-large-2-04-04 ;
+    fbo:hasCeiling ex:ceiling-large-2-04-04 ;
+    fbo:containsSensor ex:sensor-large-2-04-04 .
+
+ex:wall-large-2-04-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-2-04-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-2-04-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-2-04-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-2-04-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-2-04-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-2-04-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:stair-large-2-main a fbo:Stair ;
+    fbo:Name "Main Stair Building 2" ;
+    fbo:FireExit true ;
+    fbo:spansStorey ex:storey-large-2-01, ex:storey-large-2-02, ex:storey-large-2-03, ex:storey-large-2-04 .
+
+ex:stair-large-2-escape a fbo:Stair ;
+    fbo:Name "Escape Stair Building 2" ;
+    fbo:FireExit true ;
+    fbo:spansStorey ex:storey-large-2-01, ex:storey-large-2-02, ex:storey-large-2-03, ex:storey-large-2-04 .
+
+ex:building-large-3 a fbo:Building ;
+    fbo:Name "Large Building 3" ;
+    fbo:FireRating "R120" ;
+    fbo:BuildingHeight "36.0"^^xsd:decimal ;
+    fbo:hasStorey ex:storey-large-3-01, ex:storey-large-3-02, ex:storey-large-3-03, ex:storey-large-3-04 .
+
+ex:storey-large-3-01 a fbo:Storey ;
+    fbo:Name "Building 3 Storey 1" ;
+    fbo:StoreyNumber 1 ;
+    fbo:hasZone ex:zone-large-3-01-a, ex:zone-large-3-01-b ;
+    fbo:hasStair ex:stair-large-3-main, ex:stair-large-3-escape ;
+    fbo:hasRoom ex:room-large-3-01-01, ex:room-large-3-01-02, ex:room-large-3-01-03, ex:room-large-3-01-04 .
+
+ex:zone-large-3-01-a a fbo:Zone ;
+    fbo:Name "Office Zone B3S1A" ;
+    fbo:FireCompartmentId "LB3-S1-ZA" ;
+    fbo:hasRoom ex:room-large-3-01-01, ex:room-large-3-01-02 ;
+    fbo:adjacentToZone ex:zone-large-3-02-a .
+
+ex:zone-large-3-01-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B3S1B" ;
+    fbo:FireCompartmentId "LB3-S1-ZB" ;
+    fbo:hasRoom ex:room-large-3-01-03, ex:room-large-3-01-04 .
+
+ex:room-large-3-01-01 a fbo:Room ;
+    fbo:Name "Room B3S1R1" ;
+    fbo:roomArea "29.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-3-01 ;
+    fbo:boundedByWall ex:wall-large-3-01-01-a, ex:wall-large-3-01-01-b ;
+    fbo:hasWindow ex:window-large-3-01-01-a, ex:window-large-3-01-01-b ;
+    fbo:hasFloor ex:floor-large-3-01-01 ;
+    fbo:hasCeiling ex:ceiling-large-3-01-01 ;
+    fbo:containsSensor ex:sensor-large-3-01-01 .
+
+ex:wall-large-3-01-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-3-01-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-3-01-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-3-01-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-01-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-01-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-01-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-3-01-02 a fbo:Room ;
+    fbo:Name "Room B3S1R2" ;
+    fbo:roomArea "36.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-3-01 ;
+    fbo:boundedByWall ex:wall-large-3-01-02-a, ex:wall-large-3-01-02-b ;
+    fbo:hasWindow ex:window-large-3-01-02-a, ex:window-large-3-01-02-b ;
+    fbo:hasFloor ex:floor-large-3-01-02 ;
+    fbo:hasCeiling ex:ceiling-large-3-01-02 ;
+    fbo:containsSensor ex:sensor-large-3-01-02 .
+
+ex:wall-large-3-01-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-3-01-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-3-01-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-3-01-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-01-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-01-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-01-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-3-01-03 a fbo:Room ;
+    fbo:Name "Room B3S1R3" ;
+    fbo:roomArea "43.5"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-3-01 ;
+    fbo:boundedByWall ex:wall-large-3-01-03-a, ex:wall-large-3-01-03-b ;
+    fbo:hasWindow ex:window-large-3-01-03-a, ex:window-large-3-01-03-b ;
+    fbo:hasFloor ex:floor-large-3-01-03 ;
+    fbo:hasCeiling ex:ceiling-large-3-01-03 ;
+    fbo:containsSensor ex:sensor-large-3-01-03 .
+
+ex:wall-large-3-01-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-3-01-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-3-01-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-3-01-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-01-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-01-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-01-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-3-01-04 a fbo:Room ;
+    fbo:Name "Room B3S1R4" ;
+    fbo:roomArea "50.5"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-3-01 ;
+    fbo:boundedByWall ex:wall-large-3-01-04-a, ex:wall-large-3-01-04-b ;
+    fbo:hasWindow ex:window-large-3-01-04-a, ex:window-large-3-01-04-b ;
+    fbo:hasFloor ex:floor-large-3-01-04 ;
+    fbo:hasCeiling ex:ceiling-large-3-01-04 ;
+    fbo:containsSensor ex:sensor-large-3-01-04 .
+
+ex:wall-large-3-01-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-3-01-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-3-01-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-3-01-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-01-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-01-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-01-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:storey-large-3-02 a fbo:Storey ;
+    fbo:Name "Building 3 Storey 2" ;
+    fbo:StoreyNumber 2 ;
+    fbo:hasZone ex:zone-large-3-02-a, ex:zone-large-3-02-b ;
+    fbo:hasStair ex:stair-large-3-main, ex:stair-large-3-escape ;
+    fbo:hasRoom ex:room-large-3-02-01, ex:room-large-3-02-02, ex:room-large-3-02-03, ex:room-large-3-02-04 .
+
+ex:zone-large-3-02-a a fbo:Zone ;
+    fbo:Name "Office Zone B3S2A" ;
+    fbo:FireCompartmentId "LB3-S2-ZA" ;
+    fbo:hasRoom ex:room-large-3-02-01, ex:room-large-3-02-02 ;
+    fbo:adjacentToZone ex:zone-large-3-03-a .
+
+ex:zone-large-3-02-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B3S2B" ;
+    fbo:FireCompartmentId "LB3-S2-ZB" ;
+    fbo:hasRoom ex:room-large-3-02-03, ex:room-large-3-02-04 .
+
+ex:room-large-3-02-01 a fbo:Room ;
+    fbo:Name "Room B3S2R1" ;
+    fbo:roomArea "31.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-3-02 ;
+    fbo:boundedByWall ex:wall-large-3-02-01-a, ex:wall-large-3-02-01-b ;
+    fbo:hasWindow ex:window-large-3-02-01-a, ex:window-large-3-02-01-b ;
+    fbo:hasFloor ex:floor-large-3-02-01 ;
+    fbo:hasCeiling ex:ceiling-large-3-02-01 ;
+    fbo:containsSensor ex:sensor-large-3-02-01 .
+
+ex:wall-large-3-02-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-3-02-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-3-02-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-3-02-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-02-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-02-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-02-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-3-02-02 a fbo:Room ;
+    fbo:Name "Room B3S2R2" ;
+    fbo:roomArea "38.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-3-02 ;
+    fbo:boundedByWall ex:wall-large-3-02-02-a, ex:wall-large-3-02-02-b ;
+    fbo:hasWindow ex:window-large-3-02-02-a, ex:window-large-3-02-02-b ;
+    fbo:hasFloor ex:floor-large-3-02-02 ;
+    fbo:hasCeiling ex:ceiling-large-3-02-02 ;
+    fbo:containsSensor ex:sensor-large-3-02-02 .
+
+ex:wall-large-3-02-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-3-02-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-3-02-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-3-02-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-02-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-02-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-02-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-3-02-03 a fbo:Room ;
+    fbo:Name "Room B3S2R3" ;
+    fbo:roomArea "45.0"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-3-02 ;
+    fbo:boundedByWall ex:wall-large-3-02-03-a, ex:wall-large-3-02-03-b ;
+    fbo:hasWindow ex:window-large-3-02-03-a, ex:window-large-3-02-03-b ;
+    fbo:hasFloor ex:floor-large-3-02-03 ;
+    fbo:hasCeiling ex:ceiling-large-3-02-03 ;
+    fbo:containsSensor ex:sensor-large-3-02-03 .
+
+ex:wall-large-3-02-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-3-02-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-3-02-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-3-02-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-02-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-02-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-02-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-3-02-04 a fbo:Room ;
+    fbo:Name "Room B3S2R4" ;
+    fbo:roomArea "52.0"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-3-02 ;
+    fbo:boundedByWall ex:wall-large-3-02-04-a, ex:wall-large-3-02-04-b ;
+    fbo:hasWindow ex:window-large-3-02-04-a, ex:window-large-3-02-04-b ;
+    fbo:hasFloor ex:floor-large-3-02-04 ;
+    fbo:hasCeiling ex:ceiling-large-3-02-04 ;
+    fbo:containsSensor ex:sensor-large-3-02-04 .
+
+ex:wall-large-3-02-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-3-02-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-3-02-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-3-02-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-02-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-02-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-02-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:storey-large-3-03 a fbo:Storey ;
+    fbo:Name "Building 3 Storey 3" ;
+    fbo:StoreyNumber 3 ;
+    fbo:hasZone ex:zone-large-3-03-a, ex:zone-large-3-03-b ;
+    fbo:hasStair ex:stair-large-3-main, ex:stair-large-3-escape ;
+    fbo:hasRoom ex:room-large-3-03-01, ex:room-large-3-03-02, ex:room-large-3-03-03, ex:room-large-3-03-04 .
+
+ex:zone-large-3-03-a a fbo:Zone ;
+    fbo:Name "Office Zone B3S3A" ;
+    fbo:FireCompartmentId "LB3-S3-ZA" ;
+    fbo:hasRoom ex:room-large-3-03-01, ex:room-large-3-03-02 ;
+    fbo:adjacentToZone ex:zone-large-3-04-a .
+
+ex:zone-large-3-03-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B3S3B" ;
+    fbo:FireCompartmentId "LB3-S3-ZB" ;
+    fbo:hasRoom ex:room-large-3-03-03, ex:room-large-3-03-04 .
+
+ex:room-large-3-03-01 a fbo:Room ;
+    fbo:Name "Room B3S3R1" ;
+    fbo:roomArea "32.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-3-03 ;
+    fbo:boundedByWall ex:wall-large-3-03-01-a, ex:wall-large-3-03-01-b ;
+    fbo:hasWindow ex:window-large-3-03-01-a, ex:window-large-3-03-01-b ;
+    fbo:hasFloor ex:floor-large-3-03-01 ;
+    fbo:hasCeiling ex:ceiling-large-3-03-01 ;
+    fbo:containsSensor ex:sensor-large-3-03-01 .
+
+ex:wall-large-3-03-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-3-03-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-3-03-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-3-03-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-03-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-03-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-03-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-3-03-02 a fbo:Room ;
+    fbo:Name "Room B3S3R2" ;
+    fbo:roomArea "39.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-3-03 ;
+    fbo:boundedByWall ex:wall-large-3-03-02-a, ex:wall-large-3-03-02-b ;
+    fbo:hasWindow ex:window-large-3-03-02-a, ex:window-large-3-03-02-b ;
+    fbo:hasFloor ex:floor-large-3-03-02 ;
+    fbo:hasCeiling ex:ceiling-large-3-03-02 ;
+    fbo:containsSensor ex:sensor-large-3-03-02 .
+
+ex:wall-large-3-03-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-3-03-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-3-03-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-3-03-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-03-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-03-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-03-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-3-03-03 a fbo:Room ;
+    fbo:Name "Room B3S3R3" ;
+    fbo:roomArea "46.5"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-3-03 ;
+    fbo:boundedByWall ex:wall-large-3-03-03-a, ex:wall-large-3-03-03-b ;
+    fbo:hasWindow ex:window-large-3-03-03-a, ex:window-large-3-03-03-b ;
+    fbo:hasFloor ex:floor-large-3-03-03 ;
+    fbo:hasCeiling ex:ceiling-large-3-03-03 ;
+    fbo:containsSensor ex:sensor-large-3-03-03 .
+
+ex:wall-large-3-03-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-3-03-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-3-03-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-3-03-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-03-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-03-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-03-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-3-03-04 a fbo:Room ;
+    fbo:Name "Room B3S3R4" ;
+    fbo:roomArea "53.5"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-3-03 ;
+    fbo:boundedByWall ex:wall-large-3-03-04-a, ex:wall-large-3-03-04-b ;
+    fbo:hasWindow ex:window-large-3-03-04-a, ex:window-large-3-03-04-b ;
+    fbo:hasFloor ex:floor-large-3-03-04 ;
+    fbo:hasCeiling ex:ceiling-large-3-03-04 ;
+    fbo:containsSensor ex:sensor-large-3-03-04 .
+
+ex:wall-large-3-03-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-3-03-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-3-03-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-3-03-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-03-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-03-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-03-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:storey-large-3-04 a fbo:Storey ;
+    fbo:Name "Building 3 Storey 4" ;
+    fbo:StoreyNumber 4 ;
+    fbo:hasZone ex:zone-large-3-04-a, ex:zone-large-3-04-b ;
+    fbo:hasStair ex:stair-large-3-main, ex:stair-large-3-escape ;
+    fbo:hasRoom ex:room-large-3-04-01, ex:room-large-3-04-02, ex:room-large-3-04-03, ex:room-large-3-04-04 .
+
+ex:zone-large-3-04-a a fbo:Zone ;
+    fbo:Name "Office Zone B3S4A" ;
+    fbo:FireCompartmentId "LB3-S4-ZA" ;
+    fbo:hasRoom ex:room-large-3-04-01, ex:room-large-3-04-02 .
+
+ex:zone-large-3-04-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B3S4B" ;
+    fbo:FireCompartmentId "LB3-S4-ZB" ;
+    fbo:hasRoom ex:room-large-3-04-03, ex:room-large-3-04-04 .
+
+ex:room-large-3-04-01 a fbo:Room ;
+    fbo:Name "Room B3S4R1" ;
+    fbo:roomArea "34.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-3-04 ;
+    fbo:boundedByWall ex:wall-large-3-04-01-a, ex:wall-large-3-04-01-b ;
+    fbo:hasWindow ex:window-large-3-04-01-a, ex:window-large-3-04-01-b ;
+    fbo:hasFloor ex:floor-large-3-04-01 ;
+    fbo:hasCeiling ex:ceiling-large-3-04-01 ;
+    fbo:containsSensor ex:sensor-large-3-04-01 .
+
+ex:wall-large-3-04-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-3-04-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-3-04-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-3-04-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-04-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-04-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-04-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-3-04-02 a fbo:Room ;
+    fbo:Name "Room B3S4R2" ;
+    fbo:roomArea "41.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-3-04 ;
+    fbo:boundedByWall ex:wall-large-3-04-02-a, ex:wall-large-3-04-02-b ;
+    fbo:hasWindow ex:window-large-3-04-02-a, ex:window-large-3-04-02-b ;
+    fbo:hasFloor ex:floor-large-3-04-02 ;
+    fbo:hasCeiling ex:ceiling-large-3-04-02 ;
+    fbo:containsSensor ex:sensor-large-3-04-02 .
+
+ex:wall-large-3-04-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-3-04-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-3-04-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-3-04-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-04-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-04-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-04-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-3-04-03 a fbo:Room ;
+    fbo:Name "Room B3S4R3" ;
+    fbo:roomArea "48.0"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-3-04 ;
+    fbo:boundedByWall ex:wall-large-3-04-03-a, ex:wall-large-3-04-03-b ;
+    fbo:hasWindow ex:window-large-3-04-03-a, ex:window-large-3-04-03-b ;
+    fbo:hasFloor ex:floor-large-3-04-03 ;
+    fbo:hasCeiling ex:ceiling-large-3-04-03 ;
+    fbo:containsSensor ex:sensor-large-3-04-03 .
+
+ex:wall-large-3-04-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-3-04-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-3-04-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-3-04-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-04-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-04-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-04-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-3-04-04 a fbo:Room ;
+    fbo:Name "Room B3S4R4" ;
+    fbo:roomArea "55.0"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-3-04 ;
+    fbo:boundedByWall ex:wall-large-3-04-04-a, ex:wall-large-3-04-04-b ;
+    fbo:hasWindow ex:window-large-3-04-04-a, ex:window-large-3-04-04-b ;
+    fbo:hasFloor ex:floor-large-3-04-04 ;
+    fbo:hasCeiling ex:ceiling-large-3-04-04 ;
+    fbo:containsSensor ex:sensor-large-3-04-04 .
+
+ex:wall-large-3-04-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-3-04-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-3-04-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-3-04-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-3-04-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-3-04-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-3-04-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:stair-large-3-main a fbo:Stair ;
+    fbo:Name "Main Stair Building 3" ;
+    fbo:FireExit true ;
+    fbo:spansStorey ex:storey-large-3-01, ex:storey-large-3-02, ex:storey-large-3-03, ex:storey-large-3-04 .
+
+ex:stair-large-3-escape a fbo:Stair ;
+    fbo:Name "Escape Stair Building 3" ;
+    fbo:FireExit true ;
+    fbo:spansStorey ex:storey-large-3-01, ex:storey-large-3-02, ex:storey-large-3-03, ex:storey-large-3-04 .
+
+ex:building-large-4 a fbo:Building ;
+    fbo:Name "Large Building 4" ;
+    fbo:FireRating "R120" ;
+    fbo:BuildingHeight "42.0"^^xsd:decimal ;
+    fbo:hasStorey ex:storey-large-4-01, ex:storey-large-4-02, ex:storey-large-4-03, ex:storey-large-4-04 .
+
+ex:storey-large-4-01 a fbo:Storey ;
+    fbo:Name "Building 4 Storey 1" ;
+    fbo:StoreyNumber 1 ;
+    fbo:hasZone ex:zone-large-4-01-a, ex:zone-large-4-01-b ;
+    fbo:hasStair ex:stair-large-4-main, ex:stair-large-4-escape ;
+    fbo:hasRoom ex:room-large-4-01-01, ex:room-large-4-01-02, ex:room-large-4-01-03, ex:room-large-4-01-04 .
+
+ex:zone-large-4-01-a a fbo:Zone ;
+    fbo:Name "Office Zone B4S1A" ;
+    fbo:FireCompartmentId "LB4-S1-ZA" ;
+    fbo:hasRoom ex:room-large-4-01-01, ex:room-large-4-01-02 ;
+    fbo:adjacentToZone ex:zone-large-4-02-a .
+
+ex:zone-large-4-01-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B4S1B" ;
+    fbo:FireCompartmentId "LB4-S1-ZB" ;
+    fbo:hasRoom ex:room-large-4-01-03, ex:room-large-4-01-04 .
+
+ex:room-large-4-01-01 a fbo:Room ;
+    fbo:Name "Room B4S1R1" ;
+    fbo:roomArea "30.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-4-01 ;
+    fbo:boundedByWall ex:wall-large-4-01-01-a, ex:wall-large-4-01-01-b ;
+    fbo:hasWindow ex:window-large-4-01-01-a, ex:window-large-4-01-01-b ;
+    fbo:hasFloor ex:floor-large-4-01-01 ;
+    fbo:hasCeiling ex:ceiling-large-4-01-01 ;
+    fbo:containsSensor ex:sensor-large-4-01-01 .
+
+ex:wall-large-4-01-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-4-01-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-4-01-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-4-01-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-01-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-01-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-01-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-4-01-02 a fbo:Room ;
+    fbo:Name "Room B4S1R2" ;
+    fbo:roomArea "37.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-4-01 ;
+    fbo:boundedByWall ex:wall-large-4-01-02-a, ex:wall-large-4-01-02-b ;
+    fbo:hasWindow ex:window-large-4-01-02-a, ex:window-large-4-01-02-b ;
+    fbo:hasFloor ex:floor-large-4-01-02 ;
+    fbo:hasCeiling ex:ceiling-large-4-01-02 ;
+    fbo:containsSensor ex:sensor-large-4-01-02 .
+
+ex:wall-large-4-01-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-4-01-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-4-01-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-4-01-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-01-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-01-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-01-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-4-01-03 a fbo:Room ;
+    fbo:Name "Room B4S1R3" ;
+    fbo:roomArea "44.5"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-4-01 ;
+    fbo:boundedByWall ex:wall-large-4-01-03-a, ex:wall-large-4-01-03-b ;
+    fbo:hasWindow ex:window-large-4-01-03-a, ex:window-large-4-01-03-b ;
+    fbo:hasFloor ex:floor-large-4-01-03 ;
+    fbo:hasCeiling ex:ceiling-large-4-01-03 ;
+    fbo:containsSensor ex:sensor-large-4-01-03 .
+
+ex:wall-large-4-01-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-4-01-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-4-01-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-4-01-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-01-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-01-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-01-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-4-01-04 a fbo:Room ;
+    fbo:Name "Room B4S1R4" ;
+    fbo:roomArea "51.5"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-4-01 ;
+    fbo:boundedByWall ex:wall-large-4-01-04-a, ex:wall-large-4-01-04-b ;
+    fbo:hasWindow ex:window-large-4-01-04-a, ex:window-large-4-01-04-b ;
+    fbo:hasFloor ex:floor-large-4-01-04 ;
+    fbo:hasCeiling ex:ceiling-large-4-01-04 ;
+    fbo:containsSensor ex:sensor-large-4-01-04 .
+
+ex:wall-large-4-01-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-4-01-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-4-01-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-4-01-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-01-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-01-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-01-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:storey-large-4-02 a fbo:Storey ;
+    fbo:Name "Building 4 Storey 2" ;
+    fbo:StoreyNumber 2 ;
+    fbo:hasZone ex:zone-large-4-02-a, ex:zone-large-4-02-b ;
+    fbo:hasStair ex:stair-large-4-main, ex:stair-large-4-escape ;
+    fbo:hasRoom ex:room-large-4-02-01, ex:room-large-4-02-02, ex:room-large-4-02-03, ex:room-large-4-02-04 .
+
+ex:zone-large-4-02-a a fbo:Zone ;
+    fbo:Name "Office Zone B4S2A" ;
+    fbo:FireCompartmentId "LB4-S2-ZA" ;
+    fbo:hasRoom ex:room-large-4-02-01, ex:room-large-4-02-02 ;
+    fbo:adjacentToZone ex:zone-large-4-03-a .
+
+ex:zone-large-4-02-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B4S2B" ;
+    fbo:FireCompartmentId "LB4-S2-ZB" ;
+    fbo:hasRoom ex:room-large-4-02-03, ex:room-large-4-02-04 .
+
+ex:room-large-4-02-01 a fbo:Room ;
+    fbo:Name "Room B4S2R1" ;
+    fbo:roomArea "32.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-4-02 ;
+    fbo:boundedByWall ex:wall-large-4-02-01-a, ex:wall-large-4-02-01-b ;
+    fbo:hasWindow ex:window-large-4-02-01-a, ex:window-large-4-02-01-b ;
+    fbo:hasFloor ex:floor-large-4-02-01 ;
+    fbo:hasCeiling ex:ceiling-large-4-02-01 ;
+    fbo:containsSensor ex:sensor-large-4-02-01 .
+
+ex:wall-large-4-02-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-4-02-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-4-02-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-4-02-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-02-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-02-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-02-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-4-02-02 a fbo:Room ;
+    fbo:Name "Room B4S2R2" ;
+    fbo:roomArea "39.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-4-02 ;
+    fbo:boundedByWall ex:wall-large-4-02-02-a, ex:wall-large-4-02-02-b ;
+    fbo:hasWindow ex:window-large-4-02-02-a, ex:window-large-4-02-02-b ;
+    fbo:hasFloor ex:floor-large-4-02-02 ;
+    fbo:hasCeiling ex:ceiling-large-4-02-02 ;
+    fbo:containsSensor ex:sensor-large-4-02-02 .
+
+ex:wall-large-4-02-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-4-02-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-4-02-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-4-02-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-02-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-02-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-02-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-4-02-03 a fbo:Room ;
+    fbo:Name "Room B4S2R3" ;
+    fbo:roomArea "46.0"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-4-02 ;
+    fbo:boundedByWall ex:wall-large-4-02-03-a, ex:wall-large-4-02-03-b ;
+    fbo:hasWindow ex:window-large-4-02-03-a, ex:window-large-4-02-03-b ;
+    fbo:hasFloor ex:floor-large-4-02-03 ;
+    fbo:hasCeiling ex:ceiling-large-4-02-03 ;
+    fbo:containsSensor ex:sensor-large-4-02-03 .
+
+ex:wall-large-4-02-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-4-02-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-4-02-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-4-02-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-02-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-02-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-02-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-4-02-04 a fbo:Room ;
+    fbo:Name "Room B4S2R4" ;
+    fbo:roomArea "53.0"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-4-02 ;
+    fbo:boundedByWall ex:wall-large-4-02-04-a, ex:wall-large-4-02-04-b ;
+    fbo:hasWindow ex:window-large-4-02-04-a, ex:window-large-4-02-04-b ;
+    fbo:hasFloor ex:floor-large-4-02-04 ;
+    fbo:hasCeiling ex:ceiling-large-4-02-04 ;
+    fbo:containsSensor ex:sensor-large-4-02-04 .
+
+ex:wall-large-4-02-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-4-02-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-4-02-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-4-02-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-02-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-02-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-02-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:storey-large-4-03 a fbo:Storey ;
+    fbo:Name "Building 4 Storey 3" ;
+    fbo:StoreyNumber 3 ;
+    fbo:hasZone ex:zone-large-4-03-a, ex:zone-large-4-03-b ;
+    fbo:hasStair ex:stair-large-4-main, ex:stair-large-4-escape ;
+    fbo:hasRoom ex:room-large-4-03-01, ex:room-large-4-03-02, ex:room-large-4-03-03, ex:room-large-4-03-04 .
+
+ex:zone-large-4-03-a a fbo:Zone ;
+    fbo:Name "Office Zone B4S3A" ;
+    fbo:FireCompartmentId "LB4-S3-ZA" ;
+    fbo:hasRoom ex:room-large-4-03-01, ex:room-large-4-03-02 ;
+    fbo:adjacentToZone ex:zone-large-4-04-a .
+
+ex:zone-large-4-03-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B4S3B" ;
+    fbo:FireCompartmentId "LB4-S3-ZB" ;
+    fbo:hasRoom ex:room-large-4-03-03, ex:room-large-4-03-04 .
+
+ex:room-large-4-03-01 a fbo:Room ;
+    fbo:Name "Room B4S3R1" ;
+    fbo:roomArea "33.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-4-03 ;
+    fbo:boundedByWall ex:wall-large-4-03-01-a, ex:wall-large-4-03-01-b ;
+    fbo:hasWindow ex:window-large-4-03-01-a, ex:window-large-4-03-01-b ;
+    fbo:hasFloor ex:floor-large-4-03-01 ;
+    fbo:hasCeiling ex:ceiling-large-4-03-01 ;
+    fbo:containsSensor ex:sensor-large-4-03-01 .
+
+ex:wall-large-4-03-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-4-03-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-4-03-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-4-03-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-03-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-03-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-03-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-4-03-02 a fbo:Room ;
+    fbo:Name "Room B4S3R2" ;
+    fbo:roomArea "40.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-4-03 ;
+    fbo:boundedByWall ex:wall-large-4-03-02-a, ex:wall-large-4-03-02-b ;
+    fbo:hasWindow ex:window-large-4-03-02-a, ex:window-large-4-03-02-b ;
+    fbo:hasFloor ex:floor-large-4-03-02 ;
+    fbo:hasCeiling ex:ceiling-large-4-03-02 ;
+    fbo:containsSensor ex:sensor-large-4-03-02 .
+
+ex:wall-large-4-03-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-4-03-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-4-03-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-4-03-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-03-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-03-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-03-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-4-03-03 a fbo:Room ;
+    fbo:Name "Room B4S3R3" ;
+    fbo:roomArea "47.5"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-4-03 ;
+    fbo:boundedByWall ex:wall-large-4-03-03-a, ex:wall-large-4-03-03-b ;
+    fbo:hasWindow ex:window-large-4-03-03-a, ex:window-large-4-03-03-b ;
+    fbo:hasFloor ex:floor-large-4-03-03 ;
+    fbo:hasCeiling ex:ceiling-large-4-03-03 ;
+    fbo:containsSensor ex:sensor-large-4-03-03 .
+
+ex:wall-large-4-03-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-4-03-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-4-03-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-4-03-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-03-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-03-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-03-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-4-03-04 a fbo:Room ;
+    fbo:Name "Room B4S3R4" ;
+    fbo:roomArea "54.5"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-4-03 ;
+    fbo:boundedByWall ex:wall-large-4-03-04-a, ex:wall-large-4-03-04-b ;
+    fbo:hasWindow ex:window-large-4-03-04-a, ex:window-large-4-03-04-b ;
+    fbo:hasFloor ex:floor-large-4-03-04 ;
+    fbo:hasCeiling ex:ceiling-large-4-03-04 ;
+    fbo:containsSensor ex:sensor-large-4-03-04 .
+
+ex:wall-large-4-03-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-4-03-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-4-03-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-4-03-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-03-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-03-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-03-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:storey-large-4-04 a fbo:Storey ;
+    fbo:Name "Building 4 Storey 4" ;
+    fbo:StoreyNumber 4 ;
+    fbo:hasZone ex:zone-large-4-04-a, ex:zone-large-4-04-b ;
+    fbo:hasStair ex:stair-large-4-main, ex:stair-large-4-escape ;
+    fbo:hasRoom ex:room-large-4-04-01, ex:room-large-4-04-02, ex:room-large-4-04-03, ex:room-large-4-04-04 .
+
+ex:zone-large-4-04-a a fbo:Zone ;
+    fbo:Name "Office Zone B4S4A" ;
+    fbo:FireCompartmentId "LB4-S4-ZA" ;
+    fbo:hasRoom ex:room-large-4-04-01, ex:room-large-4-04-02 .
+
+ex:zone-large-4-04-b a fbo:Zone ;
+    fbo:Name "Mixed Zone B4S4B" ;
+    fbo:FireCompartmentId "LB4-S4-ZB" ;
+    fbo:hasRoom ex:room-large-4-04-03, ex:room-large-4-04-04 .
+
+ex:room-large-4-04-01 a fbo:Room ;
+    fbo:Name "Room B4S4R1" ;
+    fbo:roomArea "35.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-4-04 ;
+    fbo:boundedByWall ex:wall-large-4-04-01-a, ex:wall-large-4-04-01-b ;
+    fbo:hasWindow ex:window-large-4-04-01-a, ex:window-large-4-04-01-b ;
+    fbo:hasFloor ex:floor-large-4-04-01 ;
+    fbo:hasCeiling ex:ceiling-large-4-04-01 ;
+    fbo:containsSensor ex:sensor-large-4-04-01 .
+
+ex:wall-large-4-04-01-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-4-04-01-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-4-04-01-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-4-04-01-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-04-01 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-04-01 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-04-01 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-4-04-02 a fbo:Room ;
+    fbo:Name "Room B4S4R2" ;
+    fbo:roomArea "42.0"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 3 ;
+    fbo:locatedInStorey ex:storey-large-4-04 ;
+    fbo:boundedByWall ex:wall-large-4-04-02-a, ex:wall-large-4-04-02-b ;
+    fbo:hasWindow ex:window-large-4-04-02-a, ex:window-large-4-04-02-b ;
+    fbo:hasFloor ex:floor-large-4-04-02 ;
+    fbo:hasCeiling ex:ceiling-large-4-04-02 ;
+    fbo:containsSensor ex:sensor-large-4-04-02 .
+
+ex:wall-large-4-04-02-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-large-4-04-02-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:window-large-4-04-02-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-4-04-02-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-04-02 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-04-02 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-04-02 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-4-04-03 a fbo:Room ;
+    fbo:Name "Room B4S4R3" ;
+    fbo:roomArea "49.0"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:locatedInStorey ex:storey-large-4-04 ;
+    fbo:boundedByWall ex:wall-large-4-04-03-a, ex:wall-large-4-04-03-b ;
+    fbo:hasWindow ex:window-large-4-04-03-a, ex:window-large-4-04-03-b ;
+    fbo:hasFloor ex:floor-large-4-04-03 ;
+    fbo:hasCeiling ex:ceiling-large-4-04-03 ;
+    fbo:containsSensor ex:sensor-large-4-04-03 .
+
+ex:wall-large-4-04-03-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-4-04-03-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-4-04-03-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-large-4-04-03-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-04-03 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-04-03 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-04-03 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:room-large-4-04-04 a fbo:Room ;
+    fbo:Name "Room B4S4R4" ;
+    fbo:roomArea "56.0"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:locatedInStorey ex:storey-large-4-04 ;
+    fbo:boundedByWall ex:wall-large-4-04-04-a, ex:wall-large-4-04-04-b ;
+    fbo:hasWindow ex:window-large-4-04-04-a, ex:window-large-4-04-04-b ;
+    fbo:hasFloor ex:floor-large-4-04-04 ;
+    fbo:hasCeiling ex:ceiling-large-4-04-04 ;
+    fbo:containsSensor ex:sensor-large-4-04-04 .
+
+ex:wall-large-4-04-04-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-large-4-04-04-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing false .
+ex:window-large-4-04-04-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-large-4-04-04-b a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:floor-large-4-04-04 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-large-4-04-04 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:sensor-large-4-04-04 a fbo:SensorTypeSmokeSensor ; fbo:HasBuiltInAlarm true ; fbo:HasSmokeDetectionCoverage true .
+
+ex:stair-large-4-main a fbo:Stair ;
+    fbo:Name "Main Stair Building 4" ;
+    fbo:FireExit true ;
+    fbo:spansStorey ex:storey-large-4-01, ex:storey-large-4-02, ex:storey-large-4-03, ex:storey-large-4-04 .
+
+ex:stair-large-4-escape a fbo:Stair ;
+    fbo:Name "Escape Stair Building 4" ;
+    fbo:FireExit true ;
+    fbo:spansStorey ex:storey-large-4-01, ex:storey-large-4-02, ex:storey-large-4-03, ex:storey-large-4-04 .
+

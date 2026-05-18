@@ -1,0 +1,145 @@
+@prefix fbo: <http://example.org/fbo/1.0/> .
+@prefix ex: <https://firebim.org/examples/buildings/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:site-medium a fbo:Site ;
+    fbo:Name "Medium Test Site" ;
+    fbo:FireExit true ;
+    fbo:hasBuilding ex:building-medium .
+
+ex:building-medium a fbo:Building ;
+    fbo:Name "Building Medium" ;
+    fbo:FireRating "R90" ;
+    fbo:BuildingHeight "18.2"^^xsd:decimal ;
+    fbo:hasStorey ex:storey-medium-01, ex:storey-medium-02, ex:storey-medium-03 .
+
+ex:storey-medium-01 a fbo:Storey ;
+    fbo:Name "Ground Floor" ;
+    fbo:StoreyNumber 1 ;
+    fbo:hasZone ex:zone-medium-a, ex:zone-medium-b ;
+    fbo:hasStair ex:stair-medium-01 ;
+    fbo:hasRoom ex:room-medium-101, ex:room-medium-102 .
+
+ex:storey-medium-02 a fbo:Storey ;
+    fbo:Name "First Floor" ;
+    fbo:StoreyNumber 2 ;
+    fbo:hasZone ex:zone-medium-c ;
+    fbo:hasStair ex:stair-medium-01 ;
+    fbo:hasRoom ex:room-medium-201, ex:room-medium-202 .
+
+ex:storey-medium-03 a fbo:Storey ;
+    fbo:Name "Second Floor" ;
+    fbo:StoreyNumber 3 ;
+    fbo:hasZone ex:zone-medium-d ;
+    fbo:hasStair ex:stair-medium-02 ;
+    fbo:hasRoom ex:room-medium-301 .
+
+ex:zone-medium-a a fbo:Zone ;
+    fbo:Name "Reception Zone" ;
+    fbo:FireCompartmentId "M-ZA" ;
+    fbo:hasRoom ex:room-medium-101 .
+
+ex:zone-medium-b a fbo:Zone ;
+    fbo:Name "Service Zone" ;
+    fbo:FireCompartmentId "M-ZB" ;
+    fbo:hasRoom ex:room-medium-102 .
+
+ex:zone-medium-c a fbo:Zone ;
+    fbo:Name "Office Zone" ;
+    fbo:FireCompartmentId "M-ZC" ;
+    fbo:hasRoom ex:room-medium-201, ex:room-medium-202 .
+
+ex:zone-medium-d a fbo:Zone ;
+    fbo:Name "Meeting Zone" ;
+    fbo:FireCompartmentId "M-ZD" ;
+    fbo:hasRoom ex:room-medium-301 ;
+    fbo:adjacentToZone ex:zone-medium-c .
+
+ex:room-medium-101 a fbo:Room ;
+    fbo:Name "Reception" ;
+    fbo:roomArea "42.0"^^xsd:decimal ;
+    fbo:OccupancyType "assembly" ;
+    fbo:NumberOfOccupants 12 ;
+    fbo:boundedByWall ex:wall-medium-101-a, ex:wall-medium-101-b ;
+    fbo:hasWindow ex:window-medium-101-a ;
+    fbo:hasFloor ex:floor-medium-101 ;
+    fbo:hasCeiling ex:ceiling-medium-101 ;
+    fbo:containsSensor ex:sensor-medium-smoke-01 .
+
+ex:room-medium-102 a fbo:Room ;
+    fbo:Name "Storage" ;
+    fbo:roomArea "26.5"^^xsd:decimal ;
+    fbo:OccupancyType "storage" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:boundedByWall ex:wall-medium-102-a ;
+    fbo:hasWindow ex:window-medium-102-a ;
+    fbo:hasFloor ex:floor-medium-102 ;
+    fbo:hasCeiling ex:ceiling-medium-102 .
+
+ex:room-medium-201 a fbo:Room ;
+    fbo:Name "Office 201" ;
+    fbo:roomArea "24.8"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 4 ;
+    fbo:boundedByWall ex:wall-medium-201-a ;
+    fbo:hasWindow ex:window-medium-201-a ;
+    fbo:containsSensor ex:sensor-medium-smoke-02 .
+
+ex:room-medium-202 a fbo:Room ;
+    fbo:Name "Office 202" ;
+    fbo:roomArea "31.6"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 5 ;
+    fbo:boundedByWall ex:wall-medium-202-a ;
+    fbo:hasWindow ex:window-medium-202-a .
+
+ex:room-medium-301 a fbo:Room ;
+    fbo:Name "Meeting Room 301" ;
+    fbo:roomArea "58.0"^^xsd:decimal ;
+    fbo:OccupancyType "meeting" ;
+    fbo:NumberOfOccupants 18 ;
+    fbo:boundedByWall ex:wall-medium-301-a, ex:wall-medium-301-b ;
+    fbo:hasWindow ex:window-medium-301-a, ex:window-medium-301-b ;
+    fbo:containsSensor ex:sensor-medium-smoke-03 .
+
+ex:wall-medium-101-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing true .
+ex:wall-medium-101-b a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:wall-medium-102-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-medium-201-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:wall-medium-202-a a fbo:Wall ; fbo:FireRating "EI60" ; fbo:LoadBearing false .
+ex:wall-medium-301-a a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+ex:wall-medium-301-b a fbo:Wall ; fbo:FireRating "EI90" ; fbo:LoadBearing true .
+
+ex:window-medium-101-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-medium-102-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-medium-201-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-medium-202-a a fbo:Window ; fbo:FireRating "E30" ; fbo:HasBuiltInAlarm false .
+ex:window-medium-301-a a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+ex:window-medium-301-b a fbo:Window ; fbo:FireRating "E60" ; fbo:HasBuiltInAlarm true .
+
+ex:floor-medium-101 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:floor-medium-102 a fbo:Floor ; fbo:FireRating "REI60" .
+ex:ceiling-medium-101 a fbo:Ceiling ; fbo:FireRating "EI30" .
+ex:ceiling-medium-102 a fbo:Ceiling ; fbo:FireRating "EI30" .
+
+ex:stair-medium-01 a fbo:Stair ;
+    fbo:Name "Main Core Stair" ;
+    fbo:FireExit true ;
+    fbo:spansStorey ex:storey-medium-01, ex:storey-medium-02 .
+
+ex:stair-medium-02 a fbo:Stair ;
+    fbo:Name "Secondary Stair" ;
+    fbo:FireExit true ;
+    fbo:spansStorey ex:storey-medium-02, ex:storey-medium-03 .
+
+ex:sensor-medium-smoke-01 a fbo:SensorTypeSmokeSensor ;
+    fbo:HasBuiltInAlarm true ;
+    fbo:HasSmokeDetectionCoverage true .
+
+ex:sensor-medium-smoke-02 a fbo:SensorTypeSmokeSensor ;
+    fbo:HasBuiltInAlarm true ;
+    fbo:HasSmokeDetectionCoverage true .
+
+ex:sensor-medium-smoke-03 a fbo:SensorTypeSmokeSensor ;
+    fbo:HasBuiltInAlarm true ;
+    fbo:HasSmokeDetectionCoverage true .

@@ -140,6 +140,83 @@ class RuleDeleteResponse(BaseModel):
     fallback: bool = False
 
 
+class RuleTermDescriptor(BaseModel):
+    value: str
+    full_iri: str
+    namespace: str
+    local_name: str
+
+
+class RuleTermPairDescriptor(BaseModel):
+    value: str
+    full_pair: str
+    compact_pair: str
+    target_class: RuleTermDescriptor
+    property_path: RuleTermDescriptor
+
+
+class RuleTermLocalNameGroup(BaseModel):
+    local_name: str
+    count: int
+    full_iris: list[str] = Field(default_factory=list)
+    namespaces: list[str] = Field(default_factory=list)
+
+
+class RuleTermStats(BaseModel):
+    rule_count: int
+    element_count: int
+    rules_with_target_classes: int
+    rules_with_property_paths: int
+    rules_with_both: int
+    elements_with_target_class: int
+    elements_with_property_path: int
+    elements_with_both: int
+    unique_target_classes: int
+    unique_target_class_namespaces: int
+    unique_target_class_local_names: int
+    unique_property_paths: int
+    unique_property_path_namespaces: int
+    unique_property_path_local_names: int
+    unique_target_property_pairs: int
+    target_class_local_name_collisions: int
+    property_path_local_name_collisions: int
+
+
+class RuleTermsResponse(BaseModel):
+    rule_id: str
+    compact_terms: bool = False
+    target_classes: list[RuleTermDescriptor] = Field(default_factory=list)
+    property_paths: list[RuleTermDescriptor] = Field(default_factory=list)
+    target_property_pairs: list[RuleTermPairDescriptor] = Field(default_factory=list)
+    target_class_local_name_groups: list[RuleTermLocalNameGroup] = Field(default_factory=list)
+    property_path_local_name_groups: list[RuleTermLocalNameGroup] = Field(default_factory=list)
+    stats: RuleTermStats
+    success: bool = True
+    error: str | None = None
+    message: str | None = None
+    fallback: bool = False
+
+
+class RuleTermsAggregateRequest(BaseModel):
+    rule_ids: list[str] = Field(default_factory=list)
+    compact_terms: bool = False
+
+
+class RuleTermsAggregateResponse(BaseModel):
+    rule_ids: list[str] = Field(default_factory=list)
+    compact_terms: bool = False
+    target_classes: list[RuleTermDescriptor] = Field(default_factory=list)
+    property_paths: list[RuleTermDescriptor] = Field(default_factory=list)
+    target_property_pairs: list[RuleTermPairDescriptor] = Field(default_factory=list)
+    target_class_local_name_groups: list[RuleTermLocalNameGroup] = Field(default_factory=list)
+    property_path_local_name_groups: list[RuleTermLocalNameGroup] = Field(default_factory=list)
+    stats: RuleTermStats
+    success: bool = True
+    error: str | None = None
+    message: str | None = None
+    fallback: bool = False
+
+
 class RuleListItem(BaseModel):
     rule_id: str
     graph_uri: str

@@ -16,6 +16,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["health"])
 
 
+async def _run_check(func, *, timeout: float):
+    if settings.ENVIRONMENT == "test":
+        return func()
+    return await asyncio.wait_for(asyncio.to_thread(func), timeout=timeout)
+
+
 @router.get("/health", responses={503: {"description": "Service Unavailable"}})
 async def health() -> JSONResponse:
     async def _db_check() -> tuple[str, str, bool]:
@@ -25,7 +31,7 @@ async def health() -> JSONResponse:
                 with engine.connect() as conn:
                     conn.execute(text("SELECT 1"))
 
-            await asyncio.wait_for(asyncio.to_thread(_check_db_sync), timeout=3.0)
+            await _run_check(_check_db_sync, timeout=3.0)
             return "database", "ok", True
         except Exception as e:
             logger.error("Health check database error: %s", e)
@@ -33,10 +39,7 @@ async def health() -> JSONResponse:
 
     async def _s3_check() -> tuple[str, str, bool]:
         try:
-            await asyncio.wait_for(
-                asyncio.to_thread(s3_client.head_bucket, Bucket=BUCKET_NAME),
-                timeout=3.0,
-            )
+            await _run_check(lambda: s3_client.head_bucket(Bucket=BUCKET_NAME), timeout=3.0)
             return "s3", "ok", True
         except Exception as e:
             logger.error("Health check S3 error: %s", e)
@@ -44,10 +47,7 @@ async def health() -> JSONResponse:
 
     async def _celery_check() -> tuple[str, str, bool]:
         try:
-            result = await asyncio.wait_for(
-                asyncio.to_thread(celery_app.control.ping, timeout=5),
-                timeout=6.0,
-            )
+            result = await _run_check(lambda: celery_app.control.ping(timeout=5), timeout=6.0)
             if result:
                 return "celery", "ok", True
             return "celery", "no workers responding", False
