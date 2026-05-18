@@ -3,7 +3,6 @@ import os
 import pytest
 
 # Set required environment variables before importing app
-os.environ["ENVIRONMENT"] = "test"
 os.environ["POSTGRES_HOST"] = "localhost"
 os.environ["POSTGRES_PORT"] = "5433"
 os.environ["POSTGRES_USER"] = "testuser"

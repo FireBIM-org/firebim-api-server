@@ -55,7 +55,7 @@ jobs:
       - name: Run tests
         run: uv run pytest --cov=app --cov-report=xml --junitxml=test-results.xml
         env:
-          ENVIRONMENT: test
+          ENVIRONMENT: local
           POSTGRES_HOST: localhost
           POSTGRES_PORT: "5432"
           POSTGRES_USER: test
