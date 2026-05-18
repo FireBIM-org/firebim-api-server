@@ -1,8 +1,12 @@
 # Stage 1: Build
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
+ARG APT_CACHE_BUSTER
 # Install curl for healthchecks
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -15,6 +19,7 @@ RUN uv sync --package firebim-api-server --group worker --no-dev
 # Stage 2: Runtime
 FROM python:3.12-slim-bookworm AS runtime
 
+ARG APT_CACHE_BUSTER
 # Patch OS-level vulnerabilities (CVE-2026-28390: libssl3/openssl)
 RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
