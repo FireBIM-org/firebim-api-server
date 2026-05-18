@@ -31,6 +31,27 @@
         ]
       }
     },
+    "/build-info": {
+      "get": {
+        "tags": [
+          "info"
+        ],
+        "summary": "Build Info",
+        "operationId": "build_info_build_info_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuildInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/graphs/health": {
       "get": {
         "tags": [
@@ -84,12 +105,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/GraphPublishRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/GraphPublishRequest"
               }
             }
           },
@@ -212,12 +228,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/GraphSchemaExtractRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/GraphSchemaExtractRequest"
               }
             }
           },
@@ -231,6 +242,326 @@
                 "schema": {
                   "$ref": "#/components/schemas/GraphSchemaExtractResponse"
                 }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ifc-models": {
+      "get": {
+        "tags": [
+          "ifc-models"
+        ],
+        "summary": "Get Models",
+        "description": "Get all IFC models belonging to the current user.",
+        "operationId": "get_models_ifc_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "ifc-models"
+        ],
+        "summary": "Upload Model",
+        "description": "Upload an IFC-STEP file, save to S3, and queue it for processing.",
+        "operationId": "upload_model_ifc_models_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_model_ifc_models_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/ifc-models/{id}": {
+      "get": {
+        "tags": [
+          "ifc-models"
+        ],
+        "summary": "Get Model",
+        "description": "Get metadata for an IFC model by its ID.",
+        "operationId": "get_model_ifc_models__id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ifc-models/{id}/download": {
+      "get": {
+        "tags": [
+          "ifc-models"
+        ],
+        "summary": "Download Model",
+        "description": "Download an IFC-STEP file by its ID.",
+        "operationId": "download_model_ifc_models__id__download_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ids-files": {
+      "get": {
+        "tags": [
+          "ids-files"
+        ],
+        "summary": "Get Ids Files",
+        "description": "Get all IDS files belonging to the current user.",
+        "operationId": "get_ids_files_ids_files_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "ids-files"
+        ],
+        "summary": "Upload Ids",
+        "description": "Upload an IDS file (XML-based) and save to S3.",
+        "operationId": "upload_ids_ids_files_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_ids_ids_files_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/ids-files/{id}": {
+      "get": {
+        "tags": [
+          "ids-files"
+        ],
+        "summary": "Get Ids",
+        "description": "Get metadata for an IDS file by its ID.",
+        "operationId": "get_ids_ids_files__id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ids-files/{id}/download": {
+      "get": {
+        "tags": [
+          "ids-files"
+        ],
+        "summary": "Download Ids",
+        "description": "Download an IDS file by its ID.",
+        "operationId": "download_ids_ids_files__id__download_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
               }
             }
           },
@@ -516,12 +847,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconCatalogResolveRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconCatalogResolveRequest"
               }
             }
           },
@@ -562,12 +888,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconCatalogCompareRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconCatalogCompareRequest"
               }
             }
           },
@@ -608,12 +929,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconCatalogSimilarityRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconCatalogSimilarityRequest"
               }
             }
           },
@@ -654,12 +970,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconCatalogSimilarityMatrixRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconCatalogSimilarityMatrixRequest"
               }
             }
           },
@@ -672,6 +983,47 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LexiconCatalogSimilarityMatrixResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lexicon/catalog/rule-ontology-similarity": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Score Rule Ontology Similarity",
+        "operationId": "score_rule_ontology_similarity_lexicon_catalog_rule_ontology_similarity_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LexiconRuleOntologySimilarityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconRuleOntologySimilarityResponse"
                 }
               }
             }
@@ -1252,12 +1604,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconGraphEvidenceSummaryRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconGraphEvidenceSummaryRequest"
               }
             }
           },
@@ -1298,12 +1645,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconMappingValidationRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconMappingValidationRequest"
               }
             }
           },
@@ -1344,12 +1686,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconMappingEvaluateRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconMappingEvaluateRequest"
               }
             }
           },
@@ -1419,12 +1756,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconMappingCreateRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconMappingCreateRequest"
               }
             }
           },
@@ -1562,12 +1894,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconHandshakeCreateRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconHandshakeCreateRequest"
               }
             }
           },
@@ -1677,12 +2004,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconHandshakeAcceptRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconHandshakeAcceptRequest"
               }
             }
           }
@@ -1786,12 +2108,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconHandshakeReconstructionRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconHandshakeReconstructionRequest"
               }
             }
           }
@@ -1848,12 +2165,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconHandshakeConformityRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconHandshakeConformityRequest"
               }
             }
           }
@@ -1893,12 +2205,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconProfileDeriveRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconProfileDeriveRequest"
               }
             }
           },
@@ -1939,12 +2246,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconProfileDeriveRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconProfileDeriveRequest"
               }
             }
           },
@@ -1974,6 +2276,430 @@
         }
       }
     },
+    "/lexicon/profiles": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Create Profile",
+        "operationId": "create_profile_lexicon_profiles_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconProfileResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "List Profiles",
+        "operationId": "list_profiles_lexicon_profiles_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "name": "ontology_family",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ontology Family"
+            }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconProfileListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lexicon/profiles/{profile_id}": {
+      "get": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Get Profile",
+        "operationId": "get_profile_lexicon_profiles__profile_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Update Profile",
+        "operationId": "update_profile_lexicon_profiles__profile_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconProfileResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Delete Profile",
+        "operationId": "delete_profile_lexicon_profiles__profile_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconProfileDeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lexicon/profiles/{profile_id}/rules/coverage": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Profile Rules Coverage",
+        "operationId": "profile_rules_coverage_lexicon_profiles__profile_id__rules_coverage_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LexiconProfileRulesCoverageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconProfileRulesCoverageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lexicon/profiles/{profile_id}/graph-coverage": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Profile Graph Coverage",
+        "operationId": "profile_graph_coverage_lexicon_profiles__profile_id__graph_coverage_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LexiconProfileGraphCoverageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconProfileGraphCoverageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lexicon/profiles/{profile_id}/mappings/candidates": {
+      "get": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Profile Mapping Candidates",
+        "operationId": "profile_mapping_candidates_lexicon_profiles__profile_id__mappings_candidates_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconProfileMappingCandidatesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/lexicon/reconstruction": {
       "post": {
         "tags": [
@@ -1985,12 +2711,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconReconstructionRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconReconstructionRequest"
               }
             }
           },
@@ -2031,12 +2752,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/LexiconConformityCheckRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/LexiconConformityCheckRequest"
               }
             }
           },
@@ -2098,12 +2814,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/OntologyPublishRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/OntologyPublishRequest"
               }
             }
           },
@@ -2149,12 +2860,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/OntologyDictionaryConversionRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/OntologyDictionaryConversionRequest"
               }
             }
           },
@@ -2224,12 +2930,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/OntologyDictionaryCandidateCreateRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/OntologyDictionaryCandidateCreateRequest"
               }
             }
           },
@@ -2339,6 +3040,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "additionalProperties": true,
                   "title": "Response Delete Dictionary Candidate Ontologies Candidates Dictionaries  Candidate Id  Delete"
                 }
               }
@@ -2571,12 +3273,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/OntologyDictionaryCandidatePublishRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/OntologyDictionaryCandidatePublishRequest"
               }
             }
           }
@@ -3087,12 +3784,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleBuilderWorkspaceCreateRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleBuilderWorkspaceCreateRequest"
               }
             }
           },
@@ -3127,6 +3819,63 @@
         ]
       }
     },
+    "/rulebuilder/rules/{rule_id}/workspace": {
+      "post": {
+        "tags": [
+          "rulebuilder"
+        ],
+        "summary": "Create Workspace From Rule",
+        "operationId": "create_workspace_from_rule_rulebuilder_rules__rule_id__workspace_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleBuilderWorkspaceFromRuleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleBuilderWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/rulebuilder/workspaces/{workspace_id}": {
       "put": {
         "tags": [
@@ -3155,12 +3904,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleBuilderWorkspaceUpdateRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleBuilderWorkspaceUpdateRequest"
               }
             }
           }
@@ -3290,12 +4034,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleBuilderWorkspaceBatchDeleteRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleBuilderWorkspaceBatchDeleteRequest"
               }
             }
           },
@@ -3407,12 +4146,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleValidateRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleValidateRequest"
               }
             }
           },
@@ -3453,12 +4187,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleCompileRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleCompileRequest"
               }
             }
           },
@@ -3499,12 +4228,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleDecompileRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleDecompileRequest"
               }
             }
           },
@@ -3545,12 +4269,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RulePublishRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RulePublishRequest"
               }
             }
           },
@@ -3612,12 +4331,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleFetchRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleFetchRequest"
               }
             }
           },
@@ -3658,12 +4372,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleDeleteRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleDeleteRequest"
               }
             }
           },
@@ -3704,12 +4413,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleAssembleRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleAssembleRequest"
               }
             }
           },
@@ -3750,12 +4454,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleAssembleRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleAssembleRequest"
               }
             }
           },
@@ -3796,12 +4495,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleElementDeriveRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleElementDeriveRequest"
               }
             }
           },
@@ -3861,12 +4555,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleElementPublishRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleElementPublishRequest"
               }
             }
           },
@@ -3907,12 +4596,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleElementFetchRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleElementFetchRequest"
               }
             }
           },
@@ -3953,12 +4637,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleElementDeleteRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleElementDeleteRequest"
               }
             }
           },
@@ -3999,12 +4678,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleConnectRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleConnectRequest"
               }
             }
           },
@@ -4045,12 +4719,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleDisconnectRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleDisconnectRequest"
               }
             }
           },
@@ -4091,12 +4760,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleCompletenessRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleCompletenessRequest"
               }
             }
           },
@@ -4137,12 +4801,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/RuleForceEndRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/RuleForceEndRequest"
               }
             }
           },
@@ -4239,6 +4898,101 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RuleFetchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/{rule_id}/terms": {
+      "get": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Get Rule Terms",
+        "operationId": "get_rule_terms_rules__rule_id__terms_get",
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Rule Id"
+            }
+          },
+          {
+            "name": "compact_terms",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When true, the primary `value` fields use the local name after # or the final path segment.",
+              "default": false,
+              "title": "Compact Terms"
+            },
+            "description": "When true, the primary `value` fields use the local name after # or the final path segment."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleTermsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rules/terms/aggregate": {
+      "post": {
+        "tags": [
+          "rules"
+        ],
+        "summary": "Aggregate Rule Terms",
+        "operationId": "aggregate_rule_terms_rules_terms_aggregate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleTermsAggregateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleTermsAggregateResponse"
                 }
               }
             }
@@ -4373,12 +5127,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/CheckRunRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/CheckRunRequest"
               }
             }
           },
@@ -4419,12 +5168,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/CheckRunRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/CheckRunRequest"
               }
             }
           },
@@ -4465,12 +5209,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/CheckRunRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/CheckRunRequest"
               }
             }
           },
@@ -4511,12 +5250,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/CheckRunRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/CheckRunRequest"
               }
             }
           },
@@ -4557,12 +5291,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/BlindCheckRunRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/BlindCheckRunRequest"
               }
             }
           },
@@ -4603,12 +5332,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/CheckCompatibilityRequest"
-                  }
-                ],
-                "title": "Payload"
+                "$ref": "#/components/schemas/CheckCompatibilityRequest"
               }
             }
           },
@@ -4656,471 +5380,6 @@
           },
           "503": {
             "description": "Service Unavailable"
-          }
-        }
-      }
-    },
-    "/ifc-models": {
-      "get": {
-        "summary": "Get Models",
-        "description": "Get all IFC models belonging to the current user.",
-        "operationId": "get_models_ifc_models_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      },
-      "post": {
-        "summary": "Upload Model",
-        "description": "Upload an IFC-STEP file, save to S3, and queue it for processing.",
-        "operationId": "upload_model_ifc_models_post",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Body_upload_model_ifc_models_post"
-                  }
-                ],
-                "title": "Body"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/ifc-models/{id}": {
-      "get": {
-        "summary": "Get Model",
-        "description": "Get metadata for an IFC model by its ID.",
-        "operationId": "get_model_ifc_models__id__get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/ifc-models/{id}/download": {
-      "get": {
-        "summary": "Download Model",
-        "description": "Download an IFC-STEP file by its ID.",
-        "operationId": "download_model_ifc_models__id__download_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/ids-files": {
-      "get": {
-        "summary": "Get Ids Files",
-        "description": "Get all IDS files belonging to the current user.",
-        "operationId": "get_ids_files_ids_files_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      },
-      "post": {
-        "summary": "Upload Ids",
-        "description": "Upload an IDS file (XML-based) and save to S3.",
-        "operationId": "upload_ids_ids_files_post",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/Body_upload_ids_ids_files_post"
-                  }
-                ],
-                "title": "Body"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/ids-files/{id}": {
-      "get": {
-        "summary": "Get Ids",
-        "description": "Get metadata for an IDS file by its ID.",
-        "operationId": "get_ids_ids_files__id__get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/ids-files/{id}/download": {
-      "get": {
-        "summary": "Download Ids",
-        "description": "Download an IDS file by its ID.",
-        "operationId": "download_ids_ids_files__id__download_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/async/check-model-with-ids": {
-      "post": {
-        "summary": "Async Check Model With Ids",
-        "description": "Asynchronously check a model against an IDS file.\nReturns immediately with a task ID for polling the result.\n\nThis endpoint demonstrates the first requested pattern:\n\"Call that returns immediately with id for polling if result is ready. Task is sent to worker.\"",
-        "operationId": "async_check_model_with_ids_async_check_model_with_ids_post",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "model_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Model Id"
-            }
-          },
-          {
-            "name": "ids_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Ids Id"
-            }
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/async/check-result/{check_id}": {
-      "get": {
-        "summary": "Get Async Check Result",
-        "description": "Get the result of an asynchronous check operation by its ID.\nThis is the polling endpoint to check if a result is ready.",
-        "operationId": "get_async_check_result_async_check_result__check_id__get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "check_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Check Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/ifc-models/{model_id}/check": {
-      "get": {
-        "summary": "Sync Check Model With Ids",
-        "description": "Synchronously check a model against an IDS file.\nWaits for the worker to complete and returns the result.\n\nThis endpoint demonstrates the second requested pattern:\n\"Call that waits for the worker to return with the result.\"",
-        "operationId": "sync_check_model_with_ids_ifc_models__model_id__check_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "model_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Model Id"
-            }
-          },
-          {
-            "name": "ids_id",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Ids Id"
-            }
-          },
-          {
-            "name": "timeout",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "description": "Timeout in seconds",
-              "default": 300,
-              "title": "Timeout"
-            },
-            "description": "Timeout in seconds"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
           }
         }
       }
@@ -5242,6 +5501,7 @@
             "title": "Message Counts"
           },
           "debug": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Debug"
           }
@@ -5297,7 +5557,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -5311,7 +5571,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           }
         },
@@ -5320,6 +5580,34 @@
           "file"
         ],
         "title": "Body_upload_model_ifc_models_post"
+      },
+      "BuildInfo": {
+        "properties": {
+          "git_branch": {
+            "type": "string",
+            "title": "Git Branch"
+          },
+          "git_commit": {
+            "type": "string",
+            "title": "Git Commit"
+          },
+          "build_time": {
+            "type": "string",
+            "title": "Build Time"
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "git_branch",
+          "git_commit",
+          "build_time",
+          "environment"
+        ],
+        "title": "BuildInfo"
       },
       "CheckCompatibilityRequest": {
         "properties": {
@@ -5535,6 +5823,7 @@
             "$ref": "#/components/schemas/CheckRunEngineInfo"
           },
           "compatibility": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Compatibility"
           },
@@ -5550,10 +5839,12 @@
             "title": "Report Text"
           },
           "debug": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Debug"
           },
           "compiled_rule": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Compiled Rule"
           },
@@ -5566,6 +5857,7 @@
           },
           "trace": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
@@ -5575,11 +5867,13 @@
             "$ref": "#/components/schemas/CheckDiagnosticTimingGroups"
           },
           "planner": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Planner"
           },
           "transition_inspections": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
@@ -5587,6 +5881,7 @@
           },
           "node_inspections": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
@@ -5594,6 +5889,7 @@
           },
           "terminal_failures": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
@@ -5601,6 +5897,7 @@
           },
           "sequence_events": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
@@ -5608,6 +5905,7 @@
           },
           "completed_chains": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
@@ -5661,6 +5959,7 @@
           },
           "per_completed_chain_ms": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
@@ -6109,6 +6408,7 @@
             "$ref": "#/components/schemas/CheckRunEngineInfo"
           },
           "compatibility": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Compatibility"
           },
@@ -6124,6 +6424,7 @@
             "title": "Report Text"
           },
           "debug": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Debug"
           }
@@ -6188,6 +6489,7 @@
             "title": "Trace"
           },
           "evidence": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Evidence"
           }
@@ -6225,6 +6527,7 @@
             "title": "Next Node Id"
           },
           "evidence": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Evidence"
           }
@@ -7774,6 +8077,13 @@
             "type": "string",
             "title": "Rule Id"
           },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
           "entry_node_id": {
             "anyOf": [
               {
@@ -8131,7 +8441,7 @@
             "$ref": "#/components/schemas/LexiconExecutionProfile"
           },
           "accepted_payload": {
-            "$ref": "#/components/schemas/LexiconHandshakeAcceptedPayload-Output"
+            "$ref": "#/components/schemas/LexiconHandshakeAcceptedPayload"
           },
           "created_at": {
             "type": "string",
@@ -8160,7 +8470,7 @@
       "LexiconHandshakeAcceptRequest": {
         "properties": {
           "accepted_payload": {
-            "$ref": "#/components/schemas/LexiconHandshakeAcceptedPayload-Input"
+            "$ref": "#/components/schemas/LexiconHandshakeAcceptedPayload"
           }
         },
         "type": "object",
@@ -8169,27 +8479,7 @@
         ],
         "title": "LexiconHandshakeAcceptRequest"
       },
-      "LexiconHandshakeAcceptedPayload-Input": {
-        "properties": {
-          "mapping_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Mapping Ids"
-          },
-          "targets": {
-            "items": {
-              "$ref": "#/components/schemas/LexiconAcceptedTarget"
-            },
-            "type": "array",
-            "title": "Targets"
-          }
-        },
-        "type": "object",
-        "title": "LexiconHandshakeAcceptedPayload"
-      },
-      "LexiconHandshakeAcceptedPayload-Output": {
+      "LexiconHandshakeAcceptedPayload": {
         "properties": {
           "mapping_ids": {
             "items": {
@@ -8290,7 +8580,7 @@
             ]
           },
           "accepted_payload": {
-            "$ref": "#/components/schemas/LexiconHandshakeAcceptedPayload-Input"
+            "$ref": "#/components/schemas/LexiconHandshakeAcceptedPayload"
           }
         },
         "type": "object",
@@ -8987,6 +9277,24 @@
         ],
         "title": "LexiconNextNeededResponse"
       },
+      "LexiconProfileDeleteResponse": {
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted"
+          },
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted",
+          "profile_id"
+        ],
+        "title": "LexiconProfileDeleteResponse"
+      },
       "LexiconProfileDeriveRequest": {
         "properties": {
           "ontology_family": {
@@ -9034,6 +9342,13 @@
             ],
             "title": "Rule Id"
           },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
           "rule": {
             "anyOf": [
               {
@@ -9043,6 +9358,13 @@
                 "type": "null"
               }
             ]
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleDraft"
+            },
+            "type": "array",
+            "title": "Rules"
           }
         },
         "type": "object",
@@ -9090,6 +9412,20 @@
               }
             ]
           },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
+          "rule_profiles": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconExecutionProfile"
+            },
+            "type": "array",
+            "title": "Rule Profiles"
+          },
           "profile": {
             "$ref": "#/components/schemas/LexiconExecutionProfile"
           }
@@ -9105,11 +9441,376 @@
         ],
         "title": "LexiconProfileDeriveResponse"
       },
+      "LexiconProfileGraphAssociation": {
+        "properties": {
+          "source_object_ref": {
+            "type": "string",
+            "title": "Source Object Ref"
+          },
+          "matched_target_classes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Matched Target Classes"
+          },
+          "matched_properties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Matched Properties"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_object_ref"
+        ],
+        "title": "LexiconProfileGraphAssociation"
+      },
+      "LexiconProfileGraphCoverageRequest": {
+        "properties": {
+          "graph_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Graph Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_id"
+        ],
+        "title": "LexiconProfileGraphCoverageRequest"
+      },
+      "LexiconProfileGraphCoverageResponse": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "graph_id": {
+            "type": "string",
+            "title": "Graph Id"
+          },
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "covered_target_classes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Covered Target Classes"
+          },
+          "missing_target_classes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Target Classes"
+          },
+          "covered_properties": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconNeededProperty"
+            },
+            "type": "array",
+            "title": "Covered Properties"
+          },
+          "missing_properties": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconNeededProperty"
+            },
+            "type": "array",
+            "title": "Missing Properties"
+          },
+          "associations": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconProfileGraphAssociation"
+            },
+            "type": "array",
+            "title": "Associations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "graph_id",
+          "graph_uri",
+          "complete"
+        ],
+        "title": "LexiconProfileGraphCoverageResponse"
+      },
+      "LexiconProfileListResponse": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconProfileSummaryItem"
+            },
+            "type": "array",
+            "title": "Profiles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count"
+        ],
+        "title": "LexiconProfileListResponse"
+      },
+      "LexiconProfileMappingCandidate": {
+        "properties": {
+          "mapping_id": {
+            "type": "string",
+            "title": "Mapping Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "mapping_kind": {
+            "type": "string",
+            "title": "Mapping Kind"
+          },
+          "relevance": {
+            "type": "string",
+            "title": "Relevance"
+          },
+          "matched_terms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Matched Terms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mapping_id",
+          "name",
+          "mapping_kind",
+          "relevance"
+        ],
+        "title": "LexiconProfileMappingCandidate"
+      },
+      "LexiconProfileMappingCandidatesResponse": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "mappings": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconProfileMappingCandidate"
+            },
+            "type": "array",
+            "title": "Mappings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id",
+          "count"
+        ],
+        "title": "LexiconProfileMappingCandidatesResponse"
+      },
+      "LexiconProfileResponse": {
+        "properties": {
+          "profile_record": {
+            "$ref": "#/components/schemas/LexiconStoredProfile"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_record"
+        ],
+        "title": "LexiconProfileResponse"
+      },
+      "LexiconProfileRulesCoverageRequest": {
+        "properties": {
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id"
+          },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleDraft"
+            },
+            "type": "array",
+            "title": "Rules"
+          }
+        },
+        "type": "object",
+        "title": "LexiconProfileRulesCoverageRequest"
+      },
+      "LexiconProfileRulesCoverageResponse": {
+        "properties": {
+          "profile_id": {
+            "type": "string",
+            "title": "Profile Id"
+          },
+          "checked_rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Checked Rule Ids"
+          },
+          "fully_supported_rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fully Supported Rule Ids"
+          },
+          "partially_supported_rules": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleCoverageItem"
+            },
+            "type": "array",
+            "title": "Partially Supported Rules"
+          },
+          "unsupported_rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unsupported Rule Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profile_id"
+        ],
+        "title": "LexiconProfileRulesCoverageResponse"
+      },
+      "LexiconProfileSummaryItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
+          "selected_ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSelectedOntology"
+            },
+            "type": "array",
+            "title": "Selected Ontologies"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords"
+          },
+          "target_count": {
+            "type": "integer",
+            "title": "Target Count"
+          },
+          "property_requirement_count": {
+            "type": "integer",
+            "title": "Property Requirement Count"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "ontology_family",
+          "country",
+          "version",
+          "target_count",
+          "property_requirement_count",
+          "updated_at"
+        ],
+        "title": "LexiconProfileSummaryItem"
+      },
       "LexiconProfileSummaryResponse": {
         "properties": {
           "rule_id": {
             "type": "string",
             "title": "Rule Id"
+          },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
           },
           "ontology_family": {
             "type": "string",
@@ -9375,6 +10076,433 @@
           "ttl"
         ],
         "title": "LexiconReconstructionResponse"
+      },
+      "LexiconRuleCoverageItem": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "supported": {
+            "type": "boolean",
+            "title": "Supported"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "missing_target_classes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Target Classes"
+          },
+          "missing_properties": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconNeededProperty"
+            },
+            "type": "array",
+            "title": "Missing Properties"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "supported",
+          "complete"
+        ],
+        "title": "LexiconRuleCoverageItem"
+      },
+      "LexiconRuleOntologySimilarityRequest": {
+        "properties": {
+          "selected_ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSelectedOntology"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Selected Ontologies"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id"
+          },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleDraft"
+            },
+            "type": "array",
+            "title": "Rules"
+          },
+          "limit_per_term": {
+            "type": "integer",
+            "maximum": 25.0,
+            "minimum": 1.0,
+            "title": "Limit Per Term",
+            "default": 3
+          },
+          "compact_terms": {
+            "type": "boolean",
+            "title": "Compact Terms",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "LexiconRuleOntologySimilarityRequest"
+      },
+      "LexiconRuleOntologySimilarityResponse": {
+        "properties": {
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
+          "selected_ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSelectedOntology"
+            },
+            "type": "array",
+            "title": "Selected Ontologies"
+          },
+          "limit_per_term": {
+            "type": "integer",
+            "title": "Limit Per Term"
+          },
+          "compact_terms": {
+            "type": "boolean",
+            "title": "Compact Terms",
+            "default": false
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleOntologySimilarityRuleResult"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "rule_ontology_summaries": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleOntologySimilaritySummary"
+            },
+            "type": "array",
+            "title": "Rule Ontology Summaries"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/LexiconRuleOntologySimilarityStats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "limit_per_term",
+          "stats"
+        ],
+        "title": "LexiconRuleOntologySimilarityResponse"
+      },
+      "LexiconRuleOntologySimilarityRuleResult": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "target_classes": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleSimilarityTermResult"
+            },
+            "type": "array",
+            "title": "Target Classes"
+          },
+          "property_paths": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleSimilarityTermResult"
+            },
+            "type": "array",
+            "title": "Property Paths"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id"
+        ],
+        "title": "LexiconRuleOntologySimilarityRuleResult"
+      },
+      "LexiconRuleOntologySimilarityStats": {
+        "properties": {
+          "rule_count": {
+            "type": "integer",
+            "title": "Rule Count"
+          },
+          "ontology_count": {
+            "type": "integer",
+            "title": "Ontology Count"
+          },
+          "total_target_classes": {
+            "type": "integer",
+            "title": "Total Target Classes"
+          },
+          "total_property_paths": {
+            "type": "integer",
+            "title": "Total Property Paths"
+          },
+          "total_source_terms": {
+            "type": "integer",
+            "title": "Total Source Terms"
+          },
+          "total_matches": {
+            "type": "integer",
+            "title": "Total Matches"
+          },
+          "rule_ontology_pairs": {
+            "type": "integer",
+            "title": "Rule Ontology Pairs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_count",
+          "ontology_count",
+          "total_target_classes",
+          "total_property_paths",
+          "total_source_terms",
+          "total_matches",
+          "rule_ontology_pairs"
+        ],
+        "title": "LexiconRuleOntologySimilarityStats"
+      },
+      "LexiconRuleOntologySimilaritySummary": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "source_term_count": {
+            "type": "integer",
+            "title": "Source Term Count"
+          },
+          "matched_source_terms": {
+            "type": "integer",
+            "title": "Matched Source Terms"
+          },
+          "matched_target_classes": {
+            "type": "integer",
+            "title": "Matched Target Classes"
+          },
+          "matched_property_paths": {
+            "type": "integer",
+            "title": "Matched Property Paths"
+          },
+          "best_score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Best Score"
+          },
+          "average_top_score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Average Top Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "ontology_family",
+          "country",
+          "version",
+          "source_term_count",
+          "matched_source_terms",
+          "matched_target_classes",
+          "matched_property_paths",
+          "best_score",
+          "average_top_score"
+        ],
+        "title": "LexiconRuleOntologySimilaritySummary"
+      },
+      "LexiconRuleSimilarityMatch": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "term_id": {
+            "type": "string",
+            "title": "Term Id"
+          },
+          "uri": {
+            "type": "string",
+            "title": "Uri"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "full_iri": {
+            "type": "string",
+            "title": "Full Iri"
+          },
+          "namespace": {
+            "type": "string",
+            "title": "Namespace"
+          },
+          "local_name": {
+            "type": "string",
+            "title": "Local Name"
+          },
+          "score": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Score"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "version",
+          "term_id",
+          "uri",
+          "kind",
+          "value",
+          "full_iri",
+          "namespace",
+          "local_name",
+          "score"
+        ],
+        "title": "LexiconRuleSimilarityMatch"
+      },
+      "LexiconRuleSimilaritySourceTerm": {
+        "properties": {
+          "term_kind": {
+            "type": "string",
+            "title": "Term Kind"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "full_iri": {
+            "type": "string",
+            "title": "Full Iri"
+          },
+          "namespace": {
+            "type": "string",
+            "title": "Namespace"
+          },
+          "local_name": {
+            "type": "string",
+            "title": "Local Name"
+          },
+          "node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Node Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "term_kind",
+          "value",
+          "full_iri",
+          "namespace",
+          "local_name"
+        ],
+        "title": "LexiconRuleSimilaritySourceTerm"
+      },
+      "LexiconRuleSimilarityTermResult": {
+        "properties": {
+          "source_term": {
+            "$ref": "#/components/schemas/LexiconRuleSimilaritySourceTerm"
+          },
+          "match_count": {
+            "type": "integer",
+            "title": "Match Count"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleSimilarityMatch"
+            },
+            "type": "array",
+            "title": "Matches"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_term",
+          "match_count"
+        ],
+        "title": "LexiconRuleSimilarityTermResult"
       },
       "LexiconSelectedOntology": {
         "properties": {
@@ -9644,6 +10772,112 @@
         ],
         "title": "LexiconSourceTermCondition"
       },
+      "LexiconStoredProfile": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "canonical_family_uri": {
+            "type": "string",
+            "title": "Canonical Family Uri"
+          },
+          "canonical_country_uri": {
+            "type": "string",
+            "title": "Canonical Country Uri"
+          },
+          "selected_ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSelectedOntology"
+            },
+            "type": "array",
+            "title": "Selected Ontologies"
+          },
+          "canonical_target_ontology": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconSelectedOntology"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/LexiconExecutionProfile"
+          },
+          "rule_profiles": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconExecutionProfile"
+            },
+            "type": "array",
+            "title": "Rule Profiles"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "ontology_family",
+          "country",
+          "version",
+          "canonical_family_uri",
+          "canonical_country_uri",
+          "profile",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "LexiconStoredProfile"
+      },
       "LexiconTargetAssertion": {
         "properties": {
           "assertion_kind": {
@@ -9874,6 +11108,7 @@
             ]
           },
           "dictionary_json": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Dictionary Json"
           }
@@ -9924,6 +11159,7 @@
           "dictionary_json": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -9978,11 +11214,7 @@
       "OntologyDictionaryCandidatePublishRequest": {
         "properties": {
           "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/OntologyReleaseStatus"
-              }
-            ],
+            "$ref": "#/components/schemas/OntologyReleaseStatus",
             "default": "draft"
           },
           "issued_at": {
@@ -10323,6 +11555,7 @@
           "dictionary_json": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -10364,11 +11597,7 @@
             "default": false
           },
           "status": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/OntologyReleaseStatus"
-              }
-            ],
+            "$ref": "#/components/schemas/OntologyReleaseStatus",
             "default": "draft"
           },
           "issued_at": {
@@ -11278,6 +12507,31 @@
             "type": "integer",
             "title": "Triple Count"
           },
+          "class_count": {
+            "type": "integer",
+            "title": "Class Count",
+            "default": 0
+          },
+          "property_count": {
+            "type": "integer",
+            "title": "Property Count",
+            "default": 0
+          },
+          "property_set_count": {
+            "type": "integer",
+            "title": "Property Set Count",
+            "default": 0
+          },
+          "subclass_count": {
+            "type": "integer",
+            "title": "Subclass Count",
+            "default": 0
+          },
+          "class_property_link_count": {
+            "type": "integer",
+            "title": "Class Property Link Count",
+            "default": 0
+          },
           "byte_size": {
             "type": "integer",
             "title": "Byte Size"
@@ -11432,6 +12686,7 @@
           "rule": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -11557,6 +12812,7 @@
           "rule": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -11604,6 +12860,7 @@
           },
           "open_branches": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
@@ -12024,6 +13281,33 @@
         ],
         "title": "RuleBuilderWorkspaceDeleteResponse"
       },
+      "RuleBuilderWorkspaceFromRuleRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "viewport": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleBuilderViewport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "RuleBuilderWorkspaceFromRuleRequest"
+      },
       "RuleBuilderWorkspaceListResponse": {
         "properties": {
           "count": {
@@ -12276,6 +13560,7 @@
           },
           "open_branches": {
             "items": {
+              "additionalProperties": true,
               "type": "object"
             },
             "type": "array",
@@ -12351,6 +13636,7 @@
             "title": "Previous Target Id"
           },
           "rule": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Rule"
           }
@@ -12381,6 +13667,7 @@
           "rule": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -12528,6 +13815,7 @@
             "title": "Previous Target Id"
           },
           "rule": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Rule"
           }
@@ -12643,6 +13931,7 @@
             "default": false
           },
           "overrides": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Overrides"
           }
@@ -12693,6 +13982,7 @@
           "rule_element": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -12838,6 +14128,7 @@
             "title": "Label"
           },
           "config": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Config"
           },
@@ -13067,6 +14358,7 @@
             "title": "Label"
           },
           "config": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Config"
           }
@@ -13175,6 +14467,7 @@
             "title": "Label"
           },
           "config": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Config"
           }
@@ -13290,6 +14583,7 @@
           "rule": {
             "anyOf": [
               {
+                "additionalProperties": true,
                 "type": "object"
               },
               {
@@ -13382,6 +14676,7 @@
             "title": "Created Node Ids"
           },
           "rule": {
+            "additionalProperties": true,
             "type": "object",
             "title": "Rule"
           }
@@ -13632,6 +14927,388 @@
         ],
         "title": "RulePublishResponse"
       },
+      "RuleTermDescriptor": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "full_iri": {
+            "type": "string",
+            "title": "Full Iri"
+          },
+          "namespace": {
+            "type": "string",
+            "title": "Namespace"
+          },
+          "local_name": {
+            "type": "string",
+            "title": "Local Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "full_iri",
+          "namespace",
+          "local_name"
+        ],
+        "title": "RuleTermDescriptor"
+      },
+      "RuleTermLocalNameGroup": {
+        "properties": {
+          "local_name": {
+            "type": "string",
+            "title": "Local Name"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "full_iris": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Full Iris"
+          },
+          "namespaces": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Namespaces"
+          }
+        },
+        "type": "object",
+        "required": [
+          "local_name",
+          "count"
+        ],
+        "title": "RuleTermLocalNameGroup"
+      },
+      "RuleTermPairDescriptor": {
+        "properties": {
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "full_pair": {
+            "type": "string",
+            "title": "Full Pair"
+          },
+          "compact_pair": {
+            "type": "string",
+            "title": "Compact Pair"
+          },
+          "target_class": {
+            "$ref": "#/components/schemas/RuleTermDescriptor"
+          },
+          "property_path": {
+            "$ref": "#/components/schemas/RuleTermDescriptor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "full_pair",
+          "compact_pair",
+          "target_class",
+          "property_path"
+        ],
+        "title": "RuleTermPairDescriptor"
+      },
+      "RuleTermStats": {
+        "properties": {
+          "rule_count": {
+            "type": "integer",
+            "title": "Rule Count"
+          },
+          "element_count": {
+            "type": "integer",
+            "title": "Element Count"
+          },
+          "rules_with_target_classes": {
+            "type": "integer",
+            "title": "Rules With Target Classes"
+          },
+          "rules_with_property_paths": {
+            "type": "integer",
+            "title": "Rules With Property Paths"
+          },
+          "rules_with_both": {
+            "type": "integer",
+            "title": "Rules With Both"
+          },
+          "elements_with_target_class": {
+            "type": "integer",
+            "title": "Elements With Target Class"
+          },
+          "elements_with_property_path": {
+            "type": "integer",
+            "title": "Elements With Property Path"
+          },
+          "elements_with_both": {
+            "type": "integer",
+            "title": "Elements With Both"
+          },
+          "unique_target_classes": {
+            "type": "integer",
+            "title": "Unique Target Classes"
+          },
+          "unique_target_class_namespaces": {
+            "type": "integer",
+            "title": "Unique Target Class Namespaces"
+          },
+          "unique_target_class_local_names": {
+            "type": "integer",
+            "title": "Unique Target Class Local Names"
+          },
+          "unique_property_paths": {
+            "type": "integer",
+            "title": "Unique Property Paths"
+          },
+          "unique_property_path_namespaces": {
+            "type": "integer",
+            "title": "Unique Property Path Namespaces"
+          },
+          "unique_property_path_local_names": {
+            "type": "integer",
+            "title": "Unique Property Path Local Names"
+          },
+          "unique_target_property_pairs": {
+            "type": "integer",
+            "title": "Unique Target Property Pairs"
+          },
+          "target_class_local_name_collisions": {
+            "type": "integer",
+            "title": "Target Class Local Name Collisions"
+          },
+          "property_path_local_name_collisions": {
+            "type": "integer",
+            "title": "Property Path Local Name Collisions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_count",
+          "element_count",
+          "rules_with_target_classes",
+          "rules_with_property_paths",
+          "rules_with_both",
+          "elements_with_target_class",
+          "elements_with_property_path",
+          "elements_with_both",
+          "unique_target_classes",
+          "unique_target_class_namespaces",
+          "unique_target_class_local_names",
+          "unique_property_paths",
+          "unique_property_path_namespaces",
+          "unique_property_path_local_names",
+          "unique_target_property_pairs",
+          "target_class_local_name_collisions",
+          "property_path_local_name_collisions"
+        ],
+        "title": "RuleTermStats"
+      },
+      "RuleTermsAggregateRequest": {
+        "properties": {
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
+          "compact_terms": {
+            "type": "boolean",
+            "title": "Compact Terms",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "RuleTermsAggregateRequest"
+      },
+      "RuleTermsAggregateResponse": {
+        "properties": {
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
+          "compact_terms": {
+            "type": "boolean",
+            "title": "Compact Terms",
+            "default": false
+          },
+          "target_classes": {
+            "items": {
+              "$ref": "#/components/schemas/RuleTermDescriptor"
+            },
+            "type": "array",
+            "title": "Target Classes"
+          },
+          "property_paths": {
+            "items": {
+              "$ref": "#/components/schemas/RuleTermDescriptor"
+            },
+            "type": "array",
+            "title": "Property Paths"
+          },
+          "target_property_pairs": {
+            "items": {
+              "$ref": "#/components/schemas/RuleTermPairDescriptor"
+            },
+            "type": "array",
+            "title": "Target Property Pairs"
+          },
+          "target_class_local_name_groups": {
+            "items": {
+              "$ref": "#/components/schemas/RuleTermLocalNameGroup"
+            },
+            "type": "array",
+            "title": "Target Class Local Name Groups"
+          },
+          "property_path_local_name_groups": {
+            "items": {
+              "$ref": "#/components/schemas/RuleTermLocalNameGroup"
+            },
+            "type": "array",
+            "title": "Property Path Local Name Groups"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/RuleTermStats"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "stats"
+        ],
+        "title": "RuleTermsAggregateResponse"
+      },
+      "RuleTermsResponse": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "compact_terms": {
+            "type": "boolean",
+            "title": "Compact Terms",
+            "default": false
+          },
+          "target_classes": {
+            "items": {
+              "$ref": "#/components/schemas/RuleTermDescriptor"
+            },
+            "type": "array",
+            "title": "Target Classes"
+          },
+          "property_paths": {
+            "items": {
+              "$ref": "#/components/schemas/RuleTermDescriptor"
+            },
+            "type": "array",
+            "title": "Property Paths"
+          },
+          "target_property_pairs": {
+            "items": {
+              "$ref": "#/components/schemas/RuleTermPairDescriptor"
+            },
+            "type": "array",
+            "title": "Target Property Pairs"
+          },
+          "target_class_local_name_groups": {
+            "items": {
+              "$ref": "#/components/schemas/RuleTermLocalNameGroup"
+            },
+            "type": "array",
+            "title": "Target Class Local Name Groups"
+          },
+          "property_path_local_name_groups": {
+            "items": {
+              "$ref": "#/components/schemas/RuleTermLocalNameGroup"
+            },
+            "type": "array",
+            "title": "Property Path Local Name Groups"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/RuleTermStats"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "stats"
+        ],
+        "title": "RuleTermsResponse"
+      },
       "RuleTtlResponse": {
         "properties": {
           "graph_uri": {
@@ -13792,6 +15469,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
