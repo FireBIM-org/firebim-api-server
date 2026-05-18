@@ -3,26 +3,15 @@ import os
 import tempfile
 import uuid
 
-import boto3
 import ifcopenshell
 import ifctester
 import ifctester.reporter
+from sqlmodel import select
 
-from app.core.config import settings
+from app.core.s3 import BUCKET_NAME, s3_client
 from app.models.database import get_db
 from app.models.models import IfcModel
 from app.workers.celery_app import celery_app
-
-# S3 Configuration
-s3_client = boto3.client(
-    "s3",
-    endpoint_url=settings.S3_ENDPOINT_URL,
-    aws_access_key_id=settings.S3_ACCESS_KEY_ID,
-    aws_secret_access_key=settings.S3_SECRET_ACCESS_KEY.get_secret_value(),
-    region_name=settings.S3_REGION,
-)
-
-BUCKET_NAME = settings.S3_BUCKET_NAME
 
 
 @celery_app.task(name="process_model")
@@ -57,7 +46,7 @@ def process_model(model_id, s3_key):
 
         # Update database with result information
         db = next(get_db())
-        ifc_model = db.query(IfcModel).filter(IfcModel.id == model_id).first()
+        ifc_model = db.exec(select(IfcModel).where(IfcModel.id == model_id)).first()
         if ifc_model:
             ifc_model.processed = True
             ifc_model.result_key = result_key

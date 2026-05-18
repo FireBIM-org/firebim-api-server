@@ -5,7 +5,7 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.core.observability import is_request_profiling_enabled, log_event, record_metric, start_db_checkout_wait
@@ -71,7 +71,7 @@ async def get_current_user(
     # Find or auto-provision user based on Authentik subject
     lookup_started_at = monotonic()
     start_db_checkout_wait("auth_user_lookup")
-    user = db.query(User).filter(User.authentik_sub == sub).first()
+    user = db.exec(select(User).where(User.authentik_sub == sub)).first()
     lookup_duration_ms = round((monotonic() - lookup_started_at) * 1000, 3)
     record_metric("auth.user_lookup_ms", lookup_duration_ms)
     if is_request_profiling_enabled():
