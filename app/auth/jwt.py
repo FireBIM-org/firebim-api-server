@@ -1,6 +1,3 @@
-import logging
-from time import monotonic
-
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -8,13 +5,11 @@ from jwt import PyJWKClient
 from sqlmodel import Session, select
 
 from app.core.config import settings
-from app.core.observability import is_request_profiling_enabled, log_event, record_metric, start_db_checkout_wait
-from app.models.database import get_auth_db
+from app.models.database import get_db
 from app.models.models import User
 
 # Bearer token extraction
 security = HTTPBearer()
-logger = logging.getLogger(__name__)
 
 # Cached JWKS client for verifying Authentik-signed tokens
 _jwks_client = None
@@ -32,10 +27,9 @@ def get_jwks_client() -> PyJWKClient:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_auth_db),
+    db: Session = Depends(get_db),
 ) -> User:
     """Validate an Authentik-issued JWT and return the local user (auto-provisioned)."""
-    auth_started_at = monotonic()
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -45,7 +39,6 @@ async def get_current_user(
     token = credentials.credentials
 
     try:
-        jwt_started_at = monotonic()
         jwks_client = get_jwks_client()
         signing_key = jwks_client.get_signing_key_from_jwt(token)
 
@@ -62,20 +55,9 @@ async def get_current_user(
             raise credentials_exception
     except jwt.PyJWTError:
         raise credentials_exception from None
-    finally:
-        jwt_duration_ms = round((monotonic() - jwt_started_at) * 1000, 3)
-        record_metric("auth.jwt_decode_ms", jwt_duration_ms)
-        if is_request_profiling_enabled():
-            log_event(logger, "auth.jwt.decoded", duration_ms=jwt_duration_ms)
 
     # Find or auto-provision user based on Authentik subject
-    lookup_started_at = monotonic()
-    start_db_checkout_wait("auth_user_lookup")
     user = db.exec(select(User).where(User.authentik_sub == sub)).first()
-    lookup_duration_ms = round((monotonic() - lookup_started_at) * 1000, 3)
-    record_metric("auth.user_lookup_ms", lookup_duration_ms)
-    if is_request_profiling_enabled():
-        log_event(logger, "auth.user.lookup", duration_ms=lookup_duration_ms, found=user is not None)
 
     if user is None:
         email = payload.get("email", "")
@@ -87,16 +69,9 @@ async def get_current_user(
             email=email,
             is_active=True,
         )
-        provision_started_at = monotonic()
-        start_db_checkout_wait("auth_user_provision_commit")
         db.add(user)
         db.commit()
-        start_db_checkout_wait("auth_user_provision_refresh")
         db.refresh(user)
-        provision_duration_ms = round((monotonic() - provision_started_at) * 1000, 3)
-        record_metric("auth.user_provision_ms", provision_duration_ms)
-        if is_request_profiling_enabled():
-            log_event(logger, "auth.user.provisioned", duration_ms=provision_duration_ms, user_id=user.id)
     else:
         # Keep local profile in sync with Authentik claims
         updated = False
@@ -110,24 +85,9 @@ async def get_current_user(
             user.username = username
             updated = True
         if updated:
-            sync_started_at = monotonic()
-            start_db_checkout_wait("auth_user_sync_commit")
             db.commit()
-            start_db_checkout_wait("auth_user_sync_refresh")
             db.refresh(user)
-            sync_duration_ms = round((monotonic() - sync_started_at) * 1000, 3)
-            record_metric("auth.user_sync_ms", sync_duration_ms)
-            if is_request_profiling_enabled():
-                log_event(logger, "auth.user.synced", duration_ms=sync_duration_ms, user_id=user.id)
 
-    db.expunge(user)
-    db.close()
-    if is_request_profiling_enabled():
-        log_event(logger, "auth.db_session.released")
-    total_auth_ms = round((monotonic() - auth_started_at) * 1000, 3)
-    record_metric("auth.total_ms", total_auth_ms)
-    if is_request_profiling_enabled():
-        log_event(logger, "auth.completed", duration_ms=total_auth_ms, user_id=user.id)
     return user
 
 
