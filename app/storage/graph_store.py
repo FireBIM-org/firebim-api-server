@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+from time import monotonic
 from urllib.parse import quote, unquote
 
 import boto3
@@ -7,6 +9,9 @@ from botocore.exceptions import BotoCoreError, ClientError
 from rdflib import Graph
 
 from app.core.config import settings
+from app.core.observability import is_request_profiling_enabled, log_event, record_metric
+
+logger = logging.getLogger(__name__)
 
 
 class GraphStoreError(Exception):
@@ -108,6 +113,7 @@ class GraphStoreClient:
             raise GraphStoreError(f"Graph store publish failed: {exc}") from exc
 
     def get_graph_ttl(self, dataset: str, graph_uri: str) -> str:
+        started_at = monotonic()
         key = self._object_key(dataset, graph_uri)
         try:
             response = self.client.get_object(Bucket=self.bucket_name, Key=key)
@@ -119,7 +125,19 @@ class GraphStoreClient:
             raise GraphStoreError(f"Graph store fetch failed: {exc}") from exc
 
         body = response["Body"].read()
-        return body.decode("utf-8")
+        ttl = body.decode("utf-8")
+        duration_ms = round((monotonic() - started_at) * 1000, 3)
+        record_metric("graph_store.get_graph_ttl_ms", duration_ms, append=True)
+        if is_request_profiling_enabled():
+            log_event(
+                logger,
+                "graph_store.get_graph_ttl",
+                dataset=dataset,
+                graph_uri=graph_uri,
+                duration_ms=duration_ms,
+                byte_size=len(body),
+            )
+        return ttl
 
     def delete_graph(self, dataset: str, graph_uri: str) -> None:
         key = self._object_key(dataset, graph_uri)
