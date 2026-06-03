@@ -5,12 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.136.1",
+    "fastapi>=0.136.3",
     "fastapi-cli",
-    "uvicorn==0.47.0",
+    "uvicorn==0.48.0",
     "pydantic==2.13.4",
-    "python-multipart>=0.0.27",
-    "boto3==1.43.8",
+    "python-multipart>=0.0.30",
+    "boto3==1.43.20",
     "psycopg2-binary==2.9.12",
     "sqlmodel==0.0.38",
     "alembic==1.18.4",
@@ -27,9 +27,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "ruff>=0.9",
+    "ruff>=0.15.15",
     "pytest>=8.0",
-    "pytest-asyncio>=0.25",
+    "pytest-asyncio>=1.4.0",
     "aiosqlite>=0.20",
     "pytest-cov>=6.0",
     "requests>=2.31.0",
