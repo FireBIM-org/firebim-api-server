@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import logging
+import os
 from time import monotonic
 
+from alembic.config import Config
 from sqlalchemy import event
 from sqlmodel import Session, SQLModel, create_engine
 
+from alembic import command
 from app.core.config import settings
 from app.core.observability import (
     clear_db_checkout_wait,
@@ -108,3 +111,25 @@ def init_db():
 
     # Create all tables
     SQLModel.metadata.create_all(bind=engine)
+
+
+def run_migrations():
+    """Run alembic migrations programmatically"""
+    logger.info("Running database migrations")
+
+    # Calculate the path to alembic.ini relative to this file
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # database.py is in app/models/, so we go up two levels to reach firebim-api-server/
+    root_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
+    ini_path = os.path.join(root_dir, "alembic.ini")
+
+    if not os.path.exists(ini_path):
+        logger.error(f"alembic.ini not found at {ini_path}")
+        # Fallback to current working directory
+        ini_path = "alembic.ini"
+        if not os.path.exists(ini_path):
+            raise FileNotFoundError("Could not find alembic.ini")
+
+    alembic_cfg = Config(ini_path)
+    command.upgrade(alembic_cfg, "head")
+    logger.info("Database migrations completed successfully")

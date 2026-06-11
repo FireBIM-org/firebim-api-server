@@ -2,13 +2,12 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy import insert
 from sqlmodel import Session, select
 
 from app.auth.jwt import get_current_active_user
 from app.core.s3 import BUCKET_NAME, s3_client
 from app.models.database import get_db
-from app.models.models import IfcEntity, IfcModel, IfcProperty, IfcRelationship, User
+from app.models.models import IfcEntity, IfcModel, IfcProperty, IfcQuantity, User
 from app.schemas.models import IfcSqlDataUpload
 from app.workers.celery_app import celery_app
 
@@ -134,49 +133,46 @@ async def upload_data_payload(
     if model.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to access this model")
 
-    # 2. Insert Entities
+    # 2. Insert Data (Entities, Properties, Quantities)
+    # Map Express IDs to Global IDs for this model
+    id_to_global_id = {ent.id: ent.global_id for ent in data.entities}
+
+    def get_global_id(express_id: str) -> str | None:
+        if express_id in id_to_global_id:
+            return id_to_global_id[express_id]
+        # Check DB for existing entity in the same model
+        result = db.exec(
+            select(IfcEntity.global_id).where(IfcEntity.id == express_id).where(IfcEntity.model_id == id)
+        ).first()
+        if result:
+            id_to_global_id[express_id] = result
+            return result
+        return None
+
     if data.entities:
-        entities_to_insert = [
-            {
-                "id": ent.id,
-                "model_id": id,
-                "type": ent.type,
-                "global_id": ent.globalId,
-                "name": ent.name,
-                "attributes": ent.attributes,
-            }
-            for ent in data.entities
-        ]
-        db.execute(insert(IfcEntity), entities_to_insert)
+        for ent in data.entities:
+            if ent.parent_id:
+                ent.parent_id = get_global_id(ent.parent_id)
 
-    # 3. Insert Properties
+        db.add_all([IfcEntity(**ent.model_dump(), model_id=id) for ent in data.entities])
+
     if data.properties:
-        properties_to_insert = [
-            {
-                "id": str(uuid.uuid4()),
-                "entity_id": prop.entity_id,
-                "property_set_name": prop.property_set_name,
-                "property_name": prop.property_name,
-                "value": prop.value,
-                "value_type": prop.value_type,
-            }
-            for prop in data.properties
-        ]
-        db.execute(insert(IfcProperty), properties_to_insert)
+        for prop in data.properties:
+            mapped_id = get_global_id(prop.entity_id)
+            if mapped_id:
+                prop.entity_id = mapped_id
+            # else: keep original to let DB enforce FK if desired,
+            # but note that original is an Express ID which won't match any Global ID PK.
 
-    # 4. Insert Relationships
-    if data.relationships:
-        relationships_to_insert = [
-            {
-                "id": str(uuid.uuid4()),
-                "model_id": id,
-                "type": rel.type,
-                "relating_id": rel.relating_id,
-                "related_id": rel.related_id,
-            }
-            for rel in data.relationships
-        ]
-        db.execute(insert(IfcRelationship), relationships_to_insert)
+        db.add_all([IfcProperty(**prop.model_dump()) for prop in data.properties])
+
+    if data.quantities:
+        for quant in data.quantities:
+            mapped_id = get_global_id(quant.entity_id)
+            if mapped_id:
+                quant.entity_id = mapped_id
+
+        db.add_all([IfcQuantity(**quant.model_dump()) for quant in data.quantities])
 
     db.commit()
 
@@ -184,5 +180,48 @@ async def upload_data_payload(
         "message": "Data uploaded successfully",
         "entity_count": len(data.entities),
         "property_count": len(data.properties),
-        "relationship_count": len(data.relationships),
+        "quantity_count": len(data.quantities),
     }
+
+
+@router.delete("/{id}", status_code=204)
+async def delete_model(id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    """
+    Delete an IFC model, its related data in DB, and its files in S3.
+    """
+    # 1. Get model from DB and verify ownership
+    model = db.exec(select(IfcModel).where(IfcModel.id == id)).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    if model.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this model")
+
+    # 2. Collect all S3 keys to delete
+    s3_keys_to_delete = []
+    if model.s3_key:
+        s3_keys_to_delete.append(model.s3_key)
+    if model.result_key:
+        s3_keys_to_delete.append(model.result_key)
+
+    # Also collect result_keys from related check_results
+    from app.models.models import CheckResult
+
+    check_results = db.exec(select(CheckResult).where(CheckResult.ifc_model_id == id)).all()
+    for cr in check_results:
+        if cr.result_key:
+            s3_keys_to_delete.append(cr.result_key)
+
+    # 3. Synchronous S3 Cleanup (Best Effort)
+    for key in s3_keys_to_delete:
+        try:
+            s3_client.delete_object(Bucket=BUCKET_NAME, Key=key)
+        except Exception as e:
+            # Best effort: log and continue
+            print(f"Failed to delete S3 object {key}: {e}")
+
+    # 4. DB Deletion (Cascades to IfcEntity, IfcProperty, IfcQuantity, CheckResult)
+    db.delete(model)
+    db.commit()
+
+    return None

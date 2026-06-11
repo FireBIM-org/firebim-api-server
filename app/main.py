@@ -35,6 +35,7 @@ ontologies_repo = OntologyRepository()
 async def lifespan(app: FastAPI):
     init_db()
     logger.info("Database tables created successfully")
+    # run_migrations()
 
     try:
         s3_client.head_bucket(Bucket=BUCKET_NAME)

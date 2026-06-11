@@ -6,9 +6,10 @@ from pydantic import BaseModel, Field
 class IfcEntityCreate(BaseModel):
     id: str
     type: str
-    globalId: str = Field(alias="globalId")
+    global_id: str = Field(alias="globalId")
     name: str | None = None
     attributes: dict[str, Any] = {}
+    parent_id: str | None = Field(default=None, alias="parentId")
 
     class Config:
         populate_by_name = True
@@ -22,13 +23,15 @@ class IfcPropertyCreate(BaseModel):
     value_type: str
 
 
-class IfcRelationshipCreate(BaseModel):
-    type: str
-    relating_id: str
-    related_id: str
+class IfcQuantityCreate(BaseModel):
+    entity_id: str
+    quantity_set_name: str
+    quantity_name: str
+    value: str
+    value_type: str
 
 
 class IfcSqlDataUpload(BaseModel):
-    entities: list[IfcEntityCreate]
-    properties: list[IfcPropertyCreate]
-    relationships: list[IfcRelationshipCreate]
+    entities: list[IfcEntityCreate] = []
+    properties: list[IfcPropertyCreate] = []
+    quantities: list[IfcQuantityCreate] = []

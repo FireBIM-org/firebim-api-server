@@ -21,6 +21,9 @@ dependencies = [
     "pydantic-settings",
     "celery==5.6.3",
     "rdflib==7.6.0",
+    "requests>=2.31.0",
+    "pydevd-pycharm>=262.6228.39",
+    "pyshacl>=0.31.0",
 ]
 
 
@@ -32,7 +35,6 @@ dev = [
     "pytest-asyncio>=0.25",
     "aiosqlite>=0.20",
     "pytest-cov>=6.0",
-    "requests>=2.31.0",
 ]
 worker = [
     "ifcopenshell==0.8.5",

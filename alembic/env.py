@@ -17,9 +17,10 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from sqlmodel import SQLModel
+from app.models.models import SQLModel
 
 from app.core.config import settings
+from app.models.models import IfcEntity, IfcModel, IfcProperty, IfcQuantity, User
 
 target_metadata = SQLModel.metadata
 

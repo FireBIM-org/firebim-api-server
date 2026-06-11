@@ -1,8 +1,9 @@
 import uuid
 from datetime import UTC, datetime
+from typing import Optional
 
-from sqlalchemy import JSON
-from sqlmodel import Column, DateTime, Field, SQLModel
+from sqlalchemy import JSON, ForeignKey, UniqueConstraint
+from sqlmodel import Column, DateTime, Field, Relationship, SQLModel
 
 
 class User(SQLModel, table=True):
@@ -53,7 +54,7 @@ class CheckResult(SQLModel, table=True):
     __tablename__ = "check_results"
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    ifc_model_id: str = Field(foreign_key="ifc_models.id", nullable=False)
+    ifc_model_id: str = Field(sa_column=Column(ForeignKey("ifc_models.id", ondelete="CASCADE"), nullable=False))
     ids_id: str = Field(foreign_key="ids_files.id", nullable=False)
     task_id: str | None = Field(nullable=True)
     result_key: str | None = Field(nullable=True)
@@ -67,31 +68,52 @@ class CheckResult(SQLModel, table=True):
 
 class IfcEntity(SQLModel, table=True):
     __tablename__ = "ifc_entities"
+    __table_args__ = (UniqueConstraint("id", "model_id", name="uq_ifcentity_id_model_id"),)
 
-    id: str = Field(primary_key=True)
-    model_id: str = Field(foreign_key="ifc_models.id", nullable=False, index=True)
+    global_id: str = Field(primary_key=True)
+    id: str = Field(index=True)
+    model_id: str = Field(sa_column=Column(ForeignKey("ifc_models.id", ondelete="CASCADE"), nullable=False, index=True))
+    parent_id: str | None = Field(
+        default=None,
+        sa_column=Column(ForeignKey("ifc_entities.global_id", ondelete="CASCADE"), index=True, nullable=True),
+    )
     type: str = Field(nullable=False, index=True)
-    global_id: str = Field(nullable=False, index=True)
     name: str | None = Field(default=None, nullable=True)
     attributes: dict = Field(default_factory=dict, sa_column=Column(JSON, nullable=False, server_default="{}"))
+
+    parent: Optional["IfcEntity"] = Relationship(
+        back_populates="children", sa_relationship_kwargs={"remote_side": "IfcEntity.global_id"}
+    )
+    children: list["IfcEntity"] = Relationship(back_populates="parent")
+    properties: list["IfcProperty"] = Relationship(back_populates="entity")
+    quantities: list["IfcQuantity"] = Relationship(back_populates="entity")
 
 
 class IfcProperty(SQLModel, table=True):
     __tablename__ = "ifc_properties"
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    entity_id: str = Field(foreign_key="ifc_entities.id", nullable=False, index=True)
+    entity_id: str = Field(
+        sa_column=Column(ForeignKey("ifc_entities.global_id", ondelete="CASCADE"), nullable=False, index=True)
+    )
     property_set_name: str = Field(nullable=False, index=True)
     property_name: str = Field(nullable=False, index=True)
     value: str = Field(nullable=False)
     value_type: str = Field(nullable=False)
 
+    entity: "IfcEntity" = Relationship(back_populates="properties")
 
-class IfcRelationship(SQLModel, table=True):
-    __tablename__ = "ifc_relationships"
+
+class IfcQuantity(SQLModel, table=True):
+    __tablename__ = "ifc_quantities"
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    model_id: str = Field(foreign_key="ifc_models.id", nullable=False, index=True)
-    type: str = Field(nullable=False, index=True)
-    relating_id: str = Field(nullable=False, index=True)
-    related_id: str = Field(nullable=False, index=True)
+    entity_id: str = Field(
+        sa_column=Column(ForeignKey("ifc_entities.global_id", ondelete="CASCADE"), nullable=False, index=True)
+    )
+    quantity_set_name: str = Field(nullable=False, index=True)
+    quantity_name: str = Field(nullable=False, index=True)
+    value: str = Field(nullable=False)
+    value_type: str = Field(nullable=False)
+
+    entity: "IfcEntity" = Relationship(back_populates="quantities")

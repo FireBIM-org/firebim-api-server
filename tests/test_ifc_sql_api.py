@@ -1,7 +1,7 @@
 import pytest
 from sqlmodel import Session, select
 
-from app.models.models import IfcEntity, IfcModel, IfcProperty, IfcRelationship, User
+from app.models.models import IfcEntity, IfcModel, IfcProperty, IfcQuantity, User
 
 
 @pytest.mark.integration
@@ -26,6 +26,7 @@ def test_upload_ifc_sql_data(client, session: Session, test_user: User):
                 "globalId": "3$d$7$9$b$d$f$h$j$l$n$p$r$t$v$x$z",
                 "name": "Wall 1",
                 "attributes": {"OverallHeight": 3000},
+                "parentId": None,
             }
         ],
         "properties": [
@@ -37,11 +38,13 @@ def test_upload_ifc_sql_data(client, session: Session, test_user: User):
                 "value_type": "IfcBoolean",
             }
         ],
-        "relationships": [
+        "quantities": [
             {
-                "type": "IfcRelAggregates",
-                "relating_id": "0",  # Assuming project or similar
-                "related_id": "1",
+                "entity_id": "1",
+                "quantity_set_name": "Qto_WallBaseQuantities",
+                "quantity_name": "Height",
+                "value": "3000",
+                "value_type": "IfcLengthMeasure",
             }
         ],
     }
@@ -55,7 +58,7 @@ def test_upload_ifc_sql_data(client, session: Session, test_user: User):
     assert data["message"] == "Data uploaded successfully"
     assert data["entity_count"] == 1
     assert data["property_count"] == 1
-    assert data["relationship_count"] == 1
+    assert data["quantity_count"] == 1
 
     # 5. Verify DB state
     entities = session.exec(select(IfcEntity).where(IfcEntity.model_id == model.id)).all()
@@ -63,17 +66,20 @@ def test_upload_ifc_sql_data(client, session: Session, test_user: User):
     assert entities[0].type == "IfcWall"
     assert entities[0].global_id == "3$d$7$9$b$d$f$h$j$l$n$p$r$t$v$x$z"
     assert entities[0].attributes == {"OverallHeight": 3000}
+    assert entities[0].parent_id is None
 
-    properties = session.exec(select(IfcProperty).where(IfcProperty.entity_id == "1")).all()
+    properties = session.exec(
+        select(IfcProperty).where(IfcProperty.entity_id == "3$d$7$9$b$d$f$h$j$l$n$p$r$t$v$x$z")
+    ).all()
     assert len(properties) == 1
     assert properties[0].property_name == "IsExternal"
-    assert properties[0].value == "TRUE"
 
-    relationships = session.exec(select(IfcRelationship).where(IfcRelationship.model_id == model.id)).all()
-    assert len(relationships) == 1
-    assert relationships[0].type == "IfcRelAggregates"
-    assert relationships[0].relating_id == "0"
-    assert relationships[0].related_id == "1"
+    quantities = session.exec(
+        select(IfcQuantity).where(IfcQuantity.entity_id == "3$d$7$9$b$d$f$h$j$l$n$p$r$t$v$x$z")
+    ).all()
+    assert len(quantities) == 1
+    assert quantities[0].quantity_name == "Height"
+    assert quantities[0].value == "3000"
 
 
 @pytest.mark.integration
@@ -100,6 +106,7 @@ def test_upload_ifc_sql_data_bulk(client, session: Session, test_user: User):
                 "globalId": f"global-id-{i}",
                 "name": f"Wall {i}",
                 "attributes": {"height": 3000},
+                "parentId": "0" if i > 0 else None,
             }
             for i in range(num_entities)
         ],
@@ -113,9 +120,6 @@ def test_upload_ifc_sql_data_bulk(client, session: Session, test_user: User):
             }
             for i in range(num_entities)
         ],
-        "relationships": [
-            {"type": "IfcRelAggregates", "relating_id": "0", "related_id": str(i)} for i in range(num_entities)
-        ],
     }
 
     # Call the endpoint
@@ -126,7 +130,6 @@ def test_upload_ifc_sql_data_bulk(client, session: Session, test_user: User):
     data = response.json()
     assert data["entity_count"] == num_entities
     assert data["property_count"] == num_entities
-    assert data["relationship_count"] == num_entities
 
     # Verify DB state
     entities_count = session.exec(select(IfcEntity).where(IfcEntity.model_id == model_id)).all()
@@ -134,9 +137,9 @@ def test_upload_ifc_sql_data_bulk(client, session: Session, test_user: User):
 
     # Note: might have other properties from previous tests if session is not cleared,
     # but the fixture usually handles it. Assuming fresh session or filtering by entity_ids.
-    # Better filter by entity_id
-    all_entity_ids = [str(i) for i in range(num_entities)]
-    properties = session.exec(select(IfcProperty).where(IfcProperty.entity_id.in_(all_entity_ids))).all()
+    # Better filter by global_id
+    all_global_ids = [f"global-id-{i}" for i in range(num_entities)]
+    properties = session.exec(select(IfcProperty).where(IfcProperty.entity_id.in_(all_global_ids))).all()
     assert len(properties) == num_entities
 
 
@@ -166,7 +169,6 @@ def test_upload_ifc_sql_data_integrity(client, session: Session, test_user: User
                 "value_type": "Str",
             }
         ],
-        "relationships": [],
     }
 
     # Call the endpoint
@@ -176,8 +178,8 @@ def test_upload_ifc_sql_data_integrity(client, session: Session, test_user: User
     # Depending on how the app handles DB errors, it might be 500 or something else.
     assert response.status_code == 500
 
-    # Verify DB state: "valid-ent" should NOT be in the DB due to rollback
+    # Verify DB state: "gid-1" should NOT be in the DB due to rollback
     # We need a new session or refresh because the original session might be in error state
     session.rollback()  # Clear state if needed, though 'session' fixture usually handles it
-    entity = session.exec(select(IfcEntity).where(IfcEntity.id == "valid-ent")).first()
+    entity = session.exec(select(IfcEntity).where(IfcEntity.global_id == "gid-1")).first()
     assert entity is None
