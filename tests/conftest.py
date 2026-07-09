@@ -21,6 +21,7 @@ os.environ["FUSEKI_HOST"] = "http://localhost:3030"
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, StaticPool, create_engine
 
@@ -37,7 +38,15 @@ from app.models.models import User
 def engine():
     """Get SQLAlchemy engine with sqlite memory database."""
     # check_same_thread=False is needed for sqlite in multi-threaded environments like FastAPI tests
-    return create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+    return engine
 
 
 @pytest.fixture(name="session")
@@ -89,7 +98,7 @@ def client_fixture(session: Session, test_user: User, engine: Engine):
         mock_resp.raise_for_status.return_value = None
         mock_get.return_value = mock_resp
 
-        with TestClient(app) as client:
+        with TestClient(app, raise_server_exceptions=False) as client:
             yield client
 
     app.dependency_overrides.clear()

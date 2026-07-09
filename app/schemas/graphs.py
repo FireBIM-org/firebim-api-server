@@ -28,6 +28,8 @@ class GraphPublishResponse(BaseModel):
 class GraphListItem(BaseModel):
     graph_uri: str
     triple_count: int | None = None
+    label: str | None = None
+    source: str | None = None
 
 
 class GraphListResponse(BaseModel):
@@ -48,7 +50,9 @@ class GraphFetchResponse(BaseModel):
     success: bool = True
     graph_id: str
     graph_uri: str
-    ttl: str
+    ttl: str | None = None
+    nodes: list[dict] = Field(default_factory=list)
+    edges: list[dict] = Field(default_factory=list)
 
 
 class GraphSchemaExtractRequest(BaseModel):

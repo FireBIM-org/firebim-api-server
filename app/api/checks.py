@@ -7,9 +7,12 @@ from contextlib import suppress
 from time import perf_counter
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from rdflib import Graph
 from rdflib.namespace import RDF, SH
+from sqlmodel import Session
+
+from app.models.database import get_db
 
 try:
     from app.checks.blind_runner import BlindShaclRuleRunner
@@ -249,19 +252,26 @@ def _build_compatibility_response(
     rule_id: str,
     graph_id: str,
     rule_ttl: str,
-    graph_ttl: str,
+    graph_ttl: str | None = None,
+    class_counter: Counter[str] | None = None,
+    property_counter: Counter[str] | None = None,
 ) -> CheckCompatibilityResponse:
     shacl_graph = _parse_ttl_to_graph(rule_ttl)
-    schema_payload = extract_graph_schema_payload(
-        graph_id=graph_id,
-        graph_uri=default_building_graph_uri(graph_id),
-        graph_ttl=graph_ttl,
-    )
-    payload_data = schema_payload["payload"]
+
+    if class_counter is None or property_counter is None:
+        if graph_ttl is None:
+            raise ValueError("Either graph_ttl or counters must be provided")
+
+        schema_payload = extract_graph_schema_payload(
+            graph_id=graph_id,
+            graph_uri=default_building_graph_uri(graph_id),
+            graph_ttl=graph_ttl,
+        )
+        payload_data = schema_payload["payload"]
+        class_counter = Counter(payload_data["class_counts"])
+        property_counter = Counter(payload_data["property_counts"])
 
     required_classes, required_properties = _required_classes_and_properties_from_rule_graph(shacl_graph)
-    class_counter = Counter(payload_data["class_counts"])
-    property_counter = Counter(payload_data["property_counts"])
 
     target_classes_found = [
         CompatibilityMatch(value=class_uri, count=class_counter.get(class_uri, 0))
@@ -591,7 +601,7 @@ def _error_run_response(
 
 
 @router.post("/run", response_model=CheckSimpleRunResponse)
-def run_check(payload: CheckRunRequest):
+def run_check(payload: CheckRunRequest, db: Session = Depends(get_db)):
     try:
         (
             options,
@@ -634,7 +644,7 @@ def run_check(payload: CheckRunRequest):
 
 
 @router.post("/run-vertical", response_model=CheckSimpleRunResponse)
-def run_check_vertical(payload: CheckRunRequest):
+def run_check_vertical(payload: CheckRunRequest, db: Session = Depends(get_db)):
     try:
         (
             options,
@@ -645,7 +655,7 @@ def run_check_vertical(payload: CheckRunRequest):
             building_graph_uri,
             compatibility,
             result,
-        ) = _execute_check_run(payload, forced_solver="vertical", diagnostics=False)
+        ) = _execute_check_run(payload, forced_solver="vertical", diagnostics=False, db=db)
         return _build_simple_response(
             payload=payload,
             options=options,
@@ -672,7 +682,7 @@ def run_check_vertical(payload: CheckRunRequest):
 
 
 @router.post("/run-horisontal", response_model=CheckSimpleRunResponse)
-def run_check_horisontal(payload: CheckRunRequest):
+def run_check_horisontal(payload: CheckRunRequest, db: Session = Depends(get_db)):
     try:
         (
             options,
@@ -683,7 +693,7 @@ def run_check_horisontal(payload: CheckRunRequest):
             building_graph_uri,
             compatibility,
             result,
-        ) = _execute_check_run(payload, forced_solver="horizontal", diagnostics=False)
+        ) = _execute_check_run(payload, forced_solver="horizontal", diagnostics=False, db=db)
         return _build_simple_response(
             payload=payload,
             options=options,
@@ -710,7 +720,7 @@ def run_check_horisontal(payload: CheckRunRequest):
 
 
 @router.post("/run-diagnostic", response_model=CheckDiagnosticResponse)
-def run_check_diagnostic(payload: CheckRunRequest):
+def run_check_diagnostic(payload: CheckRunRequest, db: Session = Depends(get_db)):
     try:
         (
             options,
@@ -721,7 +731,7 @@ def run_check_diagnostic(payload: CheckRunRequest):
             building_graph_uri,
             compatibility,
             result,
-        ) = _execute_check_run(payload, diagnostics=True)
+        ) = _execute_check_run(payload, diagnostics=True, db=db)
         return _build_diagnostic_response(
             payload=payload,
             options=options,
@@ -831,7 +841,6 @@ def check_compatibility(payload: CheckCompatibilityRequest):
         _, rule_ttl = fetch_rule_ttl(payload.rule_id)
         building_graph_uri = default_building_graph_uri(payload.graph_id)
         graph_ttl = fetch_building_graph_ttl(building_graph_uri)
-
         return _build_compatibility_response(
             rule_id=payload.rule_id,
             graph_id=payload.graph_id,

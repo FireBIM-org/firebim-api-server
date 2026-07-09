@@ -25,7 +25,9 @@ class CheckEngine:
     ) -> None:
         self.cache = cache or get_default_execution_cache()
         self.compiler = compiler or RuleCompiler(cache=self.cache)
+
         self.evaluator = evaluator or HybridAtomicEvaluator()
+
         self.target_resolver = target_resolver or TargetResolver(cache=self.cache)
         self.runtime = runtime or CheckRuntime(
             evaluator=self.evaluator,
