@@ -605,7 +605,7 @@ requires-dist = [
     { name = "pydantic", specifier = "==2.13.4" },
     { name = "pydantic-settings" },
     { name = "pydevd-pycharm", specifier = ">=262.8665.97" },
-    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.12.1" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.13.0" },
     { name = "pyshacl", specifier = ">=0.40.0" },
     { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "rdflib", specifier = "==7.6.0" },
