@@ -21,7 +21,7 @@ jobs:
     name: Cherry-pick to ${{ inputs.release_branch }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ inputs.release_branch }}
