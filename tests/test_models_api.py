@@ -136,3 +136,54 @@ def test_download_model(client, session: Session, test_user: User, mock_s3):
     assert response.headers["content-disposition"] == 'attachment; filename="download.ifc"'
 
     mock_s3.download_file.assert_called_once()
+
+
+def test_delete_model(client, session: Session, test_user: User, mock_s3):
+    from sqlmodel import select
+
+    from app.models.models import CheckResult, IdsFile, IfcEntity
+
+    # 1. Setup: Create model and related data
+    model = IfcModel(
+        id="delete-me",
+        filename="delete.ifc",
+        s3_key="models/delete-me/delete.ifc",
+        result_key="results/delete-me/stats.json",
+        user_id=test_user.id,
+        processing_status="completed",
+    )
+    session.add(model)
+
+    ids_file = IdsFile(id="some-ids", filename="test.ids", s3_key="ids/test.ids", user_id=test_user.id)
+    session.add(ids_file)
+    session.commit()
+
+    entity = IfcEntity(global_id="global-1", id="1", model_id=model.id, type="IfcWall")
+    session.add(entity)
+
+    check_result = CheckResult(
+        ifc_model_id=model.id, ids_id=ids_file.id, result_key="checks/check-1/result.json", status="completed"
+    )
+    session.add(check_result)
+    session.commit()
+
+    # 2. Call DELETE
+    response = client.delete(f"/ifc-models/{model.id}")
+    assert response.status_code == 204
+
+    # 3. Verify S3 cleanup
+    assert mock_s3.delete_object.call_count == 3
+    called_keys = [call.kwargs["Key"] for call in mock_s3.delete_object.call_args_list]
+    assert "models/delete-me/delete.ifc" in called_keys
+    assert "results/delete-me/stats.json" in called_keys
+    assert "checks/check-1/result.json" in called_keys
+
+    # 4. Verify DB cleanup
+    # We need to refresh or use a new session to be sure, but session is usually shared in tests
+    # Actually session.exec(select(...)).first() should be enough
+    assert session.exec(select(IfcModel).where(IfcModel.id == model.id)).first() is None
+    # Note: Cascade deletion might not work in SQLite without PRAGMA foreign_keys = ON;
+    # or if SQLAlchemy doesn't emit the deletes.
+    # But let's see.
+    assert session.exec(select(IfcEntity).where(IfcEntity.model_id == model.id)).first() is None
+    assert session.exec(select(CheckResult).where(CheckResult.ifc_model_id == model.id)).first() is None

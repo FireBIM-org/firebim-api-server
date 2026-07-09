@@ -31,6 +31,8 @@ services:
         condition: service_healthy
       authentik-server:
         condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   celery-worker:
     build:

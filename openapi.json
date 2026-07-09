@@ -418,6 +418,62 @@
         }
       }
     },
+    "/ifc-models/{id}/data-payload": {
+      "post": {
+        "tags": [
+          "ifc-models"
+        ],
+        "summary": "Upload Data Payload",
+        "description": "Bulk upload IFC model data (entities, properties, relationships) into SQL tables.",
+        "operationId": "upload_data_payload_ifc_models__id__data_payload_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IfcSqlDataUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ids-files": {
       "get": {
         "tags": [
@@ -6630,15 +6686,37 @@
             "title": "Graph Uri"
           },
           "ttl": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Ttl"
+          },
+          "nodes": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Edges"
           }
         },
         "type": "object",
         "required": [
           "graph_id",
-          "graph_uri",
-          "ttl"
+          "graph_uri"
         ],
         "title": "GraphFetchResponse"
       },
@@ -6658,6 +6736,28 @@
               }
             ],
             "title": "Triple Count"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
           }
         },
         "type": "object",
@@ -6954,6 +7054,153 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "IfcEntityCreate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "globalId": {
+            "type": "string",
+            "title": "Globalid"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "attributes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attributes",
+            "default": {}
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parentid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "globalId"
+        ],
+        "title": "IfcEntityCreate"
+      },
+      "IfcPropertyCreate": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id"
+          },
+          "property_set_name": {
+            "type": "string",
+            "title": "Property Set Name"
+          },
+          "property_name": {
+            "type": "string",
+            "title": "Property Name"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_id",
+          "property_set_name",
+          "property_name",
+          "value",
+          "value_type"
+        ],
+        "title": "IfcPropertyCreate"
+      },
+      "IfcQuantityCreate": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id"
+          },
+          "quantity_set_name": {
+            "type": "string",
+            "title": "Quantity Set Name"
+          },
+          "quantity_name": {
+            "type": "string",
+            "title": "Quantity Name"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_id",
+          "quantity_set_name",
+          "quantity_name",
+          "value",
+          "value_type"
+        ],
+        "title": "IfcQuantityCreate"
+      },
+      "IfcSqlDataUpload": {
+        "properties": {
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/IfcEntityCreate"
+            },
+            "type": "array",
+            "title": "Entities",
+            "default": []
+          },
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/IfcPropertyCreate"
+            },
+            "type": "array",
+            "title": "Properties",
+            "default": []
+          },
+          "quantities": {
+            "items": {
+              "$ref": "#/components/schemas/IfcQuantityCreate"
+            },
+            "type": "array",
+            "title": "Quantities",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "IfcSqlDataUpload"
       },
       "LexiconAcceptedTarget": {
         "properties": {

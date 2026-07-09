@@ -7,7 +7,8 @@ from sqlmodel import Session, select
 from app.auth.jwt import get_current_active_user
 from app.core.s3 import BUCKET_NAME, s3_client
 from app.models.database import get_db
-from app.models.models import IfcModel, User
+from app.models.models import IfcEntity, IfcModel, IfcProperty, IfcQuantity, User
+from app.schemas.models import IfcSqlDataUpload
 from app.workers.celery_app import celery_app
 
 router = APIRouter(prefix="/ifc-models", tags=["ifc-models"])
@@ -113,3 +114,114 @@ async def download_model(id: str, db: Session = Depends(get_db), current_user: U
     s3_client.download_file(Bucket=BUCKET_NAME, Key=model.s3_key, Filename=local_path)
 
     return FileResponse(path=local_path, filename=model.filename, media_type="application/octet-stream")
+
+
+@router.post("/{id}/data-payload", status_code=201)
+async def upload_data_payload(
+    id: str,
+    data: IfcSqlDataUpload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Bulk upload IFC model data (entities, properties, relationships) into SQL tables.
+    """
+    # 1. Verify model exists and belongs to user
+    model = db.exec(select(IfcModel).where(IfcModel.id == id)).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    if model.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this model")
+
+    # 2. Insert Data (Entities, Properties, Quantities)
+    # Map Express IDs to Global IDs for this model
+    id_to_global_id = {ent.id: ent.global_id for ent in data.entities}
+
+    def get_global_id(express_id: str) -> str | None:
+        if express_id in id_to_global_id:
+            return id_to_global_id[express_id]
+        # Check DB for existing entity in the same model
+        result = db.exec(
+            select(IfcEntity.global_id).where(IfcEntity.id == express_id).where(IfcEntity.model_id == id)
+        ).first()
+        if result:
+            id_to_global_id[express_id] = result
+            return result
+        return None
+
+    if data.entities:
+        for ent in data.entities:
+            if ent.parent_id:
+                ent.parent_id = get_global_id(ent.parent_id)
+
+        db.add_all([IfcEntity(**ent.model_dump(), model_id=id) for ent in data.entities])
+
+    if data.properties:
+        for prop in data.properties:
+            mapped_id = get_global_id(prop.entity_id)
+            if mapped_id:
+                prop.entity_id = mapped_id
+            # else: keep original to let DB enforce FK if desired,
+            # but note that original is an Express ID which won't match any Global ID PK.
+
+        db.add_all([IfcProperty(**prop.model_dump()) for prop in data.properties])
+
+    if data.quantities:
+        for quant in data.quantities:
+            mapped_id = get_global_id(quant.entity_id)
+            if mapped_id:
+                quant.entity_id = mapped_id
+
+        db.add_all([IfcQuantity(**quant.model_dump()) for quant in data.quantities])
+
+    db.commit()
+
+    return {
+        "message": "Data uploaded successfully",
+        "entity_count": len(data.entities),
+        "property_count": len(data.properties),
+        "quantity_count": len(data.quantities),
+    }
+
+
+@router.delete("/{id}", status_code=204)
+async def delete_model(id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    """
+    Delete an IFC model, its related data in DB, and its files in S3.
+    """
+    # 1. Get model from DB and verify ownership
+    model = db.exec(select(IfcModel).where(IfcModel.id == id)).first()
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    if model.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this model")
+
+    # 2. Collect all S3 keys to delete
+    s3_keys_to_delete = []
+    if model.s3_key:
+        s3_keys_to_delete.append(model.s3_key)
+    if model.result_key:
+        s3_keys_to_delete.append(model.result_key)
+
+    # Also collect result_keys from related check_results
+    from app.models.models import CheckResult
+
+    check_results = db.exec(select(CheckResult).where(CheckResult.ifc_model_id == id)).all()
+    for cr in check_results:
+        if cr.result_key:
+            s3_keys_to_delete.append(cr.result_key)
+
+    # 3. Synchronous S3 Cleanup (Best Effort)
+    for key in s3_keys_to_delete:
+        try:
+            s3_client.delete_object(Bucket=BUCKET_NAME, Key=key)
+        except Exception as e:
+            # Best effort: log and continue
+            print(f"Failed to delete S3 object {key}: {e}")
+
+    # 4. DB Deletion (Cascades to IfcEntity, IfcProperty, IfcQuantity, CheckResult)
+    db.delete(model)
+    db.commit()
+
+    return None

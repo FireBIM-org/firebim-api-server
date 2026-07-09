@@ -115,9 +115,13 @@ class CheckSolverSelector:
         evaluator: AtomicEvaluator | None = None,
         target_resolver: TargetResolver | None = None,
     ) -> CheckEngine:
+
         mode = self.resolve_mode(requested_mode)
         compiler = compiler or RuleCompiler(cache=self.cache)
-        evaluator = evaluator or HybridAtomicEvaluator()
+
+        if evaluator is None:
+            evaluator = HybridAtomicEvaluator()
+
         target_resolver = target_resolver or TargetResolver(cache=self.cache)
 
         if mode == "standard":
