@@ -7,13 +7,13 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.141.1",
     "fastapi-cli",
-    "uvicorn==0.52.1",
+    "uvicorn==0.52.3",
     "pydantic==2.13.4",
     "python-multipart>=0.0.32",
-    "boto3==1.43.66",
+    "boto3==1.43.71",
     "psycopg2-binary==2.9.12",
     "sqlmodel==0.0.39",
-    "alembic==1.19.0",
+    "alembic==1.19.1",
     "httpx==0.28.1",
     "uuid==1.30",
     "pyjwt[crypto]>=2.13.0",
@@ -30,7 +30,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "ruff>=0.16.2",
+    "ruff>=0.16.3",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
     "aiosqlite>=0.20",
