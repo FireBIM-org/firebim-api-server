@@ -7,10 +7,10 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.141.1",
     "fastapi-cli",
-    "uvicorn==0.52.3",
-    "pydantic==2.13.4",
+    "uvicorn==0.52.4",
+    "pydantic==2.13.5",
     "python-multipart>=0.0.32",
-    "boto3==1.43.71",
+    "boto3==1.43.82",
     "psycopg2-binary==2.9.12",
     "sqlmodel==0.0.39",
     "alembic==1.19.1",
