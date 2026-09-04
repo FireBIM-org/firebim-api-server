@@ -856,12 +856,14 @@ def test_checks_run(client):
 def test_checks_run_vertical(client):
     response = client.post("/checks/run-vertical", json={"rule_id": "room_area_rule", "graph_id": "building-a"})
     assert response.status_code == 200
+    assert response.json()["success"] is True
     assert response.json()["solver"] == "vertical"
 
 
 def test_checks_run_horisontal(client):
     response = client.post("/checks/run-horisontal", json={"rule_id": "room_area_rule", "graph_id": "building-a"})
     assert response.status_code == 200
+    assert response.json()["success"] is True
     assert response.json()["solver"] == "horizontal"
 
 
@@ -869,6 +871,7 @@ def test_checks_run_diagnostic(client):
     response = client.post("/checks/run-diagnostic", json={"rule_id": "room_area_rule", "graph_id": "building-a"})
     assert response.status_code == 200
     body = response.json()
+    assert body["success"] is True
     assert body["engine"]["diagnostics_enabled"] is True
     assert "timings" in body
     assert "completed_chains" in body

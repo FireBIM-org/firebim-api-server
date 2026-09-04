@@ -7,12 +7,9 @@ from contextlib import suppress
 from time import perf_counter
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from rdflib import Graph
 from rdflib.namespace import RDF, SH
-from sqlmodel import Session
-
-from app.models.database import get_db
 
 try:
     from app.checks.blind_runner import BlindShaclRuleRunner
@@ -601,7 +598,7 @@ def _error_run_response(
 
 
 @router.post("/run", response_model=CheckSimpleRunResponse)
-def run_check(payload: CheckRunRequest, db: Session = Depends(get_db)):
+def run_check(payload: CheckRunRequest):
     try:
         (
             options,
@@ -644,7 +641,7 @@ def run_check(payload: CheckRunRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/run-vertical", response_model=CheckSimpleRunResponse)
-def run_check_vertical(payload: CheckRunRequest, db: Session = Depends(get_db)):
+def run_check_vertical(payload: CheckRunRequest):
     try:
         (
             options,
@@ -655,7 +652,7 @@ def run_check_vertical(payload: CheckRunRequest, db: Session = Depends(get_db)):
             building_graph_uri,
             compatibility,
             result,
-        ) = _execute_check_run(payload, forced_solver="vertical", diagnostics=False, db=db)
+        ) = _execute_check_run(payload, forced_solver="vertical", diagnostics=False)
         return _build_simple_response(
             payload=payload,
             options=options,
@@ -682,7 +679,7 @@ def run_check_vertical(payload: CheckRunRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/run-horisontal", response_model=CheckSimpleRunResponse)
-def run_check_horisontal(payload: CheckRunRequest, db: Session = Depends(get_db)):
+def run_check_horisontal(payload: CheckRunRequest):
     try:
         (
             options,
@@ -693,7 +690,7 @@ def run_check_horisontal(payload: CheckRunRequest, db: Session = Depends(get_db)
             building_graph_uri,
             compatibility,
             result,
-        ) = _execute_check_run(payload, forced_solver="horizontal", diagnostics=False, db=db)
+        ) = _execute_check_run(payload, forced_solver="horizontal", diagnostics=False)
         return _build_simple_response(
             payload=payload,
             options=options,
@@ -720,7 +717,7 @@ def run_check_horisontal(payload: CheckRunRequest, db: Session = Depends(get_db)
 
 
 @router.post("/run-diagnostic", response_model=CheckDiagnosticResponse)
-def run_check_diagnostic(payload: CheckRunRequest, db: Session = Depends(get_db)):
+def run_check_diagnostic(payload: CheckRunRequest):
     try:
         (
             options,
@@ -731,7 +728,7 @@ def run_check_diagnostic(payload: CheckRunRequest, db: Session = Depends(get_db)
             building_graph_uri,
             compatibility,
             result,
-        ) = _execute_check_run(payload, diagnostics=True, db=db)
+        ) = _execute_check_run(payload, diagnostics=True)
         return _build_diagnostic_response(
             payload=payload,
             options=options,
