@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.auth.jwt import get_current_active_user
 from app.core.config import settings
+from app.ontologies.registry_sync import OntologyRegistryError, sync_from_registry
 from app.ontologies.service import (
     build_dictionary_conversion,
     build_version_summary_from_metadata,
@@ -31,6 +32,9 @@ from app.schemas.ontologies import (
     OntologyPublishRequest,
     OntologyPublishResponse,
     OntologySummaryResponse,
+    OntologySyncRequest,
+    OntologySyncResponse,
+    OntologySyncSourceResponse,
     OntologyVersionFetchResponse,
     OntologyVersionListResponse,
     OntologyVersionSummaryResponse,
@@ -75,6 +79,45 @@ def publish_ontology(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except GraphStoreError as exc:
         logger.exception("Failed to publish ontology", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.get("/sync/source", response_model=OntologySyncSourceResponse)
+def get_sync_source() -> OntologySyncSourceResponse:
+    """The public registry this API syncs from by default (no credentials needed to read it)."""
+    return OntologySyncSourceResponse(default_source_url=settings.ONTOLOGY_REGISTRY_URL)
+
+
+@router.post("/sync/preview", response_model=OntologySyncResponse)
+def preview_ontology_sync(
+    payload: OntologySyncRequest | None = None,
+    _current_user=Depends(get_current_active_user),
+) -> OntologySyncResponse:
+    """Fetch a registry index and report what a sync would publish, update or skip. Publishes nothing."""
+    request = (payload or OntologySyncRequest()).model_copy(update={"dry_run": True})
+    return _run_sync(request)
+
+
+@router.post("/sync", response_model=OntologySyncResponse)
+def sync_ontologies(
+    payload: OntologySyncRequest | None = None,
+    _current_user=Depends(get_current_active_user),
+) -> OntologySyncResponse:
+    """Pull ontology releases from a public registry (default: firebim.org) into this API.
+
+    New versions are published; existing versions are left untouched unless ``overwrite`` is set.
+    Use ``selections`` to sync specific ``family/country/version`` items, or ``dry_run`` to preview.
+    """
+    return _run_sync(payload or OntologySyncRequest())
+
+
+def _run_sync(request: OntologySyncRequest) -> OntologySyncResponse:
+    try:
+        return sync_from_registry(repo, request)
+    except OntologyRegistryError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except GraphStoreError as exc:
+        logger.exception("Ontology sync failed", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 

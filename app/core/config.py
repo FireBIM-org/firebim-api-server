@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     # If not set, falls back to AUTHENTIK_ISSUER_URL.
     AUTHENTIK_INTERNAL_URL: str = ""
 
+    # Public ontology registry (firebim.org) used by POST /ontologies/sync.
+    # Any URL serving an index in the same format may be used as source_url per request.
+    ONTOLOGY_REGISTRY_URL: str = "https://firebim.org/documentation/ontologies/index.json"
+    ONTOLOGY_SYNC_TIMEOUT_SECONDS: float = 120.0
+
     # S3
     S3_ENDPOINT_URL: str
     S3_BUCKET_NAME: str

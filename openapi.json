@@ -370,6 +370,45 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "ifc-models"
+        ],
+        "summary": "Delete Model",
+        "description": "Delete an IFC model, its related data in DB, and its files in S3.",
+        "operationId": "delete_model_ifc_models__id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/ifc-models/{id}/download": {
@@ -2883,6 +2922,136 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OntologyPublishResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/ontologies/sync/source": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Get Sync Source",
+        "description": "The public registry this API syncs from by default (no credentials needed to read it).",
+        "operationId": "get_sync_source_ontologies_sync_source_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologySyncSourceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ontologies/sync/preview": {
+      "post": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Preview Ontology Sync",
+        "description": "Fetch a registry index and report what a sync would publish, update or skip. Publishes nothing.",
+        "operationId": "preview_ontology_sync_ontologies_sync_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/OntologySyncRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologySyncResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/ontologies/sync": {
+      "post": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Sync Ontologies",
+        "description": "Pull ontology releases from a public registry (default: firebim.org) into this API.\n\nNew versions are published; existing versions are left untouched unless ``overwrite`` is set.\nUse ``selections`` to sync specific ``family/country/version`` items, or ``dry_run`` to preview.",
+        "operationId": "sync_ontologies_ontologies_sync_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/OntologySyncRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologySyncResponse"
                 }
               }
             }
@@ -12592,6 +12761,378 @@
           "stable_url"
         ],
         "title": "OntologySummaryResponse"
+      },
+      "OntologySyncAction": {
+        "type": "string",
+        "enum": [
+          "publish",
+          "update",
+          "current",
+          "skip",
+          "failed"
+        ],
+        "title": "OntologySyncAction"
+      },
+      "OntologySyncItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "'<family>/<country>/<version>'"
+          },
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OntologyReleaseStatus"
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date",
+            "title": "Issued At"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "default": "ontology"
+          },
+          "visibility": {
+            "type": "string",
+            "title": "Visibility",
+            "default": "public"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "ttl_url": {
+            "type": "string",
+            "title": "Ttl Url"
+          },
+          "remote_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remote Sha256"
+          },
+          "remote_byte_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remote Byte Size"
+          },
+          "is_latest": {
+            "type": "boolean",
+            "title": "Is Latest",
+            "default": false
+          },
+          "is_stable": {
+            "type": "boolean",
+            "title": "Is Stable",
+            "default": false
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          },
+          "local_exists": {
+            "type": "boolean",
+            "title": "Local Exists",
+            "default": false
+          },
+          "local_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Local Sha256"
+          },
+          "local_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OntologyReleaseStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "action": {
+            "$ref": "#/components/schemas/OntologySyncAction"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "published": {
+            "type": "boolean",
+            "title": "Published",
+            "default": false
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ontology_family",
+          "country",
+          "version",
+          "status",
+          "issued_at",
+          "ttl_url",
+          "action",
+          "reason"
+        ],
+        "title": "OntologySyncItem"
+      },
+      "OntologySyncRequest": {
+        "properties": {
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "URL of a registry index (default: the public firebim.org registry). Any registry serving the same JSON format is accepted."
+          },
+          "families": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Families",
+            "description": "Only sync these ontology families, e.g. ['fbo']"
+          },
+          "countries": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Countries",
+            "description": "Only sync these countries, e.g. ['dk', 'core']"
+          },
+          "selections": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selections",
+            "description": "Explicit '<family>/<country>/<version>' identifiers to sync; overrides the other filters"
+          },
+          "include_unlisted": {
+            "type": "boolean",
+            "title": "Include Unlisted",
+            "description": "Also sync entries the registry marks as unlisted",
+            "default": true
+          },
+          "latest_only": {
+            "type": "boolean",
+            "title": "Latest Only",
+            "description": "Only sync the newest version of each ontology",
+            "default": false
+          },
+          "overwrite": {
+            "type": "boolean",
+            "title": "Overwrite",
+            "description": "Re-publish versions that already exist locally but whose content or status differs",
+            "default": false
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "description": "Only compute the plan; publish nothing",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "OntologySyncRequest"
+      },
+      "OntologySyncResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "registry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry"
+          },
+          "schema_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Version"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "to_publish": {
+            "type": "integer",
+            "title": "To Publish"
+          },
+          "to_update": {
+            "type": "integer",
+            "title": "To Update"
+          },
+          "current": {
+            "type": "integer",
+            "title": "Current"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "published": {
+            "type": "integer",
+            "title": "Published"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OntologySyncItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_url",
+          "dry_run",
+          "fetched_at",
+          "total",
+          "to_publish",
+          "to_update",
+          "current",
+          "skipped",
+          "published",
+          "failed"
+        ],
+        "title": "OntologySyncResponse"
+      },
+      "OntologySyncSourceResponse": {
+        "properties": {
+          "default_source_url": {
+            "type": "string",
+            "title": "Default Source Url"
+          },
+          "registry_format": {
+            "type": "string",
+            "title": "Registry Format",
+            "default": "firebim-ontology-registry"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version",
+            "default": 1
+          },
+          "documentation_url": {
+            "type": "string",
+            "title": "Documentation Url",
+            "default": "https://firebim.org/documentation/ontologies/#developers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "default_source_url"
+        ],
+        "title": "OntologySyncSourceResponse"
       },
       "OntologyVersionFetchResponse": {
         "properties": {
