@@ -103,6 +103,39 @@ docker run --rm -v ${PWD}:/app -w /app ghcr.io/astral-sh/uv:python3.12-bookworm-
   sh -lc "uv sync --dev && uv run ruff format --check . && uv run ruff check . && uv run pytest -q"
 ```
 
+## Syncing ontologies from a public registry
+
+Ontology releases (FBO core, the national FBO modules, the FBO → IFC mapping, and the IFC/RIR reference
+ontologies) are published on https://firebim.org/documentation/ontologies/ as versioned, credential-free
+static files with a JSON index. This API can pull them into its own ontology store:
+
+| Endpoint | Auth | Purpose |
+| --- | --- | --- |
+| `GET /ontologies/sync/source` | no | Default registry URL (`ONTOLOGY_REGISTRY_URL`) |
+| `POST /ontologies/sync/preview` | yes | Fetch the index and report per version: `publish`, `update`, `current` or `skip` – publishes nothing |
+| `POST /ontologies/sync` | yes | Publish every version that is missing locally (and, with `overwrite: true`, versions whose content or status changed) |
+
+Request body (all fields optional):
+
+```json
+{
+  "source_url": "https://firebim.org/documentation/ontologies/index.json",
+  "families": ["fbo"],
+  "countries": ["dk", "core"],
+  "selections": ["fbo/dk/2026.09.04"],
+  "include_unlisted": true,
+  "latest_only": false,
+  "overwrite": false,
+  "dry_run": false
+}
+```
+
+Synced versions land in the same place as manually published ones
+(`GET /ontologies/{family}/{country}/versions`, newest first). Content integrity is verified against the
+registry's `sha256` before publishing. To sync from another site, point `source_url` at any index that
+follows the same format (see `app/ontologies/registry_sync.py` for the schema); relative `ttl_url`s are
+resolved against the index's `base_url`.
+
 ## Deployment
 
 This repository can be deployed for self-hosting, or you can use one of the official API endpoints.
