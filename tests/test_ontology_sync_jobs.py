@@ -7,9 +7,9 @@ from types import SimpleNamespace
 import pytest
 from botocore.exceptions import ClientError
 
+from app.ontologies import sync_task
 from app.ontologies.sync_jobs import OntologySyncJobNotFoundError, OntologySyncJobStore
 from app.schemas.ontologies import OntologySyncJobStatus, OntologySyncRequest
-from app.workers import celery_worker
 
 
 class FakeS3Client:
@@ -57,11 +57,11 @@ def test_worker_persists_completed_sync_result(monkeypatch):
     fake_store = SimpleNamespace(update=lambda _job_id, **changes: updates.append(changes))
     fake_result = SimpleNamespace(model_dump=lambda **_kwargs: {"published": 1, "failed": 0})
 
-    monkeypatch.setattr(celery_worker, "OntologySyncJobStore", lambda: fake_store)
-    monkeypatch.setattr(celery_worker, "OntologyRepository", lambda: object())
-    monkeypatch.setattr(celery_worker, "sync_from_registry", lambda _repo, _request: fake_result)
+    monkeypatch.setattr(sync_task, "OntologySyncJobStore", lambda: fake_store)
+    monkeypatch.setattr(sync_task, "OntologyRepository", lambda: object())
+    monkeypatch.setattr(sync_task, "sync_from_registry", lambda _repo, _request: fake_result)
 
-    response = celery_worker.sync_ontologies_from_registry.run(
+    response = sync_task.sync_ontologies_from_registry.run(
         "2a61b84d-3021-47bd-a5e2-bfe5ad9d052c",
         {"source_url": "https://example.org/index.json"},
     )
