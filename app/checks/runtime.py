@@ -7,6 +7,7 @@ from typing import Any
 
 from app.checks.caching import accumulate_timing, increment_counter, make_content_hash
 from app.checks.derived import DerivedOverlay, DeriveEvaluator, default_derived_graph_uri
+from app.checks.end_status import status_from_end_kind
 from app.checks.evaluator_base import AtomicEvaluator
 from app.checks.execution_state import BindingFrame, DiagnosticsCollector, ExecutionContext
 from app.checks.pathways import PathwayResolver
@@ -724,14 +725,9 @@ class CheckRuntime:
             if terminal_text in {"unknown", "missing_data", "missing-data"}:
                 return "Unknown"
         text = (self._end_message(node) or "").strip().lower()
-        if node.end_kind:
-            end_kind = node.end_kind.strip().lower()
-            if end_kind in {"pass", "passed", "true", "success"}:
-                return "True"
-            if end_kind in {"fail", "failed", "false", "error"}:
-                return "False"
-            if end_kind in {"unknown", "missing_data", "missing-data"}:
-                return "Unknown"
+        kind_status = status_from_end_kind(node.end_kind or node.config.get("end_kind"))
+        if kind_status is not None:
+            return kind_status
         if "missing data" in text or "cannot be evaluated" in text or "unknown" in text:
             return "Unknown"
         if "did not pass" in text or "failed" in text or "not pass" in text:

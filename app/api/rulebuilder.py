@@ -94,6 +94,7 @@ def _normalize_rule_draft(raw_rule: dict | None) -> RuleDraft:
                 property_path=element.get("property_path"),
                 operator=element.get("operator"),
                 value=element.get("value"),
+                expression=element.get("expression"),
                 true_path=element.get("true_path"),
                 false_path=element.get("false_path"),
                 unknown_path=element.get("unknown_path"),

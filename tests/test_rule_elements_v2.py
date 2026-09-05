@@ -519,3 +519,78 @@ def test_blind_endpoint_reports_derived_values(api_client):
     body = res.json()
     assert body["summary"]["passed"] == 1 and body["summary"]["failed"] == 1 and body["summary"]["unknown"] == 1
     assert len(body["derived_values"]) == 2
+
+
+# ------------------------------------------------------------------------------ canvas import + end kinds
+def test_workspace_from_published_rule_keeps_derive_expression():
+    from app.api.rulebuilder import _normalize_rule_draft
+    from app.rulebuilder.layout import build_workspace_from_rule
+
+    rule = lt_rule()
+    draft = _normalize_rule_draft(decompile_ruleset_ttl(_ttl(rule)))
+    workspace = build_workspace_from_rule(draft)
+    by_id = {node.canvas_node_id: node.rule for node in workspace.nodes}
+    for el in rule["elements"]:
+        assert el["id"] in by_id
+        if el["element_type"] == "derive":
+            assert by_id[el["id"]].element_type == "derive"
+            assert by_id[el["id"]].expression == el["expression"]
+        if el["element_type"] == "decision":
+            assert by_id[el["id"]].value == el["value"]
+    assert len(workspace.edges) == sum(
+        1 for el in rule["elements"] for b in ("true_path", "false_path", "unknown_path") if el.get(b)
+    )
+
+
+def test_end_kind_vocabulary_is_shared_by_all_runners():
+    from app.checks.end_status import status_from_end_kind
+
+    assert status_from_end_kind("pass") == "True"
+    assert status_from_end_kind("fail") == "False"
+    assert status_from_end_kind("missing_data") == "Unknown"
+    assert status_from_end_kind("not_applicable") == "True"
+    assert status_from_end_kind("terminal") == "True"
+    assert status_from_end_kind("output") == "True"
+    assert status_from_end_kind("something-else") is None
+
+    rid = "t-kinds"
+    rule = {
+        "id": rid,
+        "entry": f"{rid}-start",
+        "elements": [
+            {"id": f"{rid}-start", "element_type": "start", "true_path": f"{rid}-q", "label": "start"},
+            {
+                "id": f"{rid}-q",
+                "element_type": "decision",
+                "target_class": f"{LT}Compartment",
+                "property_path": f"{LT}Area",
+                "operator": ">",
+                "value": 100,
+                "true_path": f"{rid}-big",
+                "false_path": f"{rid}-na",
+                "unknown_path": f"{rid}-ask",
+                "label": "big?",
+            },
+            _end(rid, "big", "terminal"),
+            _end(rid, "na", "not_applicable"),
+            _end(rid, "ask", "missing_data"),
+        ],
+    }
+    ttl = f"""
+    @prefix lt: <{LT}> . @prefix ex: <https://example.org/x#> .
+    ex:c1 a lt:Compartment ; lt:Area 150 . ex:c2 a lt:Compartment ; lt:Area 50 . ex:c3 a lt:Compartment .
+    """
+    for runtime_cls in (CheckRuntime, HorizontalLayeredCheckRuntime, VerticalPathwayCheckRuntime):
+        assert _status_by_target(_run(runtime_cls, rule, ttl)) == {"c1": "True", "c2": "True", "c3": "Unknown"}
+    blind = BlindShaclRuleRunner().run_rule(
+        graph_id="g",
+        graph_uri="https://firebim.org/graphs/buildings/g",
+        graph_ttl=ttl,
+        rule_id=rid,
+        rule_ttl=_ttl(rule),
+    )
+    assert {h["target_node"].split("#")[-1]: h["final_status"] for h in blind["end_outputs"]} == {
+        "c1": "True",
+        "c2": "True",
+        "c3": "Unknown",
+    }

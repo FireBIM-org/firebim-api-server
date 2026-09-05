@@ -8,6 +8,7 @@ from rdflib import Graph, Namespace
 
 from app.checks.compiler import RuleCompiler
 from app.checks.derived import DerivedOverlay, DeriveEvaluator, resolve_path_values
+from app.checks.end_status import status_from_end_kind
 from app.checks.execution_state import ExecutionContext
 from app.checks.pathways import PathwayResolver
 from app.checks.planner import RuleExecutionPlanner
@@ -417,14 +418,10 @@ class BlindShaclRuleRunner:
         return node.label or node.node_id
 
     def _status_from_end_node(self, node: EndNode) -> str:
-        end_kind = str(node.end_kind or node.config.get("end_kind") or "").strip().lower()
         # same vocabulary as CheckRuntime._infer_end_status
-        if end_kind in {"pass", "passed", "true", "success"}:
-            return "True"
-        if end_kind in {"fail", "failed", "false", "error"}:
-            return "False"
-        if end_kind in {"unknown", "missing_data", "missing-data"}:
-            return "Unknown"
+        kind_status = status_from_end_kind(node.end_kind or node.config.get("end_kind"))
+        if kind_status is not None:
+            return kind_status
 
         text = self._end_value(node).strip().lower()
 

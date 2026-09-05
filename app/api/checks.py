@@ -424,7 +424,11 @@ def _execute_check_run(
         rule_ttl=rule_ttl,
     )
     request_timings["run_rule"] = round((perf_counter() - started) * 1000.0, 3)
-    if options.persist_derived and result.derived_graph_ttl and result.derived_graph_uri:
+    if (
+        options.persist_derived
+        and getattr(result, "derived_graph_ttl", None)
+        and getattr(result, "derived_graph_uri", None)
+    ):
         started = perf_counter()
         publish_building_graph_ttl(ttl_text=result.derived_graph_ttl, graph_uri=result.derived_graph_uri)
         result.engine["derived_persisted"] = True
@@ -443,7 +447,7 @@ def _execute_check_run(
 
 def _to_derived_values(result: RuleRunResult) -> list[CheckDerivedValue]:
     values: list[CheckDerivedValue] = []
-    for record in result.derived_values or []:
+    for record in getattr(result, "derived_values", None) or []:
         values.append(
             CheckDerivedValue(
                 target=str(record.get("target")),
@@ -516,7 +520,7 @@ def _build_simple_response(
         report_text=(result.report_text if payload.options.include_report_text else None),
         debug=debug_payload,
         derived_values=_to_derived_values(result),
-        derived_graph_uri=result.derived_graph_uri,
+        derived_graph_uri=getattr(result, "derived_graph_uri", None),
         derived_persisted=bool(result.engine.get("derived_persisted")),
     )
 
@@ -566,7 +570,7 @@ def _build_diagnostic_response(
         },
         compiled_rule=result.compiled_rule if isinstance(result.compiled_rule, dict) else {},
         derived_values=_to_derived_values(result),
-        derived_graph_uri=result.derived_graph_uri,
+        derived_graph_uri=getattr(result, "derived_graph_uri", None),
         derived_persisted=bool(result.engine.get("derived_persisted")),
         targets=_to_check_target_results(result),
         trace=trace_payload,
