@@ -42,7 +42,7 @@ class SHACLBuilder:
 
     @staticmethod
     def _sparql_path(segments: list[str]) -> str:
-        return "/".join(f"<{seg}>" for seg in segments)
+        return "/".join(f"^<{seg[1:]}>" if seg.startswith("^") else f"<{seg}>" for seg in segments)
 
     def _build_comparison(self, element):
         op = element.operator

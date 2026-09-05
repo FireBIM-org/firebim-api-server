@@ -14,7 +14,7 @@ from typing import Any
 from rdflib import RDF, XSD, Graph, Literal, Namespace, URIRef
 
 from app.rules.expressions import ExpressionUnknown, Node, describe, evaluate, parse_expression
-from app.rules.paths import expand_curie, expand_property_path
+from app.rules.paths import expand_curie, expand_property_path, is_inverse_segment, segment_iri
 
 PROV = Namespace("http://www.w3.org/ns/prov#")
 FBO = Namespace("https://firebim.org/ontologies/fbo#")
@@ -149,6 +149,8 @@ def resolve_path_values(
 ) -> list[Any]:
     """All *distinct* values reachable from `target` along the sequence path (rdflib terms), overlay-aware per hop.
 
+    A segment starting with ``^`` is followed backwards (subjects that point at the current node).
+
     Duplicates are collapsed at every hop, so a sequence path that reaches the same literal through several
     intermediate nodes (unit -> compartments -> UseCategory = "AK2", "AK2") yields one value; only genuinely
     different values are reported as ambiguous by the evaluators.
@@ -160,8 +162,10 @@ def resolve_path_values(
         for node in frontier:
             if not isinstance(node, URIRef):
                 continue
-            if overlay is not None and overlay.has(str(node), prop):
-                candidates: list[Any] = [to_literal(overlay.get(str(node), prop))]
+            if is_inverse_segment(prop):
+                candidates: list[Any] = list(graph.subjects(URIRef(segment_iri(prop)), node))
+            elif overlay is not None and overlay.has(str(node), prop):
+                candidates = [to_literal(overlay.get(str(node), prop))]
             else:
                 candidates = list(graph.objects(node, URIRef(prop)))
             for value in candidates:

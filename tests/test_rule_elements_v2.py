@@ -616,3 +616,56 @@ def test_sequence_path_collapses_identical_values():
         "AK2",
         "AK3",
     ]
+
+
+def test_inverse_path_segments_round_trip_and_execute():
+    from app.checks.evaluator_pyshacl import PyShaclAtomicEvaluator
+
+    assert split_property_path(f"^{LT}has/{LT}Flag") == [f"^{LT}has", f"{LT}Flag"]
+    assert expand_curie("^fbo-lt:has") == f"^{LT}has"
+
+    rid = "t-inv"
+    rule = {
+        "id": rid,
+        "entry": f"{rid}-start",
+        "elements": [
+            {"id": f"{rid}-start", "element_type": "start", "true_path": f"{rid}-q", "label": "start"},
+            {
+                "id": f"{rid}-q",
+                "element_type": "decision",
+                "target_class": f"{LT}Compartment",
+                "property_path": f"^{LT}has/{LT}Flag",  # compartment -> the building that lists it -> Flag
+                "operator": "==",
+                "value": True,
+                "true_path": f"{rid}-ok",
+                "false_path": f"{rid}-no",
+                "unknown_path": f"{rid}-ask",
+                "label": "building flag?",
+            },
+            _end(rid, "ok", "pass"),
+            _end(rid, "no", "fail"),
+            _end(rid, "ask", "missing_data"),
+        ],
+    }
+    ttl = f"""
+    @prefix lt: <{LT}> . @prefix ex: <https://example.org/x#> .
+    ex:b1 lt:has ex:c1, ex:c2 ; lt:Flag true .
+    ex:b2 lt:has ex:c3 ; lt:Flag false .
+    ex:c1 a lt:Compartment . ex:c2 a lt:Compartment . ex:c3 a lt:Compartment . ex:c4 a lt:Compartment .
+    """
+    rule_ttl = _ttl(rule)
+    back = decompile_ruleset_ttl(rule_ttl)
+    assert {n["id"]: n for n in back["nodes"]}[f"{rid}-q"]["property_path"] == f"^{LT}has/{LT}Flag"
+    expected = {"c1": "True", "c2": "True", "c3": "False", "c4": "Unknown"}
+    for runtime_cls in (CheckRuntime, HorizontalLayeredCheckRuntime, VerticalPathwayCheckRuntime):
+        assert _status_by_target(_run(runtime_cls, rule, ttl)) == expected
+    # pySHACL evaluator builds sh:inversePath inside the sequence list
+    compiled = RuleCompiler().compile_from_ttl(rule_ttl)
+    runtime = CheckRuntime(evaluator=PyShaclAtomicEvaluator())
+    graph_ref = GraphRef(graph_id="g", graph_uri="https://firebim.org/graphs/buildings/g", ttl=ttl)
+    result = runtime.run_rule(graph_ref=graph_ref, compiled=compiled, options=RunOptions(diagnostics=True))
+    assert _status_by_target(result) == expected
+    blind = BlindShaclRuleRunner().run_rule(
+        graph_id="g", graph_uri="https://firebim.org/graphs/buildings/g", graph_ttl=ttl, rule_id=rid, rule_ttl=rule_ttl
+    )
+    assert {h["target_node"].split("#")[-1]: h["final_status"] for h in blind["end_outputs"]} == expected

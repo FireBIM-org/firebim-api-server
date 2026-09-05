@@ -20,17 +20,17 @@ def _coerce_token(token: str) -> Any:
 
 
 def _path_from_sparql(text: str) -> str:
-    return "/".join(re.findall(r"<([^>]+)>", text))
+    return "/".join(("^" if inv else "") + iri for inv, iri in re.findall(r"(\^?)<([^>]+)>", text))
 
 
 def parse_construct_rule(sparql_text: str) -> tuple[str | None, str | None, Any]:
     prop_match = re.search(
-        r"OPTIONAL\s*\{\s*\?this\s*((?:<[^>]+>)(?:\s*/\s*<[^>]+>)*)\s*\?h\s*\}",
+        r"OPTIONAL\s*\{\s*\?this\s*((?:\^?<[^>]+>)(?:\s*/\s*\^?<[^>]+>)*)\s*\?h\s*\}",
         sparql_text,
         re.DOTALL,
     )
     ref_match = re.search(
-        r"OPTIONAL\s*\{\s*\?this\s*((?:<[^>]+>)(?:\s*/\s*<[^>]+>)*)\s*\?v\s*\}",
+        r"OPTIONAL\s*\{\s*\?this\s*((?:\^?<[^>]+>)(?:\s*/\s*\^?<[^>]+>)*)\s*\?v\s*\}",
         sparql_text,
         re.DOTALL,
     )

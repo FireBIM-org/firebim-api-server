@@ -8,6 +8,10 @@ A property path is one IRI, or a *sequence* of IRIs joined with "/":
 Because IRIs themselves contain "/", the sequence separator is only a "/" that is immediately followed by
 the start of a new IRI (``http://``, ``https://``, ``urn:``) or a CURIE (``prefix:local``).
 
+A segment may be prefixed with ``^`` to follow the property *backwards* (SHACL ``sh:inversePath``):
+
+    ^fbo:FireSafetyUnit/fbo-dk:PeopleKnowledgeEscaperoutes   # from a compartment up to whatever lists it, then down
+
 A `$ref` value is ``{"$ref": "<path>"}`` and means "compare with this path evaluated on the same target".
 """
 
@@ -28,7 +32,8 @@ DEFAULT_PREFIXES: dict[str, str] = {
     "xsd": "http://www.w3.org/2001/XMLSchema#",
 }
 
-_SEGMENT_SPLIT = re.compile(r"/(?=(?:https?://|urn:|[A-Za-z][A-Za-z0-9_.\-]*:(?!//)))")
+_SEGMENT_SPLIT = re.compile(r"/(?=\^?(?:https?://|urn:|[A-Za-z][A-Za-z0-9_.\-]*:(?!//)))")
+INVERSE = "^"
 _CURIE = re.compile(r"^([A-Za-z][A-Za-z0-9_.\-]*):([^/:#][^/]*)$")
 REF_KEY = "$ref"
 
@@ -41,7 +46,7 @@ def split_property_path(path: str | None) -> list[str]:
     if not text:
         return []
     # allow an explicit spaced form "a / b" as well
-    text = re.sub(r"\s*/\s*(?=(?:https?://|urn:|[A-Za-z][A-Za-z0-9_.\-]*:(?!//)))", "/", text)
+    text = re.sub(r"\s*/\s*(?=\^?(?:https?://|urn:|[A-Za-z][A-Za-z0-9_.\-]*:(?!//)))", "/", text)
     return [seg for seg in _SEGMENT_SPLIT.split(text) if seg]
 
 
@@ -53,9 +58,20 @@ def is_sequence_path(path: str | None) -> bool:
     return len(split_property_path(path)) > 1
 
 
+def is_inverse_segment(segment: str) -> bool:
+    return str(segment).startswith(INVERSE)
+
+
+def segment_iri(segment: str) -> str:
+    """The IRI of a (possibly inverse) expanded segment."""
+    return segment[1:] if is_inverse_segment(segment) else segment
+
+
 def expand_curie(term: str, prefixes: dict[str, str] | None = None) -> str:
-    """fbo-dk:UseCategory -> full IRI; full IRIs are returned unchanged."""
+    """fbo-dk:UseCategory -> full IRI; full IRIs are returned unchanged. A leading ``^`` (inverse) is kept."""
     text = str(term).strip()
+    if text.startswith(INVERSE):
+        return INVERSE + expand_curie(text[1:], prefixes)
     if text.startswith(("http://", "https://", "urn:")):
         return text
     match = _CURIE.match(text)
@@ -89,6 +105,8 @@ def validate_path_syntax(path: str | None, *, field: str = "property_path") -> N
     if not segments:
         raise ValueError(f"{field} is empty")
     for seg in segments:
+        if seg == INVERSE:
+            raise ValueError(f"{field} has an inverse marker without a property: {path!r}")
         if not seg or seg.startswith("/") or seg.endswith("/") and not seg.startswith(("http", "urn:")):
             raise ValueError(f"{field} has an empty segment: {path!r}")
         if any(ch.isspace() for ch in seg):
