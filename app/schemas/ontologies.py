@@ -399,6 +399,11 @@ class OntologySummaryResponse(BaseModel):
     stable_url: str
 
 
+class OntologyListResponse(BaseModel):
+    count: int
+    ontologies: list[OntologySummaryResponse] = Field(default_factory=list)
+
+
 class OntologyVersionListResponse(BaseModel):
     ontology_family: str
     country: str

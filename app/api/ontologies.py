@@ -29,6 +29,7 @@ from app.schemas.ontologies import (
     OntologyDictionaryConversionResponse,
     OntologyDictionaryValidationReport,
     OntologyHealthResponse,
+    OntologyListResponse,
     OntologyPublishRequest,
     OntologyPublishResponse,
     OntologySummaryResponse,
@@ -65,6 +66,17 @@ def ontologies_health() -> OntologyHealthResponse:
         storage_host=settings.S3_ENDPOINT_URL,
         resource_directories=repo.resource_directories(),
     )
+
+
+@router.get("", response_model=OntologyListResponse)
+def list_ontologies() -> OntologyListResponse:
+    """List every ontology family/country currently published in this API."""
+    try:
+        ontologies = repo.list_summaries()
+        return OntologyListResponse(count=len(ontologies), ontologies=ontologies)
+    except GraphStoreError as exc:
+        logger.exception("Failed to list ontologies", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
 @router.post("/publish", response_model=OntologyPublishResponse)
