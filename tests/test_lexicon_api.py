@@ -1324,6 +1324,75 @@ def test_rule_ontology_similarity_with_multiple_rules_and_ontologies(monkeypatch
     )
 
 
+def test_rule_term_validation_reports_unknown_and_wrong_kind_terms(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/catalog/rule-term-validation",
+        json={
+            "selected_ontologies": [
+                {"ontology_family": "fbo", "country": "dk", "version": "latest"},
+            ],
+            "rule": {
+                "id": "rule_with_invalid_terms",
+                "entry": "valid",
+                "elements": [
+                    {
+                        "id": "valid",
+                        "element_type": "decision",
+                        "target_class": "Wall",
+                        "property_path": "Combustible",
+                        "label": "Valid terms",
+                    },
+                    {
+                        "id": "unknown",
+                        "element_type": "decision",
+                        "target_class": "NotARealClass",
+                        "property_path": "NotARealProperty",
+                        "label": "Unknown terms",
+                    },
+                    {
+                        "id": "wrong-kind",
+                        "element_type": "decision",
+                        "target_class": "Combustible",
+                        "property_path": "Wall",
+                        "label": "Terms of the wrong kind",
+                    },
+                    {
+                        "id": "empty",
+                        "element_type": "decision",
+                        "target_class": None,
+                        "property_path": None,
+                        "label": "Completeness handles empty fields",
+                    },
+                ],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is False
+    assert body["rule_ids"] == ["rule_with_invalid_terms"]
+    assert body["stats"] == {
+        "rule_count": 1,
+        "ontology_count": 1,
+        "validated_node_count": 3,
+        "validated_field_count": 6,
+        "invalid_node_count": 2,
+        "issue_count": 4,
+    }
+    valid_node = next(node for node in body["nodes"] if node["node_id"] == "valid")
+    assert valid_node["valid"] is True
+    assert all(field["matches"] for field in valid_node["fields"])
+    issue_codes = {(issue["node_id"], issue["field"]): issue["code"] for issue in body["issues"]}
+    assert issue_codes == {
+        ("unknown", "target_class"): "unknown_term",
+        ("unknown", "property_path"): "unknown_term",
+        ("wrong-kind", "target_class"): "wrong_term_kind",
+        ("wrong-kind", "property_path"): "wrong_term_kind",
+    }
+
+
 def test_property_and_property_set_related_catalog_endpoints(monkeypatch):
     client = _build_client(monkeypatch)
 

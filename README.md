@@ -136,6 +136,17 @@ registry's `sha256` before publishing. To sync from another site, point `source_
 follows the same format (see `app/ontologies/registry_sync.py` for the schema); relative `ttl_url`s are
 resolved against the index's `base_url`.
 
+## Validating RuleBuilder ontology terms
+
+`POST /lexicon/catalog/rule-term-validation` validates the non-empty `target_class` and
+`property_path` values in one or more rules against a caller-selected ontology set. Validation is
+exact and kind-aware: target classes must resolve to declared classes, and property paths must
+resolve to declared properties. The response includes a flattened issue list plus per-node and
+per-field results, making it suitable for both live editor feedback and an imported-rule overview.
+
+The endpoint accepts the same `rule`, `rules`, `rule_id`, and `rule_ids` alternatives as the rule
+ontology similarity endpoint. Empty fields are left to the existing rule completeness validation.
+
 ## Deployment
 
 This repository can be deployed for self-hosting, or you can use one of the official API endpoints.
