@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import RDF, RDFS
 
@@ -13,6 +14,17 @@ EDGE_EX = Namespace("https://firebim.org/test-data/unrealistic-edge-case/")
 
 REALISTIC_FIXTURE = "building_three_storey_office_fbo.ttl"
 EDGE_FIXTURE = "building_unrealistic_edge_case_fbo.ttl"
+
+PUBLIC_FBO = Namespace("https://firebim.org/ontologies/fbo#")
+COUNTRIES = {
+    "be": ("Belgium", 63),
+    "dk": ("Denmark", 107),
+    "lt": ("Lithuania", 62),
+    "nl": ("Netherlands", 109),
+    "pt": ("Portugal", 137),
+}
+SYNTHETIC_REALISTIC_FIXTURE = "synthetic-three-storey-office-fbo-{country}.ttl"
+SYNTHETIC_EDGE_FIXTURE = "synthetic-unrealistic-edge-case-fbo-{country}.ttl"
 
 
 def _parse(name: str) -> Graph:
@@ -155,3 +167,79 @@ def test_unrealistic_room_covers_every_declared_room_function_variant():
         if isinstance(value, Literal) and value.datatype and str(value.datatype).endswith(("#float", "#decimal"))
     ]
     assert any(float(value) < 0 for value in numeric_literals)
+
+
+@pytest.mark.parametrize(
+    ("country", "country_name", "_"),
+    [(country, country_name, expected_terms) for country, (country_name, expected_terms) in COUNTRIES.items()],
+)
+def test_country_realistic_graphs_have_the_same_requested_topology(
+    country: str,
+    country_name: str,
+    _: int,
+):
+    graph = _parse(SYNTHETIC_REALISTIC_FIXTURE.format(country=country))
+    example = Namespace(f"https://firebim.org/test-data/{country}/three-storey-office/")
+    country_namespace = f"https://firebim.org/ontologies/fbo/{country}#"
+
+    rooms = _subjects_with(graph, PUBLIC_FBO.AreaFloorRoom)
+    storeys = set(graph.subjects(RDF.type, PUBLIC_FBO.BuildingStorey))
+
+    assert len(set(graph.subjects(RDF.type, PUBLIC_FBO.Building))) == 1
+    assert storeys == {example["ground-storey"], example["first-storey"], example["second-storey"]}
+    assert len(rooms) == 25
+    assert len(_subjects_with(graph, PUBLIC_FBO.Roomfunction)) == 25
+
+    expected_room_counts = {
+        example["ground-storey"]: 8,
+        example["first-storey"]: 8,
+        example["second-storey"]: 9,
+    }
+    for storey, expected_count in expected_room_counts.items():
+        assert len(set(graph.objects(storey, PUBLIC_FBO.hasSubitem)) & rooms) == expected_count
+
+    descriptions = {str(value) for value in graph.objects(example.dataset, PUBLIC_FBO.hasDescription)}
+    assert any(country_name in value and "does not represent a real building" in value for value in descriptions)
+    assert any(
+        str(predicate).startswith(country_namespace)
+        or (predicate == RDF.type and isinstance(obj, URIRef) and str(obj).startswith(country_namespace))
+        for _, predicate, obj in graph
+    )
+
+
+@pytest.mark.parametrize(
+    ("country", "country_name", "expected_national_terms"),
+    [(country, country_name, expected_terms) for country, (country_name, expected_terms) in COUNTRIES.items()],
+)
+def test_country_edge_graphs_cover_each_national_term_and_remain_single_object_examples(
+    country: str,
+    country_name: str,
+    expected_national_terms: int,
+):
+    graph = _parse(SYNTHETIC_EDGE_FIXTURE.format(country=country))
+    example = Namespace(f"https://firebim.org/test-data/{country}/unrealistic-edge-case/")
+    country_namespace = f"https://firebim.org/ontologies/fbo/{country}#"
+
+    assert len(set(graph.subjects(RDF.type, PUBLIC_FBO.Building))) == 1
+    assert len(set(graph.subjects(RDF.type, PUBLIC_FBO.BuildingStorey))) == 1
+    for object_name in ("room", "wall", "door", "exit"):
+        assert (example.storey, PUBLIC_FBO.hasSubitem, example[object_name]) in graph
+    assert (example.compartment, PUBLIC_FBO.hasSubitem, example.room) in graph
+
+    national_terms = {predicate for _, predicate, _ in graph if str(predicate).startswith(country_namespace)}
+    national_terms.update(
+        obj
+        for _, predicate, obj in graph
+        if predicate == RDF.type and isinstance(obj, URIRef) and str(obj).startswith(country_namespace)
+    )
+    assert len(national_terms) == expected_national_terms
+
+    descriptions = {str(value) for value in graph.objects(example.dataset, PUBLIC_FBO.hasDescription)}
+    assert any(country_name in value and "does not represent a real building" in value for value in descriptions)
+
+    for subject, predicate, obj in graph:
+        for term in (subject, predicate, obj):
+            if isinstance(term, URIRef):
+                assert "ontology.firebim.be" not in str(term)
+                assert "fbo-ifc" not in str(term).lower()
+                assert "/ifc" not in str(term).lower()
