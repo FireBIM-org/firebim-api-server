@@ -1,0 +1,307 @@
+# SYNTHETIC TEST GRAPH — NOT A REAL BUILDING.
+# Deliberately unrealistic edge cases using generic FBO and FBO-DK.
+
+@prefix ex: <https://firebim.org/test-data/dk/unrealistic-edge-case/>.
+@prefix fbo: <https://firebim.org/ontologies/fbo#>.
+@prefix fbo-dk: <https://firebim.org/ontologies/fbo/dk#>.
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+
+ex:site rdfs:label "Synthetic site with negative usable area"@en;
+    fbo:hasSubitem ex:building.
+ex:building a fbo:Building;
+    rdfs:label "Impossible one-storey building"@en;
+    fbo:hasDescription "One building containing one floor, one room, one wall, and one compartment."@en;
+    fbo:HeightBuilding "-9999.0"^^xsd:float;
+    fbo:BuildingFireCompartmentDaytimeoccupancy false;
+    fbo:BuildingFunctionalFireUnit "impossible-functional-unit";
+    fbo:ActiveFireProtection ex:alarm-system;
+    fbo:PassiveFireProtection ex:passive-protection;
+    fbo:FireSafetyUnit ex:compartment;
+    fbo:FireHazardSpecial ex:special-hazard;
+    fbo:hasSubitem ex:storey, ex:building-layers.
+ex:project-type rdfs:label "Simultaneously new, altered, and demolished"@en.
+ex:passive-protection rdfs:label "Negative-thickness passive protection"@en.
+ex:special-hazard rdfs:label "Impossible hazard with zero fuel and infinite heat"@en.
+ex:open-ramp rdfs:label "Free-open ramp with no opening"@en.
+ex:industrial-class-5 rdfs:label "Contradictory office industrial class"@en.
+ex:building-layers a fbo:BuildingLayers;
+    rdfs:label "Minus seven building layers"@en;
+    fbo:hasDescription "Represents an impossible negative layer count."@en.
+ex:storey a fbo:BuildingStorey;
+    rdfs:label "Only storey and floor"@en;
+    fbo:hasSubitem ex:room, ex:wall, ex:door, ex:exit, ex:ceiling, ex:surface-cladding, ex:rainscreen, ex:exposed-surface.
+ex:room rdfs:label "Only room with every contradictory function"@en;
+    fbo:hasDescription "Synthetic room simultaneously serving every declared room function."@en;
+    fbo:AreaFloorRoom "-1000000.0"^^xsd:float;
+    fbo:NumberOccupants ex:negative-occupants;
+    fbo:Roomfunction ex:function-all;
+    fbo:AreaEvacuationroute ex:evacuation-area;
+    fbo:DistanceActualTravel "-5000.0"^^xsd:float;
+    fbo:DistanceDirectTravel "9999999.0"^^xsd:float;
+    fbo:DistancePathway "-1.0"^^xsd:float;
+    fbo:TimeWalking "-3600.0"^^xsd:float;
+    fbo:EvacuationTime "-7200.0"^^xsd:float;
+    fbo:FireLoadDensity "-200.0"^^xsd:float;
+    fbo:FireLoad "-1000.0"^^xsd:float;
+    fbo:FireHazardSpecial ex:special-hazard;
+    fbo:AutomaticFireExtinguishSystem false;
+    fbo:ActiveFireProtection ex:alarm-system;
+    fbo:PassiveFireProtection ex:passive-protection;
+    fbo:EmergencyExitLighting ex:exit-lighting;
+    fbo:EmergencyPanicLights ex:panic-lighting;
+    fbo:OpeningRescue ex:rescue-opening;
+    fbo:PlaceSaferefuge ex:safe-refuge;
+    fbo:FireSafetyUnit ex:compartment.
+ex:negative-occupants rdfs:label "Negative nine hundred ninety-nine occupants"@en.
+ex:function-all rdfs:label "Every mutually exclusive function"@en.
+ex:function-canteen rdfs:label "Canteen"@en.
+ex:function-classroom rdfs:label "Classroom"@en.
+ex:function-copyroom rdfs:label "Copy room"@en.
+ex:function-dormitory rdfs:label "Dormitory"@en.
+ex:function-office rdfs:label "Office"@en.
+ex:function-residential rdfs:label "Residential unit"@en.
+ex:function-shop rdfs:label "Shop"@en.
+ex:function-staff rdfs:label "Staff room"@en.
+ex:function-storage rdfs:label "Storage"@en.
+ex:function-storeroom rdfs:label "Storage room"@en.
+ex:ak1 rdfs:label "AK1 selected"@en.
+ex:ak2 rdfs:label "AK2 selected"@en.
+ex:ak3 rdfs:label "AK3 selected"@en.
+ex:ak4 rdfs:label "AK4 selected"@en.
+ex:ak5 rdfs:label "AK5 selected"@en.
+ex:ak6 rdfs:label "AK6 selected"@en.
+ex:compartment a fbo:FireCompartment;
+    rdfs:label "Only impossible fire compartment"@en;
+    fbo:AreaFireCompartment "-1000000.0"^^xsd:float;
+    fbo:hasSubitem ex:room.
+ex:subcompartment-area rdfs:label "Negative subcompartment area"@en.
+ex:wall a fbo:BoundaryFireCompartment;
+    rdfs:label "Only wall and compartment boundary"@en;
+    fbo:ExteriorWall true;
+    fbo:WalltypeCompartmentFirewall ex:wall-type;
+    fbo:FireResistance "-120.0"^^xsd:float;
+    fbo:FireStability "-60.0"^^xsd:float;
+    fbo:Integrity "-30.0"^^xsd:float;
+    fbo:ThermalInsulation "-15.0"^^xsd:float;
+    fbo:ThermalConductivity "999999.0"^^xsd:float;
+    fbo:ReactionToFire "-999.0"^^xsd:float;
+    fbo:PassiveFireProtection ex:passive-protection.
+ex:wall-type rdfs:label "Contradictory building, compartment, and subcompartment firewall"@en.
+ex:door a fbo:DoorExit, fbo:DoorEscaperoute;
+    rdfs:label "Only door, wider than the building and opening both ways"@en;
+    fbo:WidthFreeDoors "9999.0"^^xsd:float;
+    fbo:UsefulWidth "-1.0"^^xsd:float;
+    fbo:SelfClosing true;
+    fbo:SwingDirection "simultaneously-inward-and-outward";
+    fbo:FireResistance "-120.0"^^xsd:float;
+    fbo:OpeningRescue ex:rescue-opening.
+ex:exit a fbo:Exit;
+    rdfs:label "Only exit leading back into the same room"@en;
+    fbo:PlaceSaferefuge ex:safe-refuge.
+ex:route a fbo:TravelDistance;
+    rdfs:label "Only route with negative and contradictory distances"@en;
+    fbo:WidthFreeEvacuationroutes ex:route-width;
+    fbo:AreaEvacuationroute ex:evacuation-area.
+ex:route-width rdfs:label "Negative clear route width"@en;
+    fbo:UsefulWidth "-500.0"^^xsd:float.
+ex:evacuation-area rdfs:label "Negative evacuation area"@en.
+ex:stair-core rdfs:label "Only internal stair, with negative height"@en.
+ex:rescue-opening rdfs:label "Rescue opening with negative areas and height"@en.
+ex:safe-refuge rdfs:label "Safe refuge located in the hazard"@en.
+ex:alarm-system a fbo:AutomaticFireAlarmsystem;
+    rdfs:label "Automatic alarm that never alarms"@en.
+ex:warning-system a fbo:AutomaticWarningSystem;
+    rdfs:label "Warning system with negative audibility"@en.
+ex:sprinkler-system rdfs:label "Sprinkler with negative flow"@en.
+ex:ventilation-system a fbo:AutomaticFireVentilationsystem;
+    rdfs:label "Smoke ventilation that blows smoke inward"@en.
+ex:smoke-alarm-system a fbo:FireSafetyInstallationSmokeAlarmsystem;
+    rdfs:label "Smoke alarm system installed below the floor"@en.
+ex:hose-reel a fbo:HoseReel;
+    rdfs:label "Hose reel with negative hose length"@en;
+    fbo:LengthHosepath "-500.0"^^xsd:float.
+ex:exit-lighting rdfs:label "Emergency lighting with negative illumination"@en;
+    fbo:EmergencyExitLighting ex:exit-lighting.
+ex:panic-lighting rdfs:label "Panic lighting that increases panic"@en;
+    fbo:EmergencyPanicLights ex:panic-lighting.
+ex:ceiling rdfs:label "Suspended ceiling below the floor"@en;
+    fbo:ReactionToFire "-999.0"^^xsd:float.
+ex:surface-cladding rdfs:label "Surface cladding with impossible conductivity"@en;
+    fbo:ReactionToFire "-999.0"^^xsd:float;
+    fbo:ThermalConductivity "999999.0"^^xsd:float.
+ex:rainscreen rdfs:label "Rainscreen installed indoors and underwater"@en;
+    fbo:ReactionToFire "-999.0"^^xsd:float;
+    fbo:ThermalInsulation "-999.0"^^xsd:float.
+ex:exposed-surface rdfs:label "Fire-exposed surface with negative exposure"@en;
+    fbo:ReactionToFire "-999.0"^^xsd:float;
+    fbo:FireStability "-999.0"^^xsd:float.
+ex:storey fbo:FireSafetyUnit ex:compartment.
+ex:compartment fbo:BoundaryFireCompartment "no-boundary";
+    fbo:FireCompartment "simultaneously-compartment-and-subcompartment";
+    fbo:BuildingFireCompartmentDaytimeoccupancy false;
+    fbo:BuildingFunctionalFireUnit "impossible-functional-unit";
+    fbo:FireLoadDensity "-200.0"^^xsd:float;
+    fbo:FireHazardSpecial ex:special-hazard;
+    fbo:FireSafetyUnit ex:compartment.
+ex:route fbo:DistanceActualTravel "-5000.0"^^xsd:float;
+    fbo:DistanceDirectTravel "9999999.0"^^xsd:float;
+    fbo:DistancePathway "-1.0"^^xsd:float;
+    fbo:TimeWalking "-3600.0"^^xsd:float;
+    fbo:EvacuationTime "-7200.0"^^xsd:float.
+ex:evacuation-area fbo:AreaFloorRoom "-999.0"^^xsd:float.
+ex:stair-core fbo:FireResistance "-120.0"^^xsd:float.
+ex:alarm-system fbo:ActiveFireProtection ex:alarm-system.
+ex:warning-system fbo:ActiveFireProtection ex:warning-system.
+ex:sprinkler-system fbo:ActiveFireProtection ex:sprinkler-system.
+ex:ventilation-system fbo:ActiveFireProtection ex:ventilation-system.
+ex:ceiling fbo:FireResistance "-60.0"^^xsd:float.
+ex:dataset rdfs:label "Denmark: unrealistic edge-case building synthetic graph"@en;
+    fbo:hasDescription "Synthetic Denmark test graph; it does not represent a real building."@en;
+    fbo:hasRemarks "For software testing and demonstrations only; not evidence of regulatory compliance or a design reference."@en.
+ex:room fbo-dk:AreaBuildingFunctionalFireUnit ex:synthetic-value-AreaBuildingFunctionalFireUnit.
+ex:synthetic-value-AreaBuildingFunctionalFireUnit rdfs:label "Synthetic value for AreaBuildingFunctionalFireUnit"@en.
+ex:route fbo-dk:AreaEvacuationroute ex:synthetic-value-AreaEvacuationroute.
+ex:synthetic-value-AreaEvacuationroute rdfs:label "Synthetic value for AreaEvacuationroute"@en.
+ex:compartment fbo-dk:AreaFireCompartment -9999.0.
+ex:room fbo-dk:AreaFloorRoom -9999.0;
+    fbo-dk:AreaFreespace -9999.0.
+ex:building fbo-dk:AreaOpeningClearAerodynamicAa -9999.0;
+    fbo-dk:AreaOpeningClearGeometric -9999.0;
+    fbo-dk:AreaOpeningGeometricAg -9999.0.
+ex:compartment fbo-dk:AreaSubCompartment ex:synthetic-value-AreaSubCompartment.
+ex:synthetic-value-AreaSubCompartment rdfs:label "Synthetic value for AreaSubCompartment"@en.
+ex:building a fbo-dk:AutomaticWarningsystem.
+ex:compartment a fbo-dk:BoundaryFireCompartment;
+    fbo-dk:BoundarySubcompartment "synthetic-unrealistic-value".
+ex:room fbo-dk:BuildingFireCompartmentDaytimeoccupancy true;
+    fbo-dk:BuildingFunctionalFireUnit "synthetic-unrealistic-value".
+ex:storey a fbo-dk:BuildingLayers.
+ex:building fbo-dk:BuildingsectionOffices "synthetic-unrealistic-value".
+ex:ceiling a fbo-dk:CeilingSuspended.
+ex:room fbo-dk:CompartmentSleeping "synthetic-unrealistic-value".
+ex:route fbo-dk:DistanceActualTravel -9999.0;
+    fbo-dk:DistanceBlindEnd -9999.0;
+    fbo-dk:DistanceDirectTravel -9999.0;
+    fbo-dk:DistancePathway -9999.0.
+ex:door a fbo-dk:DoorEscaperoute, fbo-dk:DoorExit;
+    fbo-dk:DoorIndependentExitdoors ex:synthetic-value-DoorIndependentExitdoors.
+ex:synthetic-value-DoorIndependentExitdoors rdfs:label "Synthetic value for DoorIndependentExitdoors"@en.
+ex:route fbo-dk:EscapeRoute true;
+    fbo-dk:EvacuationRoutePrimary true;
+    fbo-dk:EvacuationTime -9999.0.
+ex:exit a fbo-dk:Exit.
+ex:compartment a fbo-dk:FireCompartment;
+    fbo-dk:FireCompartmentSubcompartment "synthetic-unrealistic-value".
+ex:building fbo-dk:FireHazardSpecial ex:synthetic-value-FireHazardSpecial.
+ex:synthetic-value-FireHazardSpecial rdfs:label "Synthetic value for FireHazardSpecial"@en.
+ex:building fbo-dk:FireResistance "synthetic-unrealistic-value";
+    a fbo-dk:FireSafetyInstallationSmokeAlarmsystem;
+    fbo-dk:FireSafetyUnit ex:synthetic-value-FireSafetyUnit.
+ex:synthetic-value-FireSafetyUnit rdfs:label "Synthetic value for FireSafetyUnit"@en.
+ex:building fbo-dk:FireloadDensity -9999.0;
+    fbo-dk:FreeOpenRamps ex:synthetic-value-FreeOpenRamps.
+ex:synthetic-value-FreeOpenRamps rdfs:label "Synthetic value for FreeOpenRamps"@en.
+ex:room fbo-dk:FunctionType ex:synthetic-value-FunctionType.
+ex:synthetic-value-FunctionType rdfs:label "Synthetic value for FunctionType"@en.
+ex:building fbo-dk:HeightBuilding -9999.0;
+    fbo-dk:HeightRescue -9999.0;
+    fbo-dk:HeightStackingRack -9999.0;
+    a fbo-dk:HoseReel;
+    fbo-dk:IndustrialClass5 ex:synthetic-value-IndustrialClass5.
+ex:synthetic-value-IndustrialClass5 rdfs:label "Synthetic value for IndustrialClass5"@en.
+ex:route fbo-dk:LengthHosepath -9999.0;
+    fbo-dk:NumberOccupantsEvacuationRoute -9999.0.
+ex:room fbo-dk:NumberOccupantsSpaceCompartment -9999.0;
+    fbo-dk:NumberOccupantsSubcompartments -9999.0;
+    fbo-dk:NumberSleepingarea "synthetic-unrealistic-value".
+ex:building fbo-dk:OpeningRescue ex:synthetic-value-OpeningRescue.
+ex:synthetic-value-OpeningRescue rdfs:label "Synthetic value for OpeningRescue"@en.
+ex:building fbo-dk:PassiveFireProtection ex:synthetic-value-PassiveFireProtection.
+ex:synthetic-value-PassiveFireProtection rdfs:label "Synthetic value for PassiveFireProtection"@en.
+ex:route fbo-dk:PeopleKnowledgeEscaperoutes true.
+ex:building fbo-dk:PlaceSaferefuge ex:synthetic-value-PlaceSaferefuge.
+ex:synthetic-value-PlaceSaferefuge rdfs:label "Synthetic value for PlaceSaferefuge"@en.
+ex:building fbo-dk:RiskClass -9999.0;
+    fbo-dk:SeparationFire ex:synthetic-value-SeparationFire.
+ex:synthetic-value-SeparationFire rdfs:label "Synthetic value for SeparationFire"@en.
+ex:site a fbo-dk:Site.
+ex:room fbo-dk:SpaceLivingunit "synthetic-unrealistic-value";
+    fbo-dk:SpaceUsableAttic "synthetic-unrealistic-value".
+ex:building fbo-dk:SpacialZone "synthetic-unrealistic-value".
+ex:route fbo-dk:StairInternal ex:synthetic-value-StairInternal.
+ex:synthetic-value-StairInternal rdfs:label "Synthetic value for StairInternal"@en.
+ex:building a fbo-dk:SurfaceCladding, fbo-dk:SurfaceCladdingRainscreen, fbo-dk:SurfaceExposed.
+ex:route fbo-dk:SystemEscaperouteSecondary ex:synthetic-value-SystemEscaperouteSecondary.
+ex:synthetic-value-SystemEscaperouteSecondary rdfs:label "Synthetic value for SystemEscaperouteSecondary"@en.
+ex:route fbo-dk:SystemEscaperouteShared ex:synthetic-value-SystemEscaperouteShared.
+ex:synthetic-value-SystemEscaperouteShared rdfs:label "Synthetic value for SystemEscaperouteShared"@en.
+ex:route fbo-dk:SystemEvacuationroute ex:synthetic-value-SystemEvacuationroute.
+ex:synthetic-value-SystemEvacuationroute rdfs:label "Synthetic value for SystemEvacuationroute"@en.
+ex:route fbo-dk:SystemIndependentEvacuationRoute ex:synthetic-value-SystemIndependentEvacuationRoute.
+ex:synthetic-value-SystemIndependentEvacuationRoute rdfs:label "Synthetic value for SystemIndependentEvacuationRoute"@en.
+ex:exit fbo-dk:SystemIndependentExit ex:synthetic-value-SystemIndependentExit.
+ex:synthetic-value-SystemIndependentExit rdfs:label "Synthetic value for SystemIndependentExit"@en.
+ex:building fbo-dk:TimeWalking -9999.0;
+    fbo-dk:TypeProject ex:synthetic-value-TypeProject.
+ex:synthetic-value-TypeProject rdfs:label "Synthetic value for TypeProject"@en.
+ex:wall fbo-dk:WalltypeBuildingFirewall "synthetic-unrealistic-value";
+    fbo-dk:WalltypeCompartmentFirewall ex:synthetic-value-WalltypeCompartmentFirewall.
+ex:synthetic-value-WalltypeCompartmentFirewall rdfs:label "Synthetic value for WalltypeCompartmentFirewall"@en.
+ex:wall fbo-dk:WalltypeSubcompartmentFirewall ex:synthetic-value-WalltypeSubcompartmentFirewall.
+ex:synthetic-value-WalltypeSubcompartmentFirewall rdfs:label "Synthetic value for WalltypeSubcompartmentFirewall"@en.
+ex:door fbo-dk:WidthFreeDoors -9999.0.
+ex:route fbo-dk:WidthFreeEvacuationroutes ex:synthetic-value-WidthFreeEvacuationroutes.
+ex:synthetic-value-WidthFreeEvacuationroutes rdfs:label "Synthetic value for WidthFreeEvacuationroutes"@en.
+ex:building a fbo-dk:AutomaticFireAlarmsystem, fbo-dk:AutomaticFireSprinklersystem, fbo-dk:AutomaticFireVentilationsystem.
+ex:exit fbo-dk:EmergencyExitLighting ex:synthetic-value-EmergencyExitLighting.
+ex:synthetic-value-EmergencyExitLighting rdfs:label "Synthetic value for EmergencyExitLighting"@en.
+ex:building fbo-dk:EmergencyPanicLights ex:synthetic-value-EmergencyPanicLights.
+ex:synthetic-value-EmergencyPanicLights rdfs:label "Synthetic value for EmergencyPanicLights"@en.
+ex:room fbo-dk:RoomOccupancy true;
+    fbo-dk:RoomfunctionAssemblyrooms "synthetic-unrealistic-value";
+    fbo-dk:RoomfunctionCanteen ex:synthetic-value-RoomfunctionCanteen.
+ex:synthetic-value-RoomfunctionCanteen rdfs:label "Synthetic value for RoomfunctionCanteen"@en.
+ex:room fbo-dk:RoomfunctionClassrooms ex:synthetic-value-RoomfunctionClassrooms.
+ex:synthetic-value-RoomfunctionClassrooms rdfs:label "Synthetic value for RoomfunctionClassrooms"@en.
+ex:room fbo-dk:RoomfunctionCopyroom ex:synthetic-value-RoomfunctionCopyroom.
+ex:synthetic-value-RoomfunctionCopyroom rdfs:label "Synthetic value for RoomfunctionCopyroom"@en.
+ex:room fbo-dk:RoomfunctionDormitory ex:synthetic-value-RoomfunctionDormitory.
+ex:synthetic-value-RoomfunctionDormitory rdfs:label "Synthetic value for RoomfunctionDormitory"@en.
+ex:route fbo-dk:RoomfunctionEscaperouteCorridor "synthetic-unrealistic-value";
+    fbo-dk:RoomfunctionEscapestaircase "synthetic-unrealistic-value".
+ex:room fbo-dk:RoomfunctionKitchen "synthetic-unrealistic-value";
+    fbo-dk:RoomfunctionKitchenette "synthetic-unrealistic-value";
+    fbo-dk:RoomfunctionOfficespace ex:synthetic-value-RoomfunctionOfficespace.
+ex:synthetic-value-RoomfunctionOfficespace rdfs:label "Synthetic value for RoomfunctionOfficespace"@en.
+ex:room fbo-dk:RoomfunctionProductionskitchen "synthetic-unrealistic-value";
+    fbo-dk:RoomfunctionResidentialunit ex:synthetic-value-RoomfunctionResidentialunit.
+ex:synthetic-value-RoomfunctionResidentialunit rdfs:label "Synthetic value for RoomfunctionResidentialunit"@en.
+ex:route fbo-dk:RoomfunctionSafetyStaircase "synthetic-unrealistic-value".
+ex:room fbo-dk:RoomfunctionSchoolkitchen "synthetic-unrealistic-value";
+    fbo-dk:RoomfunctionShop ex:synthetic-value-RoomfunctionShop.
+ex:synthetic-value-RoomfunctionShop rdfs:label "Synthetic value for RoomfunctionShop"@en.
+ex:room fbo-dk:RoomfunctionStaffroom ex:synthetic-value-RoomfunctionStaffroom.
+ex:synthetic-value-RoomfunctionStaffroom rdfs:label "Synthetic value for RoomfunctionStaffroom"@en.
+ex:room fbo-dk:RoomfunctionStorage ex:synthetic-value-RoomfunctionStorage.
+ex:synthetic-value-RoomfunctionStorage rdfs:label "Synthetic value for RoomfunctionStorage"@en.
+ex:room fbo-dk:RoomfunctionStorageroom ex:synthetic-value-RoomfunctionStorageroom.
+ex:synthetic-value-RoomfunctionStorageroom rdfs:label "Synthetic value for RoomfunctionStorageroom"@en.
+ex:building fbo-dk:UseCategoryAK1 ex:synthetic-value-UseCategoryAK1.
+ex:synthetic-value-UseCategoryAK1 rdfs:label "Synthetic value for UseCategoryAK1"@en.
+ex:building fbo-dk:UseCategoryAK2 ex:synthetic-value-UseCategoryAK2.
+ex:synthetic-value-UseCategoryAK2 rdfs:label "Synthetic value for UseCategoryAK2"@en.
+ex:building fbo-dk:UseCategoryAK3 ex:synthetic-value-UseCategoryAK3.
+ex:synthetic-value-UseCategoryAK3 rdfs:label "Synthetic value for UseCategoryAK3"@en.
+ex:building fbo-dk:UseCategoryAK4 ex:synthetic-value-UseCategoryAK4.
+ex:synthetic-value-UseCategoryAK4 rdfs:label "Synthetic value for UseCategoryAK4"@en.
+ex:building fbo-dk:UseCategoryAK5 ex:synthetic-value-UseCategoryAK5.
+ex:synthetic-value-UseCategoryAK5 rdfs:label "Synthetic value for UseCategoryAK5"@en.
+ex:building fbo-dk:UseCategoryAK6 ex:synthetic-value-UseCategoryAK6.
+ex:synthetic-value-UseCategoryAK6 rdfs:label "Synthetic value for UseCategoryAK6"@en.
+ex:building fbo-dk:ActiveFireProtection ex:synthetic-value-ActiveFireProtection.
+ex:synthetic-value-ActiveFireProtection rdfs:label "Synthetic value for ActiveFireProtection"@en.
+ex:building fbo-dk:UseCategory "synthetic-unrealistic-value".
+ex:room fbo-dk:Roomfunction ex:synthetic-value-Roomfunction.
+ex:synthetic-value-Roomfunction rdfs:label "Synthetic value for Roomfunction"@en.
