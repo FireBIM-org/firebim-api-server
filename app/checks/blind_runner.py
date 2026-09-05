@@ -253,8 +253,13 @@ class BlindShaclRuleRunner:
 
         statuses: dict[str, str] = {}
 
+        # A multi-valued (or sequence/inverse) path binds ?h several times, so one subject can receive several
+        # fb:ruleResult triples. The direct evaluator reports such inputs as ambiguous -> Unknown; do the same here
+        # instead of letting the last triple win.
         for subject, _, obj in constructed_graph.triples((None, FB.ruleResult, None)):
-            statuses[str(subject)] = self._status_from_result_iri(str(obj))
+            status = self._status_from_result_iri(str(obj))
+            previous = statuses.get(str(subject))
+            statuses[str(subject)] = status if previous is None or previous == status else "Unknown"
 
         return statuses
 

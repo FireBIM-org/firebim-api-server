@@ -669,3 +669,44 @@ def test_inverse_path_segments_round_trip_and_execute():
         graph_id="g", graph_uri="https://firebim.org/graphs/buildings/g", graph_ttl=ttl, rule_id=rid, rule_ttl=rule_ttl
     )
     assert {h["target_node"].split("#")[-1]: h["final_status"] for h in blind["end_outputs"]} == expected
+
+
+def test_blind_runner_treats_conflicting_multi_value_results_as_unknown():
+    rid = "t-multi"
+    rule = {
+        "id": rid,
+        "entry": f"{rid}-start",
+        "elements": [
+            {"id": f"{rid}-start", "element_type": "start", "true_path": f"{rid}-q", "label": "start"},
+            {
+                "id": f"{rid}-q",
+                "element_type": "decision",
+                "target_class": f"{LT}Compartment",
+                "property_path": f"{LT}Flag",
+                "operator": "==",
+                "value": True,
+                "true_path": f"{rid}-ok",
+                "false_path": f"{rid}-no",
+                "unknown_path": f"{rid}-ask",
+                "label": "flag?",
+            },
+            _end(rid, "ok", "pass"),
+            _end(rid, "no", "fail"),
+            _end(rid, "ask", "missing_data"),
+        ],
+    }
+    ttl = f"""
+    @prefix lt: <{LT}> . @prefix ex: <https://example.org/x#> .
+    ex:c1 a lt:Compartment ; lt:Flag true . ex:c2 a lt:Compartment ; lt:Flag true, false .
+    ex:c3 a lt:Compartment ; lt:Flag true, true .
+    """
+    expected = {"c1": "True", "c2": "Unknown", "c3": "True"}
+    assert _status_by_target(_run(CheckRuntime, rule, ttl)) == expected
+    blind = BlindShaclRuleRunner().run_rule(
+        graph_id="g",
+        graph_uri="https://firebim.org/graphs/buildings/g",
+        graph_ttl=ttl,
+        rule_id=rid,
+        rule_ttl=_ttl(rule),
+    )
+    assert {h["target_node"].split("#")[-1]: h["final_status"] for h in blind["end_outputs"]} == expected
