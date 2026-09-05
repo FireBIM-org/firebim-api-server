@@ -1,0 +1,360 @@
+@prefix ex: <https://firebim.org/test-data/unrealistic-edge-case/> .
+@prefix fbo: <https://ontology.firebim.be/ontology/fbo#> .
+@prefix fbo-dk: <https://ontology.firebim.be/ontology/fbo-DK#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Deliberately impossible but RDF-valid test data. Values are intentionally
+# negative, contradictory, or extreme so rule engines can exercise failure paths.
+# The graph has exactly one building, storey/floor, room, wall/boundary,
+# compartment, door, exit, site, route, stair core, and instance of each
+# supported fire-safety/building-object class from the supplied FBO snapshots.
+
+ex:dataset
+    rdfs:label "UNREALISTIC synthetic FBO edge-case graph"@en ;
+    fbo:hasDescription "Deliberately impossible test data; never interpret as a compliant design."@en ;
+    fbo:hasRemarks "Every value is synthetic and many values are intentionally contradictory."@en .
+
+ex:site
+    a fbo-dk:Site ;
+    rdfs:label "Synthetic site with negative usable area"@en ;
+    fbo-dk:AreaFreespace "-1000000.0"^^xsd:float ;
+    fbo:hasSubitem ex:building .
+
+ex:building
+    a fbo:Building ;
+    rdfs:label "Impossible one-storey building"@en ;
+    fbo:hasDescription "One building containing one floor, one room, one wall, and one compartment."@en ;
+    fbo-dk:HeightBuilding "-9999.0"^^xsd:float ;
+    fbo:HeightBuilding "-9999.0"^^xsd:float ;
+    fbo-dk:BuildingsectionOffices false ;
+    fbo-dk:BuildingFireCompartmentDaytimeoccupancy false ;
+    fbo:BuildingFireCompartmentDaytimeoccupancy false ;
+    fbo-dk:BuildingFunctionalFireUnit "impossible-functional-unit" ;
+    fbo:BuildingFunctionalFireUnit "impossible-functional-unit" ;
+    fbo-dk:RiskClass "999.0"^^xsd:float ;
+    fbo-dk:PeopleKnowledgeEscaperoutes false ;
+    fbo-dk:TypeProject ex:project-type ;
+    fbo-dk:ActiveFireProtection ex:alarm-system ;
+    fbo:ActiveFireProtection ex:alarm-system ;
+    fbo-dk:PassiveFireProtection ex:passive-protection ;
+    fbo:PassiveFireProtection ex:passive-protection ;
+    fbo-dk:FireSafetyUnit ex:compartment ;
+    fbo:FireSafetyUnit ex:compartment ;
+    fbo-dk:SystemEvacuationroute ex:route ;
+    fbo-dk:SystemIndependentEvacuationRoute ex:route ;
+    fbo-dk:SystemEscaperouteSecondary ex:route ;
+    fbo-dk:SystemEscaperouteShared ex:route ;
+    fbo-dk:SystemIndependentExit ex:exit ;
+    fbo-dk:FireHazardSpecial ex:special-hazard ;
+    fbo:FireHazardSpecial ex:special-hazard ;
+    fbo-dk:FreeOpenRamps ex:open-ramp ;
+    fbo-dk:IndustrialClass5 ex:industrial-class-5 ;
+    fbo-dk:SpaceUsableAttic true ;
+    fbo-dk:SpacialZone "simultaneously-inside-and-outside" ;
+    fbo:hasSubitem ex:storey, ex:building-layers .
+
+ex:project-type rdfs:label "Simultaneously new, altered, and demolished"@en .
+ex:passive-protection rdfs:label "Negative-thickness passive protection"@en .
+ex:special-hazard rdfs:label "Impossible hazard with zero fuel and infinite heat"@en .
+ex:open-ramp rdfs:label "Free-open ramp with no opening"@en .
+ex:industrial-class-5 rdfs:label "Contradictory office industrial class"@en .
+
+ex:building-layers
+    a fbo:BuildingLayers, fbo-dk:BuildingLayers ;
+    rdfs:label "Minus seven building layers"@en ;
+    fbo:hasDescription "Represents an impossible negative layer count."@en .
+
+ex:storey
+    a fbo:BuildingStorey ;
+    rdfs:label "Only storey and floor"@en ;
+    fbo-dk:FireSafetyUnit ex:compartment ;
+    fbo-dk:StairInternal ex:stair-core ;
+    fbo-dk:SystemEvacuationroute ex:route ;
+    fbo:hasSubitem ex:room, ex:wall, ex:door, ex:exit, ex:ceiling,
+        ex:surface-cladding, ex:rainscreen, ex:exposed-surface .
+
+# One room/space with every room- or space-applicable FBO-DK property in the
+# supplied snapshot. Object-valued room functions point to labelled resources;
+# ontology-declared datatype properties use literals.
+ex:room
+    rdfs:label "Only room with every contradictory function"@en ;
+    fbo:hasDescription "Synthetic room simultaneously serving every declared room function."@en ;
+    fbo-dk:AreaFloorRoom "-1000000.0"^^xsd:float ;
+    fbo:AreaFloorRoom "-1000000.0"^^xsd:float ;
+    fbo-dk:AreaFreespace "2000000.0"^^xsd:float ;
+    fbo-dk:AreaOpeningClearAerodynamicAa "-20.0"^^xsd:float ;
+    fbo-dk:AreaOpeningClearGeometric "-30.0"^^xsd:float ;
+    fbo-dk:AreaOpeningGeometricAg "-40.0"^^xsd:float ;
+    fbo-dk:RoomOccupancy true ;
+    fbo-dk:NumberOccupantsSpaceCompartment "-999.0"^^xsd:float ;
+    fbo:NumberOccupants ex:negative-occupants ;
+    fbo-dk:NumberSleepingarea "minus-one-sleeping-area" ;
+    fbo-dk:CompartmentSleeping "awake-and-asleep" ;
+    fbo-dk:PeopleKnowledgeEscaperoutes false ;
+    fbo-dk:UseCategory "AK999" ;
+    fbo-dk:UseCategoryAK1 ex:ak1 ;
+    fbo-dk:UseCategoryAK2 ex:ak2 ;
+    fbo-dk:UseCategoryAK3 ex:ak3 ;
+    fbo-dk:UseCategoryAK4 ex:ak4 ;
+    fbo-dk:UseCategoryAK5 ex:ak5 ;
+    fbo-dk:UseCategoryAK6 ex:ak6 ;
+    fbo-dk:FunctionType ex:function-all ;
+    fbo-dk:Roomfunction ex:function-all ;
+    fbo:Roomfunction ex:function-all ;
+    fbo-dk:RoomfunctionAssemblyrooms true ;
+    fbo-dk:RoomfunctionCanteen ex:function-canteen ;
+    fbo-dk:RoomfunctionClassrooms ex:function-classroom ;
+    fbo-dk:RoomfunctionCopyroom ex:function-copyroom ;
+    fbo-dk:RoomfunctionDormitory ex:function-dormitory ;
+    fbo-dk:RoomfunctionEscaperouteCorridor true ;
+    fbo-dk:RoomfunctionEscapestaircase true ;
+    fbo-dk:RoomfunctionKitchen true ;
+    fbo-dk:RoomfunctionKitchenette true ;
+    fbo-dk:RoomfunctionOfficespace ex:function-office ;
+    fbo-dk:RoomfunctionProductionskitchen true ;
+    fbo-dk:RoomfunctionResidentialunit ex:function-residential ;
+    fbo-dk:RoomfunctionSafetyStaircase true ;
+    fbo-dk:RoomfunctionSchoolkitchen true ;
+    fbo-dk:RoomfunctionShop ex:function-shop ;
+    fbo-dk:RoomfunctionStaffroom ex:function-staff ;
+    fbo-dk:RoomfunctionStorage ex:function-storage ;
+    fbo-dk:RoomfunctionStorageroom ex:function-storeroom ;
+    fbo-dk:SpaceLivingunit "both-living-and-not-living" ;
+    fbo-dk:SpaceUsableAttic true ;
+    fbo-dk:SpacialZone "zero-dimensional-room" ;
+    fbo-dk:EscapeRoute true ;
+    fbo-dk:EvacuationRoutePrimary false ;
+    fbo-dk:AreaEvacuationroute ex:evacuation-area ;
+    fbo:AreaEvacuationroute ex:evacuation-area ;
+    fbo-dk:DistanceActualTravel "-5000.0"^^xsd:float ;
+    fbo:DistanceActualTravel "-5000.0"^^xsd:float ;
+    fbo-dk:DistanceDirectTravel "9999999.0"^^xsd:float ;
+    fbo:DistanceDirectTravel "9999999.0"^^xsd:float ;
+    fbo-dk:DistancePathway "-1.0"^^xsd:float ;
+    fbo:DistancePathway "-1.0"^^xsd:float ;
+    fbo-dk:DistanceBlindEnd "-100.0"^^xsd:float ;
+    fbo-dk:TimeWalking "-3600.0"^^xsd:float ;
+    fbo:TimeWalking "-3600.0"^^xsd:float ;
+    fbo-dk:EvacuationTime "-7200.0"^^xsd:float ;
+    fbo:EvacuationTime "-7200.0"^^xsd:float ;
+    fbo-dk:FireloadDensity "-200.0"^^xsd:float ;
+    fbo:FireLoadDensity "-200.0"^^xsd:float ;
+    fbo:FireLoad "-1000.0"^^xsd:float ;
+    fbo-dk:FireHazardSpecial ex:special-hazard ;
+    fbo:FireHazardSpecial ex:special-hazard ;
+    fbo:AutomaticFireExtinguishSystem false ;
+    fbo-dk:ActiveFireProtection ex:alarm-system ;
+    fbo:ActiveFireProtection ex:alarm-system ;
+    fbo-dk:PassiveFireProtection ex:passive-protection ;
+    fbo:PassiveFireProtection ex:passive-protection ;
+    fbo-dk:EmergencyExitLighting ex:exit-lighting ;
+    fbo:EmergencyExitLighting ex:exit-lighting ;
+    fbo-dk:EmergencyPanicLights ex:panic-lighting ;
+    fbo:EmergencyPanicLights ex:panic-lighting ;
+    fbo-dk:OpeningRescue ex:rescue-opening ;
+    fbo:OpeningRescue ex:rescue-opening ;
+    fbo-dk:PlaceSaferefuge ex:safe-refuge ;
+    fbo:PlaceSaferefuge ex:safe-refuge ;
+    fbo-dk:FireSafetyUnit ex:compartment ;
+    fbo:FireSafetyUnit ex:compartment ;
+    fbo-dk:SeparationFire ex:wall ;
+    fbo-dk:DoorIndependentExitdoors ex:door ;
+    fbo-dk:SystemEvacuationroute ex:route ;
+    fbo-dk:SystemIndependentEvacuationRoute ex:route .
+
+ex:negative-occupants rdfs:label "Negative nine hundred ninety-nine occupants"@en .
+ex:function-all rdfs:label "Every mutually exclusive function"@en .
+ex:function-canteen rdfs:label "Canteen"@en .
+ex:function-classroom rdfs:label "Classroom"@en .
+ex:function-copyroom rdfs:label "Copy room"@en .
+ex:function-dormitory rdfs:label "Dormitory"@en .
+ex:function-office rdfs:label "Office"@en .
+ex:function-residential rdfs:label "Residential unit"@en .
+ex:function-shop rdfs:label "Shop"@en .
+ex:function-staff rdfs:label "Staff room"@en .
+ex:function-storage rdfs:label "Storage"@en .
+ex:function-storeroom rdfs:label "Storage room"@en .
+ex:ak1 rdfs:label "AK1 selected"@en .
+ex:ak2 rdfs:label "AK2 selected"@en .
+ex:ak3 rdfs:label "AK3 selected"@en .
+ex:ak4 rdfs:label "AK4 selected"@en .
+ex:ak5 rdfs:label "AK5 selected"@en .
+ex:ak6 rdfs:label "AK6 selected"@en .
+
+ex:compartment
+    a fbo:FireCompartment, fbo-dk:FireCompartment ;
+    rdfs:label "Only impossible fire compartment"@en ;
+    fbo-dk:AreaFireCompartment "-1000000.0"^^xsd:float ;
+    fbo:AreaFireCompartment "-1000000.0"^^xsd:float ;
+    fbo-dk:AreaSubCompartment ex:subcompartment-area ;
+    fbo-dk:BoundarySubcompartment "no-boundary" ;
+    fbo-dk:FireCompartmentSubcompartment "simultaneously-compartment-and-subcompartment" ;
+    fbo-dk:NumberOccupantsSpaceCompartment "-999.0"^^xsd:float ;
+    fbo-dk:NumberOccupantsSubcompartments "-999.0"^^xsd:float ;
+    fbo-dk:BuildingFireCompartmentDaytimeoccupancy false ;
+    fbo-dk:BuildingFunctionalFireUnit "impossible-functional-unit" ;
+    fbo-dk:CompartmentSleeping "awake-and-asleep" ;
+    fbo-dk:UseCategory "AK999" ;
+    fbo-dk:FireloadDensity "-200.0"^^xsd:float ;
+    fbo-dk:FireHazardSpecial ex:special-hazard ;
+    fbo-dk:FireSafetyUnit ex:compartment ;
+    fbo-dk:SeparationFire ex:wall ;
+    fbo:hasSubitem ex:room .
+
+ex:subcompartment-area rdfs:label "Negative subcompartment area"@en .
+
+# The one wall is also the one compartment boundary, carrying every applicable
+# wall/material/fire-performance property in the supplied generic/Danish set.
+ex:wall
+    a fbo:BoundaryFireCompartment, fbo-dk:BoundaryFireCompartment ;
+    rdfs:label "Only wall and compartment boundary"@en ;
+    fbo:ExteriorWall true ;
+    fbo-dk:WalltypeBuildingFirewall "not-a-wall" ;
+    fbo-dk:WalltypeCompartmentFirewall ex:wall-type ;
+    fbo:WalltypeCompartmentFirewall ex:wall-type ;
+    fbo-dk:WalltypeSubcompartmentFirewall ex:wall-type ;
+    fbo-dk:FireResistance "-120.0"^^xsd:float ;
+    fbo:FireResistance "-120.0"^^xsd:float ;
+    fbo:FireStability "-60.0"^^xsd:float ;
+    fbo:Integrity "-30.0"^^xsd:float ;
+    fbo:ThermalInsulation "-15.0"^^xsd:float ;
+    fbo:ThermalConductivity "999999.0"^^xsd:float ;
+    fbo:ReactionToFire "-999.0"^^xsd:float ;
+    fbo-dk:PassiveFireProtection ex:passive-protection ;
+    fbo:PassiveFireProtection ex:passive-protection .
+
+ex:wall-type rdfs:label "Contradictory building, compartment, and subcompartment firewall"@en .
+
+ex:door
+    a fbo:DoorExit, fbo:DoorEscaperoute, fbo-dk:DoorExit, fbo-dk:DoorEscaperoute ;
+    rdfs:label "Only door, wider than the building and opening both ways"@en ;
+    fbo-dk:WidthFreeDoors "9999.0"^^xsd:float ;
+    fbo:WidthFreeDoors "9999.0"^^xsd:float ;
+    fbo:UsefulWidth "-1.0"^^xsd:float ;
+    fbo:SelfClosing true ;
+    fbo:SwingDirection "simultaneously-inward-and-outward" ;
+    fbo-dk:FireResistance "-120.0"^^xsd:float ;
+    fbo:FireResistance "-120.0"^^xsd:float ;
+    fbo-dk:OpeningRescue ex:rescue-opening ;
+    fbo:OpeningRescue ex:rescue-opening .
+
+ex:exit
+    a fbo:Exit, fbo-dk:Exit ;
+    rdfs:label "Only exit leading back into the same room"@en ;
+    fbo-dk:SystemIndependentExit ex:door ;
+    fbo-dk:DoorIndependentExitdoors ex:door ;
+    fbo-dk:PlaceSaferefuge ex:safe-refuge ;
+    fbo:PlaceSaferefuge ex:safe-refuge .
+
+ex:route
+    a fbo:TravelDistance ;
+    rdfs:label "Only route with negative and contradictory distances"@en ;
+    fbo-dk:EscapeRoute true ;
+    fbo-dk:EvacuationRoutePrimary false ;
+    fbo-dk:DistanceActualTravel "-5000.0"^^xsd:float ;
+    fbo-dk:DistanceDirectTravel "9999999.0"^^xsd:float ;
+    fbo-dk:DistancePathway "-1.0"^^xsd:float ;
+    fbo-dk:DistanceBlindEnd "-100.0"^^xsd:float ;
+    fbo-dk:TimeWalking "-3600.0"^^xsd:float ;
+    fbo-dk:EvacuationTime "-7200.0"^^xsd:float ;
+    fbo-dk:NumberOccupantsEvacuationRoute "-999.0"^^xsd:float ;
+    fbo-dk:WidthFreeEvacuationroutes ex:route-width ;
+    fbo:WidthFreeEvacuationroutes ex:route-width ;
+    fbo-dk:AreaEvacuationroute ex:evacuation-area ;
+    fbo:AreaEvacuationroute ex:evacuation-area ;
+    fbo-dk:SystemIndependentEvacuationRoute ex:route ;
+    fbo-dk:SystemEscaperouteSecondary ex:route ;
+    fbo-dk:SystemEscaperouteShared ex:route ;
+    fbo-dk:DoorIndependentExitdoors ex:door .
+
+ex:route-width
+    rdfs:label "Negative clear route width"@en ;
+    fbo:UsefulWidth "-500.0"^^xsd:float .
+
+ex:evacuation-area
+    rdfs:label "Negative evacuation area"@en ;
+    fbo-dk:AreaFloorRoom "-999.0"^^xsd:float .
+
+ex:stair-core
+    rdfs:label "Only internal stair, with negative height"@en ;
+    fbo-dk:RoomfunctionEscapestaircase true ;
+    fbo-dk:RoomfunctionSafetyStaircase true ;
+    fbo-dk:HeightRescue "-100.0"^^xsd:float ;
+    fbo-dk:FireResistance "-120.0"^^xsd:float .
+
+ex:rescue-opening
+    rdfs:label "Rescue opening with negative areas and height"@en ;
+    fbo-dk:AreaOpeningClearAerodynamicAa "-20.0"^^xsd:float ;
+    fbo-dk:AreaOpeningClearGeometric "-30.0"^^xsd:float ;
+    fbo-dk:AreaOpeningGeometricAg "-40.0"^^xsd:float ;
+    fbo-dk:HeightRescue "-100.0"^^xsd:float .
+
+ex:safe-refuge rdfs:label "Safe refuge located in the hazard"@en .
+
+ex:alarm-system
+    a fbo:AutomaticFireAlarmsystem, fbo-dk:AutomaticFireAlarmsystem ;
+    rdfs:label "Automatic alarm that never alarms"@en ;
+    fbo-dk:ActiveFireProtection ex:alarm-system .
+
+ex:warning-system
+    a fbo:AutomaticWarningSystem, fbo-dk:AutomaticWarningsystem ;
+    rdfs:label "Warning system with negative audibility"@en ;
+    fbo-dk:ActiveFireProtection ex:warning-system .
+
+ex:sprinkler-system
+    a fbo-dk:AutomaticFireSprinklersystem ;
+    rdfs:label "Sprinkler with negative flow"@en ;
+    fbo-dk:ActiveFireProtection ex:sprinkler-system .
+
+ex:ventilation-system
+    a fbo:AutomaticFireVentilationsystem, fbo-dk:AutomaticFireVentilationsystem ;
+    rdfs:label "Smoke ventilation that blows smoke inward"@en ;
+    fbo-dk:AreaOpeningClearAerodynamicAa "-100.0"^^xsd:float ;
+    fbo-dk:AreaOpeningClearGeometric "-100.0"^^xsd:float ;
+    fbo-dk:AreaOpeningGeometricAg "-100.0"^^xsd:float ;
+    fbo-dk:ActiveFireProtection ex:ventilation-system .
+
+ex:smoke-alarm-system
+    a fbo:FireSafetyInstallationSmokeAlarmsystem, fbo-dk:FireSafetyInstallationSmokeAlarmsystem ;
+    rdfs:label "Smoke alarm system installed below the floor"@en .
+
+ex:hose-reel
+    a fbo:HoseReel, fbo-dk:HoseReel ;
+    rdfs:label "Hose reel with negative hose length"@en ;
+    fbo-dk:LengthHosepath "-500.0"^^xsd:float ;
+    fbo:LengthHosepath "-500.0"^^xsd:float .
+
+ex:exit-lighting
+    rdfs:label "Emergency lighting with negative illumination"@en ;
+    fbo-dk:EmergencyExitLighting ex:exit-lighting ;
+    fbo:EmergencyExitLighting ex:exit-lighting .
+
+ex:panic-lighting
+    rdfs:label "Panic lighting that increases panic"@en ;
+    fbo-dk:EmergencyPanicLights ex:panic-lighting ;
+    fbo:EmergencyPanicLights ex:panic-lighting .
+
+ex:ceiling
+    a fbo-dk:CeilingSuspended ;
+    rdfs:label "Suspended ceiling below the floor"@en ;
+    fbo-dk:FireResistance "-60.0"^^xsd:float ;
+    fbo:ReactionToFire "-999.0"^^xsd:float .
+
+ex:surface-cladding
+    a fbo-dk:SurfaceCladding ;
+    rdfs:label "Surface cladding with impossible conductivity"@en ;
+    fbo:ReactionToFire "-999.0"^^xsd:float ;
+    fbo:ThermalConductivity "999999.0"^^xsd:float .
+
+ex:rainscreen
+    a fbo-dk:SurfaceCladdingRainscreen ;
+    rdfs:label "Rainscreen installed indoors and underwater"@en ;
+    fbo:ReactionToFire "-999.0"^^xsd:float ;
+    fbo:ThermalInsulation "-999.0"^^xsd:float .
+
+ex:exposed-surface
+    a fbo-dk:SurfaceExposed ;
+    rdfs:label "Fire-exposed surface with negative exposure"@en ;
+    fbo:ReactionToFire "-999.0"^^xsd:float ;
+    fbo:FireStability "-999.0"^^xsd:float .
