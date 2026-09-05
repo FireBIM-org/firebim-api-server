@@ -1,7 +1,10 @@
+import json
+
 from rdflib import RDF, BNode, Graph, Literal, Namespace, URIRef
 from rdflib.namespace import SH
 
 from .models import fbRuleElement
+from .paths import expand_curie, expand_property_path, is_ref_value, ref_path
 
 
 class SHACLBuilder:
@@ -37,9 +40,19 @@ class SHACLBuilder:
             return f'"{value}"'
         return str(value)
 
+    @staticmethod
+    def _sparql_path(segments: list[str]) -> str:
+        return "/".join(f"<{seg}>" for seg in segments)
+
     def _build_comparison(self, element):
         op = element.operator
         value = element.value
+
+        if is_ref_value(value):
+            if op == "between":
+                raise ValueError("'between' cannot be combined with a $ref value")
+            sparql_op = "=" if op == "==" else op
+            return f"?h {sparql_op} ?v"
 
         if op in ["<=", ">=", "<", ">"]:
             return f"?h {op} {value}"
@@ -105,6 +118,10 @@ class SHACLBuilder:
             self._add_metadata_node(element)
             return
 
+        if element.node_type == "derive":
+            self._add_derive_node(element)
+            return
+
         if element.node_type != "decision":
             raise ValueError(f"Unsupported node_type: {element.node_type}")
 
@@ -121,8 +138,16 @@ class SHACLBuilder:
         if element.label:
             self.graph.add((shape_uri, self.EX.label, Literal(element.label)))
 
-        property_uri = element.property_path
+        prefixes = element.config.get("prefixes") if isinstance(element.config, dict) else None
+        segments = expand_property_path(element.property_path, prefixes)
+        property_path = self._sparql_path(segments)
         comparison = self._build_comparison(element)
+        ref_clause = ""
+        unknown_test = "!BOUND(?h)"
+        if is_ref_value(element.value):
+            ref_segments = expand_property_path(ref_path(element.value), prefixes)
+            ref_clause = f"OPTIONAL {{ ?this {self._sparql_path(ref_segments)} ?v }}"
+            unknown_test = "!BOUND(?h) || !BOUND(?v)"
 
         sparql = f"""
         CONSTRUCT {{
@@ -130,16 +155,21 @@ class SHACLBuilder:
         }}
         WHERE {{
 
-            OPTIONAL {{ ?this <{property_uri}> ?h }}
+            OPTIONAL {{ ?this {property_path} ?h }}
+            {ref_clause}
 
             BIND(
-                IF(!BOUND(?h), fb:Unknown,
+                IF({unknown_test}, fb:Unknown,
                     IF({comparison}, fb:True, fb:False)
                 ) AS ?result
             )
 
         }}
         """
+        # explicit, lossless copies of the condition (the CONSTRUCT is for SPARQL engines)
+        self.graph.add((shape_uri, self.EX.propertyPath, Literal("/".join(segments))))
+        self.graph.add((shape_uri, self.EX.operator, Literal(str(element.operator))))
+        self.graph.add((shape_uri, self.EX.valueJson, Literal(json.dumps(element.value, ensure_ascii=False))))
 
         rule_node = BNode()
         self.graph.add((shape_uri, SH.rule, rule_node))
@@ -152,6 +182,27 @@ class SHACLBuilder:
             self.graph.add((shape_uri, self.FB.falsePath, self.EX[element.false_path]))
         if element.unknown_path:
             self.graph.add((shape_uri, self.FB.unknownPath, self.EX[element.unknown_path]))
+
+    def _add_derive_node(self, element: fbRuleElement):
+        node_uri = self.EX[element.id]
+        prefixes = element.config.get("prefixes") if isinstance(element.config, dict) else None
+        self.graph.add((node_uri, RDF.type, self.EX.RuleElement))
+        self.graph.add((node_uri, self.EX.nodeType, Literal("derive")))
+        if element.label is not None:
+            self.graph.add((node_uri, self.EX.label, Literal(element.label)))
+        if element.target_class and str(element.target_class).startswith("http"):
+            self.graph.add((node_uri, SH.targetClass, URIRef(element.target_class)))
+        elif element.target_class:
+            self.graph.add((node_uri, SH.targetClass, URIRef(expand_curie(element.target_class, prefixes))))
+        written = expand_curie(str(element.property_path), prefixes)
+        self.graph.add((node_uri, self.EX.propertyPath, Literal(written)))
+        self.graph.add((node_uri, self.EX.expression, Literal(str(element.expression))))
+        if prefixes:
+            self.graph.add((node_uri, self.EX.prefixesJson, Literal(json.dumps(prefixes))))
+        if element.true_path:
+            self.graph.add((node_uri, self.FB.truePath, self.EX[element.true_path]))
+        if element.unknown_path:
+            self.graph.add((node_uri, self.FB.unknownPath, self.EX[element.unknown_path]))
 
     def add_rule_set(self, rule_set):
         ruleset_uri = self.EX[rule_set.id]

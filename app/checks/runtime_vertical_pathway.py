@@ -58,6 +58,7 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
             metrics=metrics,
         )
         self._active_execution_context = execution_context
+        self._new_overlay(graph_ref, compiled)
 
         started_targets = perf_counter()
         initial_targets = self.target_resolver.resolve_targets_for_decision(
@@ -146,7 +147,7 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
         if not options.include_report_graph_ttl:
             result.report_graph_ttl = None
         self._active_execution_context = None
-        return result
+        return self._attach_derived(result, options)
 
     def _group_states_by_vertical_pathway(
         self,
@@ -170,7 +171,7 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
             signature.append(current_node_id)
             seen.add(current_node_id)
 
-            if node.node_type != "decision":
+            if node.node_type not in self.EXECUTABLE_TYPES:
                 break
             if not self._is_linear_vertical_step(node):
                 break
@@ -183,6 +184,8 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
         return tuple(signature)
 
     def _is_linear_vertical_step(self, node: DecisionNode) -> bool:
+        if node.node_type == "derive":
+            return bool(node.true_node_id and node.true_node_id == node.unknown_node_id)
         return bool(node.true_node_id and node.true_node_id == node.false_node_id == node.unknown_node_id)
 
     def _linear_next_node_id(self, node: DecisionNode) -> str | None:
@@ -307,7 +310,7 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
                 )
                 continue
 
-            if node.node_type != "decision":
+            if node.node_type not in self.EXECUTABLE_TYPES:
                 traces.append(
                     self._make_terminal_trace(
                         target_node=state.target_node,
@@ -324,7 +327,7 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
 
             executable_states.append(state)
 
-        if not executable_states or node.node_type != "decision":
+        if not executable_states or node.node_type not in self.EXECUTABLE_TYPES:
             return traces, next_states
 
         if self._active_execution_context is not None:
@@ -353,7 +356,7 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
                 node_type=node.node_type,
                 status=outcome.status,
                 next_node_id=next_node_id,
-                evidence=outcome.evidence,
+                evidence=self._step_evidence(outcome),
             )
             updated_steps = state.steps + [step]
             visited = state.visited_node_ids + [state.node_id]
@@ -405,6 +408,15 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
         options: RunOptions,
         metrics: dict[str, Any] | None = None,
     ) -> list[AtomicOutcome]:
+        if decision.node_type == "derive":
+            # derive elements write per target; never batched, never cached
+            started_derive = perf_counter()
+            outcomes = [
+                self._execute_derive(graph_ref=graph_ref, node=decision, target=state.target_node, metrics=metrics)
+                for state in states
+            ]
+            accumulate_timing(metrics, "evaluate_derive_total", perf_counter() - started_derive)
+            return outcomes
         self._prefetch_row_property_values(
             graph_ref=graph_ref,
             decision=decision,
@@ -424,6 +436,7 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
             "column_size": len(states),
             "graph_index": self._active_execution_context.graph_index if self._active_execution_context else None,
             "execution_context": self._active_execution_context,
+            "overlay": self._active_overlay,
         }
         if isinstance(self.evaluator, HybridAtomicEvaluator) and self.evaluator.direct_evaluator.supports(decision):
             increment_counter(metrics, "vertical_column_direct_batches")

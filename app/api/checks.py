@@ -16,6 +16,7 @@ try:
 except Exception:  # pragma: no cover
     BlindShaclRuleRunner = None
 
+from app.checks.derived import default_derived_graph_uri
 from app.checks.result_models import RuleRunResult, RunOptions
 from app.checks.schema_service import extract_graph_schema_payload
 from app.checks.solver_selector import CheckSolverSelector
@@ -24,6 +25,7 @@ from app.graphs_and_checks.publisher import (
     default_building_graph_uri,
     fetch_building_graph_ttl,
     fetch_rule_ttl,
+    publish_building_graph_ttl,
 )
 from app.schemas.checks import (
     BlindCheckRunRequest,
@@ -31,6 +33,7 @@ from app.schemas.checks import (
     BlindCheckTerminalOutput,
     CheckCompatibilityRequest,
     CheckCompatibilityResponse,
+    CheckDerivedValue,
     CheckDiagnosticResponse,
     CheckDiagnosticTimingGroups,
     CheckEndNodeSummary,
@@ -367,6 +370,8 @@ def _build_run_options(payload: CheckRunRequest, *, diagnostics: bool) -> RunOpt
         diagnostic_end_node_ids=payload.options.diagnostic_end_node_ids,
         diagnostic_analysis_codes=payload.options.diagnostic_analysis_codes,
         diagnostic_success_only=payload.options.diagnostic_success_only,
+        persist_derived=payload.options.persist_derived,
+        use_derived_from=list(payload.options.use_derived_from),
     )
 
 
@@ -390,6 +395,10 @@ def _execute_check_run(
     building_graph_uri = default_building_graph_uri(payload.graph_id)
     started = perf_counter()
     graph_ttl = fetch_building_graph_ttl(building_graph_uri)
+    if payload.options.use_derived_from:
+        graph_ttl = merge_derived_graphs(
+            graph_ttl=graph_ttl, graph_id=payload.graph_id, rule_ids=payload.options.use_derived_from
+        )
     request_timings["fetch_graph"] = round((perf_counter() - started) * 1000.0, 3)
 
     started = perf_counter()
@@ -415,6 +424,11 @@ def _execute_check_run(
         rule_ttl=rule_ttl,
     )
     request_timings["run_rule"] = round((perf_counter() - started) * 1000.0, 3)
+    if options.persist_derived and result.derived_graph_ttl and result.derived_graph_uri:
+        started = perf_counter()
+        publish_building_graph_ttl(ttl_text=result.derived_graph_ttl, graph_uri=result.derived_graph_uri)
+        result.engine["derived_persisted"] = True
+        request_timings["persist_derived"] = round((perf_counter() - started) * 1000.0, 3)
     return (
         options,
         requested_solver,
@@ -425,6 +439,46 @@ def _execute_check_run(
         compatibility,
         result,
     )
+
+
+def _to_derived_values(result: RuleRunResult) -> list[CheckDerivedValue]:
+    values: list[CheckDerivedValue] = []
+    for record in result.derived_values or []:
+        values.append(
+            CheckDerivedValue(
+                target=str(record.get("target")),
+                property=str(record.get("property")),
+                value=record.get("value"),
+                node_id=record.get("node_id"),
+                expression=record.get("expression"),
+                inputs=dict(record.get("inputs") or {}),
+                overwrote_previous=record.get("overwrote_previous"),
+            )
+        )
+    return values
+
+
+def merge_derived_graphs(*, graph_ttl: str, graph_id: str, rule_ids: list[str]) -> str:
+    """Append the persisted derived graphs of earlier rules to the building graph TTL (missing ones are skipped)."""
+    from rdflib import Graph
+
+    merged = Graph()
+    merged.parse(data=graph_ttl, format="turtle")
+    for rule_id in rule_ids:
+        derived_uri = default_derived_graph_uri(graph_id, rule_id)
+        try:
+            derived_ttl = fetch_building_graph_ttl(derived_uri)
+        except Exception:
+            logger.info("No persisted derived graph for rule '%s' on graph '%s'", rule_id, graph_id)
+            continue
+        overlay = Graph()
+        overlay.parse(data=derived_ttl, format="turtle")
+        # derived values shadow base values for the same (subject, predicate)
+        for subj, pred in {(s, p) for s, p, _ in overlay if not str(p).startswith("http://www.w3.org/ns/prov#")}:
+            merged.remove((subj, pred, None))
+        for triple in overlay:
+            merged.add(triple)
+    return merged.serialize(format="turtle")
 
 
 def _build_simple_response(
@@ -461,6 +515,9 @@ def _build_simple_response(
         compatibility=compatibility.model_dump(),
         report_text=(result.report_text if payload.options.include_report_text else None),
         debug=debug_payload,
+        derived_values=_to_derived_values(result),
+        derived_graph_uri=result.derived_graph_uri,
+        derived_persisted=bool(result.engine.get("derived_persisted")),
     )
 
 
@@ -508,6 +565,9 @@ def _build_diagnostic_response(
             "counters": result_debug.get("counters", {}),
         },
         compiled_rule=result.compiled_rule if isinstance(result.compiled_rule, dict) else {},
+        derived_values=_to_derived_values(result),
+        derived_graph_uri=result.derived_graph_uri,
+        derived_persisted=bool(result.engine.get("derived_persisted")),
         targets=_to_check_target_results(result),
         trace=trace_payload,
         timings=_build_timings_payload(
@@ -795,8 +855,9 @@ def run_blind_check(payload: BlindCheckRunRequest):
             end_outputs=[BlindCheckTerminalOutput(**item) for item in result.get("end_outputs", [])],
             terminal_counts=result.get("terminal_counts", {}),
             message_counts=result.get("message_counts", {}),
+            derived_values=[CheckDerivedValue(**item) for item in result.get("derived_values", [])],
             debug={
-                **result.debug,
+                **(result.get("debug") or {}),
                 "rule_graph_uri": rule_graph_uri,
                 "building_graph_uri": building_graph_uri,
                 "rule_ttl_length": len(rule_ttl or ""),

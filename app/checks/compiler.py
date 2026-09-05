@@ -8,8 +8,9 @@ from rdflib import RDF, Graph, Namespace
 from rdflib.namespace import SH
 
 from app.checks.caching import CheckExecutionCache, accumulate_timing, get_default_execution_cache, increment_counter
-from app.checks.result_models import CompiledRuleSet, DecisionNode, EndNode, StartNode
+from app.checks.result_models import CompiledNode, CompiledRuleSet, DecisionNode, DeriveNode, EndNode, StartNode
 from app.rules.construct_parser import parse_construct_rule
+from app.rules.decompiler import extract_derive_fields, extract_shape_condition
 
 EX = Namespace("http://example.org/firebim/")
 FB = Namespace("http://example.org/firebim/rule/")
@@ -50,7 +51,7 @@ class RuleCompiler:
         if not entry_node_id:
             raise ValueError(f"Rule '{rule_id}' is missing ex:entryPoint")
 
-        compiled_nodes: dict[str, StartNode | DecisionNode | EndNode] = {}
+        compiled_nodes: dict[str, CompiledNode] = {}
 
         for shape in graph.subjects(RDF.type, SH.NodeShape):
             node = self._compile_decision_node(graph, shape)
@@ -79,6 +80,14 @@ class RuleCompiler:
                 "decision_count": sum(1 for n in compiled_nodes.values() if n.node_type == "decision"),
                 "start_count": sum(1 for n in compiled_nodes.values() if n.node_type == "start"),
                 "end_count": sum(1 for n in compiled_nodes.values() if n.node_type == "end"),
+                "derive_count": sum(1 for n in compiled_nodes.values() if n.node_type == "derive"),
+                "derived_properties": sorted(
+                    {
+                        str(n.property_path)
+                        for n in compiled_nodes.values()
+                        if n.node_type == "derive" and n.property_path
+                    }
+                ),
             },
         )
 
@@ -96,11 +105,7 @@ class RuleCompiler:
         unknown_obj = graph.value(shape_uri, FB.unknownPath)
         rule_bnode = graph.value(shape_uri, SH.rule)
         construct_text = graph.value(rule_bnode, SH.construct) if rule_bnode else None
-        property_path = None
-        operator = None
-        value: Any = None
-        if construct_text:
-            property_path, operator, value = self._parse_construct_rule(str(construct_text))
+        property_path, operator, value = extract_shape_condition(graph, shape_uri)
         label = graph.value(shape_uri, EX.label)
         config: dict[str, Any] = {}
         if construct_text:
@@ -124,12 +129,32 @@ class RuleCompiler:
         self._validate_decision_node(node)
         return node
 
-    def _compile_metadata_node(self, graph: Graph, node_uri) -> StartNode | EndNode:
+    def _compile_metadata_node(self, graph: Graph, node_uri) -> StartNode | EndNode | DeriveNode:
         node_id = self._local_name(node_uri)
         node_type_obj = graph.value(node_uri, EX.nodeType)
         node_type = str(node_type_obj) if node_type_obj is not None else None
         if not node_type:
             raise ValueError(f"Rule metadata node '{node_id}' is missing ex:nodeType")
+
+        if node_type == "derive":
+            fields = extract_derive_fields(graph, node_uri)
+            label_obj = graph.value(node_uri, EX.label)
+            true_obj = graph.value(node_uri, FB.truePath)
+            unknown_obj = graph.value(node_uri, FB.unknownPath)
+            false_obj = graph.value(node_uri, FB.falsePath)
+            node = DeriveNode(
+                node_id=node_id,
+                label=str(label_obj) if label_obj is not None else None,
+                target_class=fields["target_class"],
+                property_path=fields["property_path"],
+                expression=fields["expression"],
+                prefixes=fields["config"].get("prefixes"),
+                true_node_id=self._local_name(true_obj) if true_obj else None,
+                unknown_node_id=self._local_name(unknown_obj) if unknown_obj else None,
+                config={"expression": fields["expression"], **fields["config"]},
+            )
+            self._validate_derive_node(node, false_obj=false_obj)
+            return node
 
         label = graph.value(node_uri, EX.label)
         value = graph.value(node_uri, EX.value)
@@ -187,10 +212,10 @@ class RuleCompiler:
                 f"Rule '{compiled.rule_id}' entry node '{compiled.entry_node_id}' does not exist in compiled nodes"
             )
         entry_node = compiled.nodes[compiled.entry_node_id]
-        if entry_node.node_type not in {"start", "decision"}:
+        if entry_node.node_type not in {"start", "decision", "derive"}:
             raise ValueError(
                 f"Rule '{compiled.rule_id}' entry node '{compiled.entry_node_id}' "
-                f"must be a start or decision node, got '{entry_node.node_type}'"
+                f"must be a start, decision or derive node, got '{entry_node.node_type}'"
             )
         if not compiled.nodes:
             raise ValueError(f"Rule '{compiled.rule_id}' compiled to zero nodes")
@@ -200,7 +225,7 @@ class RuleCompiler:
             if node.node_type == "start":
                 if node.next_node_id:
                     referenced_node_ids.add(node.next_node_id)
-            elif node.node_type == "decision":
+            elif node.node_type in {"decision", "derive"}:
                 for next_id in [node.true_node_id, node.false_node_id, node.unknown_node_id]:
                     if next_id:
                         referenced_node_ids.add(next_id)
@@ -233,7 +258,7 @@ class RuleCompiler:
             if node.node_type == "start":
                 if node.next_node_id:
                     next_ids.append(node.next_node_id)
-            elif node.node_type == "decision":
+            elif node.node_type in {"decision", "derive"}:
                 for next_id in [node.true_node_id, node.false_node_id, node.unknown_node_id]:
                     if next_id:
                         next_ids.append(next_id)
@@ -267,6 +292,22 @@ class RuleCompiler:
             raise ValueError(
                 f"Decision node '{node.node_id}' missing required outgoing branches: {', '.join(missing_branches)}"
             )
+
+    def _validate_derive_node(self, node: DeriveNode, false_obj=None) -> None:
+        missing = [
+            name
+            for name, value in [
+                ("target_class", node.target_class),
+                ("property_path", node.property_path),
+                ("expression", node.expression),
+                ("true_node_id", node.true_node_id),
+            ]
+            if not value
+        ]
+        if missing:
+            raise ValueError(f"Derive node '{node.node_id}' missing required fields: {', '.join(missing)}")
+        if false_obj is not None:
+            raise ValueError(f"Derive node '{node.node_id}' must not define a false path")
 
     def _validate_start_node(self, node: StartNode, false_obj=None, unknown_obj=None) -> None:
         if false_obj is not None or unknown_obj is not None:

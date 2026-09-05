@@ -9,6 +9,7 @@ class fbRuleElement:
 
     node_type:
       - decision: SHACL-backed decision node
+      - derive: computes `expression` and writes it to `property_path` on the target (run overlay)
       - start: entry/orchestration node
       - end: terminal/output node
     """
@@ -19,6 +20,7 @@ class fbRuleElement:
     property_path: str | None = None
     operator: str | None = None
     value: Any | None = None
+    expression: str | None = None
 
     true_path: str | None = None
     false_path: str | None = None

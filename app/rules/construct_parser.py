@@ -19,9 +19,18 @@ def _coerce_token(token: str) -> Any:
     return token
 
 
+def _path_from_sparql(text: str) -> str:
+    return "/".join(re.findall(r"<([^>]+)>", text))
+
+
 def parse_construct_rule(sparql_text: str) -> tuple[str | None, str | None, Any]:
     prop_match = re.search(
-        r"OPTIONAL\s*\{\s*\?this\s*<([^>]+)>\s*\?h\s*\}",
+        r"OPTIONAL\s*\{\s*\?this\s*((?:<[^>]+>)(?:\s*/\s*<[^>]+>)*)\s*\?h\s*\}",
+        sparql_text,
+        re.DOTALL,
+    )
+    ref_match = re.search(
+        r"OPTIONAL\s*\{\s*\?this\s*((?:<[^>]+>)(?:\s*/\s*<[^>]+>)*)\s*\?v\s*\}",
         sparql_text,
         re.DOTALL,
     )
@@ -41,9 +50,16 @@ def parse_construct_rule(sparql_text: str) -> tuple[str | None, str | None, Any]
         re.DOTALL,
     )
 
-    property_path = prop_match.group(1) if prop_match else None
+    property_path = _path_from_sparql(prop_match.group(1)) if prop_match else None
     operator = None
     value: Any = None
+
+    if ref_match:
+        ref_cmp = re.search(r"IF\s*\(\s*\?h\s*(<=|>=|=|<|>)\s*\?v\s*,\s*fb:True", sparql_text, re.DOTALL)
+        operator = ref_cmp.group(1) if ref_cmp else "=="
+        if operator == "=":
+            operator = "=="
+        return property_path, operator, {"$ref": _path_from_sparql(ref_match.group(1))}
 
     if in_match:
         operator = "=="
