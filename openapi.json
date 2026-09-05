@@ -1136,6 +1136,48 @@
         }
       }
     },
+    "/lexicon/catalog/rule-term-validation": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Validate Rule Terms",
+        "description": "Validate rule target classes and property paths against the selected ontologies.",
+        "operationId": "validate_rule_terms_lexicon_catalog_rule_term_validation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LexiconRuleTermValidationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconRuleTermValidationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/lexicon/catalog/{ontology_family}/{country}/{version}/classes/{term_id}/properties": {
       "get": {
         "tags": [
@@ -10919,6 +10961,320 @@
           "match_count"
         ],
         "title": "LexiconRuleSimilarityTermResult"
+      },
+      "LexiconRuleTermValidationFieldResult": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "target_class",
+              "property_path"
+            ],
+            "title": "Field"
+          },
+          "expected_kind": {
+            "type": "string",
+            "enum": [
+              "class",
+              "property"
+            ],
+            "title": "Expected Kind"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleTermValidationMatch"
+            },
+            "type": "array",
+            "title": "Matches"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconRuleTermValidationIssue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "expected_kind",
+          "value",
+          "valid"
+        ],
+        "title": "LexiconRuleTermValidationFieldResult"
+      },
+      "LexiconRuleTermValidationIssue": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "target_class",
+              "property_path"
+            ],
+            "title": "Field"
+          },
+          "expected_kind": {
+            "type": "string",
+            "enum": [
+              "class",
+              "property"
+            ],
+            "title": "Expected Kind"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "unknown_term",
+              "wrong_term_kind"
+            ],
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "node_id",
+          "field",
+          "expected_kind",
+          "value",
+          "code",
+          "message"
+        ],
+        "title": "LexiconRuleTermValidationIssue"
+      },
+      "LexiconRuleTermValidationMatch": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "term_id": {
+            "type": "string",
+            "title": "Term Id"
+          },
+          "uri": {
+            "type": "string",
+            "title": "Uri"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "version",
+          "term_id",
+          "uri"
+        ],
+        "title": "LexiconRuleTermValidationMatch"
+      },
+      "LexiconRuleTermValidationNodeResult": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleTermValidationFieldResult"
+            },
+            "type": "array",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "node_id",
+          "valid"
+        ],
+        "title": "LexiconRuleTermValidationNodeResult"
+      },
+      "LexiconRuleTermValidationRequest": {
+        "properties": {
+          "selected_ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSelectedOntology"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Selected Ontologies"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id"
+          },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleDraft"
+            },
+            "type": "array",
+            "title": "Rules"
+          }
+        },
+        "type": "object",
+        "title": "LexiconRuleTermValidationRequest"
+      },
+      "LexiconRuleTermValidationResponse": {
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
+          "selected_ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSelectedOntology"
+            },
+            "type": "array",
+            "title": "Selected Ontologies"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleTermValidationNodeResult"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleTermValidationIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/LexiconRuleTermValidationStats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valid",
+          "stats"
+        ],
+        "title": "LexiconRuleTermValidationResponse"
+      },
+      "LexiconRuleTermValidationStats": {
+        "properties": {
+          "rule_count": {
+            "type": "integer",
+            "title": "Rule Count"
+          },
+          "ontology_count": {
+            "type": "integer",
+            "title": "Ontology Count"
+          },
+          "validated_node_count": {
+            "type": "integer",
+            "title": "Validated Node Count"
+          },
+          "validated_field_count": {
+            "type": "integer",
+            "title": "Validated Field Count"
+          },
+          "invalid_node_count": {
+            "type": "integer",
+            "title": "Invalid Node Count"
+          },
+          "issue_count": {
+            "type": "integer",
+            "title": "Issue Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_count",
+          "ontology_count",
+          "validated_node_count",
+          "validated_field_count",
+          "invalid_node_count",
+          "issue_count"
+        ],
+        "title": "LexiconRuleTermValidationStats"
       },
       "LexiconSelectedOntology": {
         "properties": {

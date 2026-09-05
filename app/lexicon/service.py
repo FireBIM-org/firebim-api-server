@@ -71,6 +71,13 @@ from app.schemas.lexicon import (
     LexiconRuleSimilarityMatch,
     LexiconRuleSimilaritySourceTerm,
     LexiconRuleSimilarityTermResult,
+    LexiconRuleTermValidationFieldResult,
+    LexiconRuleTermValidationIssue,
+    LexiconRuleTermValidationMatch,
+    LexiconRuleTermValidationNodeResult,
+    LexiconRuleTermValidationRequest,
+    LexiconRuleTermValidationResponse,
+    LexiconRuleTermValidationStats,
     LexiconSelectedOntology,
     LexiconSimilarityComponentScore,
     LexiconSourceEntityPattern,
@@ -454,6 +461,146 @@ class LexiconService:
                 rule_ontology_pairs=len(normalized_rules) * len(selected_ontologies),
             ),
         )
+
+    def validate_rule_terms(
+        self,
+        payload: LexiconRuleTermValidationRequest,
+    ) -> LexiconRuleTermValidationResponse:
+        """Perform exact, kind-aware validation of rule terms in selected ontology catalogs."""
+        normalized_rules = self._load_rules(
+            rule_id=payload.rule_id,
+            rule_ids=payload.rule_ids,
+            rule=payload.rule,
+            rules=payload.rules,
+        )
+        selected_ontologies = self._resolve_similarity_selected_ontologies(payload.selected_ontologies)
+        bundles = [
+            self._resolve_ontology_bundle(
+                ontology_family=selection.ontology_family,
+                country=selection.country,
+                version=selection.version,
+            )
+            for selection in selected_ontologies
+        ]
+        runtime = LexiconQueryRuntime.from_bundles(bundles)
+
+        nodes: list[LexiconRuleTermValidationNodeResult] = []
+        issues: list[LexiconRuleTermValidationIssue] = []
+        validated_field_count = 0
+
+        for normalized_rule in normalized_rules:
+            rule_id = str(normalized_rule.get("id") or "")
+            for element in normalized_rule.get("elements", []):
+                if element.get("element_type") != "decision":
+                    continue
+
+                node_id = str(element.get("id") or "")
+                field_results: list[LexiconRuleTermValidationFieldResult] = []
+                for field, expected_kind in (
+                    ("target_class", "class"),
+                    ("property_path", "property"),
+                ):
+                    raw_value = element.get(field)
+                    value = str(raw_value).strip() if raw_value is not None else ""
+                    if not value:
+                        continue
+
+                    validated_field_count += 1
+                    resolved = runtime.resolve_term_matches(value)
+                    expected_uris = sorted(resolved[f"{expected_kind}_matches"])
+                    opposite_kind = "property" if expected_kind == "class" else "class"
+                    opposite_uris = sorted(resolved[f"{opposite_kind}_matches"])
+                    matches = self._rule_term_validation_matches(runtime, expected_uris)
+
+                    issue = None
+                    if not matches:
+                        code = "wrong_term_kind" if opposite_uris else "unknown_term"
+                        if code == "wrong_term_kind":
+                            message = (
+                                f"{field.replace('_', ' ').capitalize()} '{value}' is an ontology "
+                                f"{opposite_kind}, not an ontology {expected_kind}."
+                            )
+                        else:
+                            message = (
+                                f"{field.replace('_', ' ').capitalize()} '{value}' was not found as an "
+                                f"ontology {expected_kind} in the selected ontologies."
+                            )
+                        issue = LexiconRuleTermValidationIssue(
+                            rule_id=rule_id,
+                            node_id=node_id,
+                            field=field,
+                            expected_kind=expected_kind,
+                            value=value,
+                            code=code,
+                            message=message,
+                        )
+                        issues.append(issue)
+
+                    field_results.append(
+                        LexiconRuleTermValidationFieldResult(
+                            field=field,
+                            expected_kind=expected_kind,
+                            value=value,
+                            valid=bool(matches),
+                            matches=matches,
+                            issue=issue,
+                        )
+                    )
+
+                if field_results:
+                    nodes.append(
+                        LexiconRuleTermValidationNodeResult(
+                            rule_id=rule_id,
+                            node_id=node_id,
+                            label=element.get("label"),
+                            valid=all(field.valid for field in field_results),
+                            fields=field_results,
+                        )
+                    )
+
+        invalid_node_count = sum(not node.valid for node in nodes)
+        return LexiconRuleTermValidationResponse(
+            valid=not issues,
+            rule_ids=[str(rule.get("id") or "") for rule in normalized_rules],
+            selected_ontologies=selected_ontologies,
+            nodes=nodes,
+            issues=issues,
+            stats=LexiconRuleTermValidationStats(
+                rule_count=len(normalized_rules),
+                ontology_count=len(selected_ontologies),
+                validated_node_count=len(nodes),
+                validated_field_count=validated_field_count,
+                invalid_node_count=invalid_node_count,
+                issue_count=len(issues),
+            ),
+        )
+
+    @staticmethod
+    def _rule_term_validation_matches(
+        runtime: LexiconQueryRuntime,
+        matched_uris: list[str],
+    ) -> list[LexiconRuleTermValidationMatch]:
+        matches: list[LexiconRuleTermValidationMatch] = []
+        seen: set[tuple[str, str, str, str]] = set()
+        for matched_uri in matched_uris:
+            term = runtime.dataset.catalog.get(matched_uri)
+            if term is None:
+                continue
+            for ontology_family, country, version in runtime.dataset.provenance_by_uri.get(matched_uri, []):
+                key = (ontology_family, country, version, str(term["uri"]))
+                if key in seen:
+                    continue
+                seen.add(key)
+                matches.append(
+                    LexiconRuleTermValidationMatch(
+                        ontology_family=ontology_family,
+                        country=country,
+                        version=version,
+                        term_id=str(term["term_id"]),
+                        uri=str(term["uri"]),
+                    )
+                )
+        return matches
 
     def summarize_profile(
         self,

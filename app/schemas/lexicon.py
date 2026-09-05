@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -580,6 +580,74 @@ class LexiconRuleOntologySimilarityResponse(BaseModel):
     results: list[LexiconRuleOntologySimilarityRuleResult] = Field(default_factory=list)
     rule_ontology_summaries: list[LexiconRuleOntologySimilaritySummary] = Field(default_factory=list)
     stats: LexiconRuleOntologySimilarityStats
+
+
+class LexiconRuleTermValidationRequest(BaseModel):
+    selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list, min_length=1)
+    rule_id: str | None = None
+    rule_ids: list[str] = Field(default_factory=list)
+    rule: RuleDraft | None = None
+    rules: list[RuleDraft] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_rule_source(self) -> LexiconRuleTermValidationRequest:
+        active = int(bool(self.rule_id)) + int(bool(self.rule_ids)) + int(bool(self.rule)) + int(bool(self.rules))
+        if active != 1:
+            raise ValueError("Provide exactly one of rule_id, rule_ids, rule, or rules")
+        return self
+
+
+class LexiconRuleTermValidationMatch(BaseModel):
+    ontology_family: str
+    country: str
+    version: str
+    term_id: str
+    uri: str
+
+
+class LexiconRuleTermValidationIssue(BaseModel):
+    rule_id: str
+    node_id: str
+    field: Literal["target_class", "property_path"]
+    expected_kind: Literal["class", "property"]
+    value: str
+    code: Literal["unknown_term", "wrong_term_kind"]
+    message: str
+
+
+class LexiconRuleTermValidationFieldResult(BaseModel):
+    field: Literal["target_class", "property_path"]
+    expected_kind: Literal["class", "property"]
+    value: str
+    valid: bool
+    matches: list[LexiconRuleTermValidationMatch] = Field(default_factory=list)
+    issue: LexiconRuleTermValidationIssue | None = None
+
+
+class LexiconRuleTermValidationNodeResult(BaseModel):
+    rule_id: str
+    node_id: str
+    label: str | None = None
+    valid: bool
+    fields: list[LexiconRuleTermValidationFieldResult] = Field(default_factory=list)
+
+
+class LexiconRuleTermValidationStats(BaseModel):
+    rule_count: int
+    ontology_count: int
+    validated_node_count: int
+    validated_field_count: int
+    invalid_node_count: int
+    issue_count: int
+
+
+class LexiconRuleTermValidationResponse(BaseModel):
+    valid: bool
+    rule_ids: list[str] = Field(default_factory=list)
+    selected_ontologies: list[LexiconSelectedOntology] = Field(default_factory=list)
+    nodes: list[LexiconRuleTermValidationNodeResult] = Field(default_factory=list)
+    issues: list[LexiconRuleTermValidationIssue] = Field(default_factory=list)
+    stats: LexiconRuleTermValidationStats
 
 
 class LexiconMappedTermReference(BaseModel):
