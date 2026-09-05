@@ -111,6 +111,7 @@ static files with a JSON index. This API can pull them into its own ontology sto
 
 | Endpoint | Auth | Purpose |
 | --- | --- | --- |
+| `GET /ontologies` | no | Discover every ontology family/country currently published in this API |
 | `GET /ontologies/sync/source` | no | Default registry URL (`ONTOLOGY_REGISTRY_URL`) |
 | `POST /ontologies/sync/preview` | yes | Fetch the index and report per version: `publish`, `update`, `current` or `skip` – publishes nothing |
 | `POST /ontologies/sync` | yes | Publish every version that is missing locally (and, with `overwrite: true`, versions whose content or status changed) |

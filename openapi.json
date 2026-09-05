@@ -2940,6 +2940,28 @@
         }
       }
     },
+    "/ontologies": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "List Ontologies",
+        "description": "List every ontology family/country currently published in this API.",
+        "operationId": "list_ontologies_ontologies_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologyListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ontologies/publish": {
       "post": {
         "tags": [
@@ -12840,6 +12862,26 @@
           "dataset"
         ],
         "title": "OntologyHealthResponse"
+      },
+      "OntologyListResponse": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/OntologySummaryResponse"
+            },
+            "type": "array",
+            "title": "Ontologies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count"
+        ],
+        "title": "OntologyListResponse"
       },
       "OntologyPublishRequest": {
         "properties": {

@@ -47,6 +47,9 @@ class DummyOntologyRepo:
             "stable_url": f"/ontologies/{ontology_family}/{country}/versions/stable",
         }
 
+    def list_summaries(self) -> list[dict]:
+        return [self.get_summary("fbo", "be"), self.get_summary("fbo", "dk")]
+
     def list_versions(self, ontology_family: str, country: str):
         return OntologyVersionListResponse(
             ontology_family=ontology_family,
@@ -300,6 +303,18 @@ def test_ontologies_health(monkeypatch):
     assert body["status"] == "ok"
     assert body["dataset"] == "ontologies"
     assert body["resource_directories"] == ["C:\\dummy\\resources"]
+
+
+def test_list_ontologies(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.get("/ontologies")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 2
+    assert [(item["ontology_family"], item["country"]) for item in body["ontologies"]] == [
+        ("fbo", "be"),
+        ("fbo", "dk"),
+    ]
 
 
 def test_ontology_summary_and_versions(monkeypatch):
