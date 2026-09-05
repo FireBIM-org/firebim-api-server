@@ -594,3 +594,25 @@ def test_end_kind_vocabulary_is_shared_by_all_runners():
         "c2": "True",
         "c3": "Unknown",
     }
+
+
+def test_sequence_path_collapses_identical_values():
+    from rdflib import Graph
+
+    from app.checks.derived import resolve_path_values
+
+    g = Graph()
+    g.parse(
+        data=f"""
+        @prefix lt: <{LT}> . @prefix ex: <https://example.org/x#> .
+        ex:u lt:has ex:c1, ex:c2, ex:c3 .
+        ex:c1 lt:Cat "AK2" . ex:c2 lt:Cat "AK2" . ex:c3 lt:Cat "AK3" .
+        ex:v lt:has ex:c1, ex:c2 .
+        """,
+        format="turtle",
+    )
+    assert [str(v) for v in resolve_path_values(g, "https://example.org/x#v", [f"{LT}has", f"{LT}Cat"])] == ["AK2"]
+    assert sorted(str(v) for v in resolve_path_values(g, "https://example.org/x#u", [f"{LT}has", f"{LT}Cat"])) == [
+        "AK2",
+        "AK3",
+    ]

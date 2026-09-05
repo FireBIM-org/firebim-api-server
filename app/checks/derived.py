@@ -147,17 +147,28 @@ def resolve_path_values(
     segments: list[str],
     overlay: DerivedOverlay | None = None,
 ) -> list[Any]:
-    """All values reachable from `target` along the sequence path (rdflib terms), overlay-aware per hop."""
+    """All *distinct* values reachable from `target` along the sequence path (rdflib terms), overlay-aware per hop.
+
+    Duplicates are collapsed at every hop, so a sequence path that reaches the same literal through several
+    intermediate nodes (unit -> compartments -> UseCategory = "AK2", "AK2") yields one value; only genuinely
+    different values are reported as ambiguous by the evaluators.
+    """
     frontier: list[Any] = [URIRef(target)]
     for prop in segments:
         nxt: list[Any] = []
+        seen: set[Any] = set()
         for node in frontier:
             if not isinstance(node, URIRef):
                 continue
             if overlay is not None and overlay.has(str(node), prop):
-                nxt.append(to_literal(overlay.get(str(node), prop)))
-                continue
-            nxt.extend(graph.objects(node, URIRef(prop)))
+                candidates: list[Any] = [to_literal(overlay.get(str(node), prop))]
+            else:
+                candidates = list(graph.objects(node, URIRef(prop)))
+            for value in candidates:
+                if value in seen:
+                    continue
+                seen.add(value)
+                nxt.append(value)
         frontier = nxt
         if not frontier:
             break
