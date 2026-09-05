@@ -95,8 +95,16 @@ class GraphStoreClient:
         except (BotoCoreError, ClientError):
             return False
 
-    def put_graph_ttl(self, dataset: str, graph_uri: str, ttl: str) -> None:
-        triple_count = self._triple_count(ttl)
+    def put_graph_ttl(
+        self,
+        dataset: str,
+        graph_uri: str,
+        ttl: str,
+        *,
+        triple_count: int | None = None,
+    ) -> None:
+        if triple_count is None:
+            triple_count = self._triple_count(ttl)
         key = self._object_key(dataset, graph_uri)
         try:
             self.client.put_object(

@@ -52,7 +52,7 @@ services:
       - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://firebim:firebim@rabbitmq:5672/firebim}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
       - CHECKS_SOLVER=${CHECKS_SOLVER-standard}
-    command: celery -A app.workers.celery_worker worker --loglevel=info
+    command: celery -A app.workers.celery_worker worker --loglevel=info --concurrency=1
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -18,6 +19,7 @@ from app.ontologies.service import (
 from app.ontologies.service import (
     fetch_ontology_version as fetch_ontology_version_data,
 )
+from app.ontologies.sync_jobs import OntologySyncJobNotFoundError, OntologySyncJobStore
 from app.schemas.ontologies import (
     OntologyDeleteResponse,
     OntologyDictionaryCandidateCreateRequest,
@@ -33,6 +35,8 @@ from app.schemas.ontologies import (
     OntologyPublishRequest,
     OntologyPublishResponse,
     OntologySummaryResponse,
+    OntologySyncJobResponse,
+    OntologySyncJobStatus,
     OntologySyncRequest,
     OntologySyncResponse,
     OntologySyncSourceResponse,
@@ -47,12 +51,14 @@ from app.storage.ontology_candidate_repository import (
     OntologyCandidateRepositoryError,
 )
 from app.storage.ontology_repository import ONTOLOGIES_DATASET, OntologyRepository
+from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ontologies", tags=["ontologies"])
 
 repo = OntologyRepository()
 candidate_repo = OntologyCandidateRepository()
+sync_job_store = OntologySyncJobStore()
 
 
 @router.get("/health", response_model=OntologyHealthResponse)
@@ -121,6 +127,62 @@ def sync_ontologies(
     Use ``selections`` to sync specific ``family/country/version`` items, or ``dry_run`` to preview.
     """
     return _run_sync(payload or OntologySyncRequest())
+
+
+@router.post(
+    "/sync/jobs",
+    response_model=OntologySyncJobResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def start_ontology_sync_job(
+    payload: OntologySyncRequest | None = None,
+    current_user=Depends(get_current_active_user),
+) -> OntologySyncJobResponse:
+    """Queue an ontology sync so large releases do not hold an HTTP request open."""
+    request = payload or OntologySyncRequest()
+    record: dict | None = None
+    try:
+        record = sync_job_store.create(owner_id=str(current_user.id), request=request)
+        celery_app.send_task(
+            "sync_ontologies_from_registry",
+            args=[record["job_id"], request.model_dump(mode="json")],
+        )
+        return OntologySyncJobResponse.model_validate(record)
+    except GraphStoreError as exc:
+        logger.exception("Could not create ontology sync job", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    except Exception as exc:
+        if record is not None:
+            try:
+                sync_job_store.update(
+                    record["job_id"],
+                    status=OntologySyncJobStatus.failed.value,
+                    completed_at=datetime.now(UTC).isoformat(),
+                    error=f"Could not queue ontology sync: {exc}",
+                )
+            except GraphStoreError:
+                logger.exception("Could not mark ontology sync job as failed")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not queue ontology sync",
+        ) from exc
+
+
+@router.get("/sync/jobs/{job_id}", response_model=OntologySyncJobResponse)
+def get_ontology_sync_job(
+    job_id: str,
+    current_user=Depends(get_current_active_user),
+) -> OntologySyncJobResponse:
+    try:
+        record = sync_job_store.get(job_id)
+    except OntologySyncJobNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except GraphStoreError as exc:
+        logger.exception("Could not read ontology sync job", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    if record.get("owner_id") != str(current_user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ontology sync job not found")
+    return OntologySyncJobResponse.model_validate(record)
 
 
 def _run_sync(request: OntologySyncRequest) -> OntologySyncResponse:
