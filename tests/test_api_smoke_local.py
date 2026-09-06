@@ -361,6 +361,7 @@ def client(monkeypatch):
         lambda self, requested_mode=None: requested_mode or "standard",
     )
     monkeypatch.setattr(checks_api, "BlindShaclRuleRunner", DummyBlindRunner)
+    monkeypatch.setattr(checks_api, "_published_ontology_summaries", lambda: [])
     monkeypatch.setattr(
         checks_api,
         "fetch_rule_ttl",

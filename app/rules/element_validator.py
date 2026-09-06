@@ -2,7 +2,7 @@ from app.rules.expressions import ExpressionError, validate_expression
 from app.rules.paths import expand_curie, is_ref_value, ref_path, split_property_path, validate_path_syntax
 
 ELEMENT_TYPES = {"decision", "derive", "start", "end"}
-OPERATORS = {">", "<", "<=", ">=", "between", "=="}
+OPERATORS = {">", "<", "<=", ">=", "between", "==", "exists"}
 
 
 def validate_rule_element_payload(node: dict) -> None:
@@ -25,7 +25,11 @@ def validate_rule_element_payload(node: dict) -> None:
 
         operator = node.get("operator")
         value = node.get("value")
-        if operator in OPERATORS:
+        if operator == "exists":
+            # presence check: True when the path has at least one value, False otherwise (never Unknown)
+            if value not in (None, True, "*", "true"):
+                raise ValueError(f"Decision node '{node_id}' with operator 'exists' takes no value")
+        elif operator in OPERATORS:
             if value is None:
                 raise ValueError(f"Decision node '{node_id}' with operator '{operator}' must define a value")
 

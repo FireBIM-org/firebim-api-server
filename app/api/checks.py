@@ -47,6 +47,7 @@ from app.schemas.checks import (
     CompatibilityMatch,
     CompatibilityWarning,
 )
+from app.storage.ontology_repository import OntologyRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/checks", tags=["checks"])
@@ -178,6 +179,7 @@ def _extract_end_node_summaries(result: RuleRunResult) -> list[CheckEndNodeSumma
                 label=meta.get("label"),
                 output_text=meta.get("output_text"),
                 analysis_code=meta.get("analysis_code"),
+                next_rule=meta.get("next_rule"),
                 count=count,
             )
         )
@@ -372,6 +374,7 @@ def _build_run_options(payload: CheckRunRequest, *, diagnostics: bool) -> RunOpt
         diagnostic_success_only=payload.options.diagnostic_success_only,
         persist_derived=payload.options.persist_derived,
         use_derived_from=list(payload.options.use_derived_from),
+        target_nodes=list(payload.options.target_nodes),
     )
 
 
@@ -399,6 +402,9 @@ def _execute_check_run(
         graph_ttl = merge_derived_graphs(
             graph_ttl=graph_ttl, graph_id=payload.graph_id, rule_ids=payload.options.use_derived_from
         )
+    graph_ttl, merged_schemas = merge_schema_graphs(
+        graph_ttl=graph_ttl, rule_ttl=rule_ttl, schema=payload.options.schema
+    )
     request_timings["fetch_graph"] = round((perf_counter() - started) * 1000.0, 3)
 
     started = perf_counter()
@@ -424,6 +430,8 @@ def _execute_check_run(
         rule_ttl=rule_ttl,
     )
     request_timings["run_rule"] = round((perf_counter() - started) * 1000.0, 3)
+    if merged_schemas and isinstance(getattr(result, "engine", None), dict):
+        result.engine["merged_schemas"] = merged_schemas
     if (
         options.persist_derived
         and getattr(result, "derived_graph_ttl", None)
@@ -460,6 +468,72 @@ def _to_derived_values(result: RuleRunResult) -> list[CheckDerivedValue]:
             )
         )
     return values
+
+
+_ontology_repo = OntologyRepository()
+_ONTOLOGY_SUMMARY_CACHE: dict[str, Any] = {"at": 0.0, "summaries": []}
+_ONTOLOGY_SUMMARY_TTL_SECONDS = 60.0
+
+
+def _published_ontology_summaries() -> list[dict[str, Any]]:
+    """Cached list of published ontologies (a failed store call is cached too, so a check never waits twice)."""
+    now = perf_counter()
+    if now - float(_ONTOLOGY_SUMMARY_CACHE["at"]) < _ONTOLOGY_SUMMARY_TTL_SECONDS:
+        return list(_ONTOLOGY_SUMMARY_CACHE["summaries"])
+    try:
+        summaries = list(_ontology_repo.list_summaries())
+    except Exception:  # store unavailable: run without schema
+        summaries = []
+    _ONTOLOGY_SUMMARY_CACHE.update({"at": now, "summaries": summaries})
+    return list(summaries)
+
+
+def _ontologies_used_by_rule(rule_ttl: str) -> list[tuple[str, str, str]]:
+    """(family, country, version-token) of every published ontology whose namespace occurs in the rule."""
+    found: list[tuple[str, str, str]] = []
+    for summary in _published_ontology_summaries():
+        namespace = str(summary.get("canonical_country_uri") or "")
+        if namespace and namespace in rule_ttl and summary.get("default_version"):
+            found.append((str(summary["ontology_family"]), str(summary["country"]), str(summary["default_version"])))
+    return found
+
+
+def merge_schema_graphs(*, graph_ttl: str, rule_ttl: str, schema: str | None) -> tuple[str, list[str]]:
+    """Append the schema subset (sub-class / sub-property / equivalence / inverse triples) of the ontologies the
+    rule uses, so that `target_class` matches sub-classes and a rule can read `fbo:X` when the graph says
+    `fbo-dk:X` (declared `rdfs:subPropertyOf fbo:X`). Returns (ttl, list of 'family/country/version' merged)."""
+    from app.checks.rdfs_light import schema_subset
+
+    mode = (schema or "auto").strip().lower()
+    if mode == "none":
+        return graph_ttl, []
+    if mode == "auto":
+        selections = _ontologies_used_by_rule(rule_ttl)
+    else:
+        selections = []
+        for item in mode.split(","):
+            parts = [p for p in item.strip().split("/") if p]
+            if len(parts) == 2:
+                selections.append((parts[0], parts[1], "default"))
+            elif len(parts) == 3:
+                selections.append((parts[0], parts[1], parts[2]))
+    if not selections:
+        return graph_ttl, []
+    merged = Graph()
+    merged.parse(data=graph_ttl, format="turtle")
+    used: list[str] = []
+    for family, country, version in selections:
+        try:
+            fetched = _ontology_repo.fetch_version(family, country, version)
+        except Exception:
+            logger.info("No published ontology %s/%s/%s to merge as schema", family, country, version)
+            continue
+        for triple in schema_subset(fetched.ttl):
+            merged.add(triple)
+        used.append(f"{family}/{country}/{fetched.version.version}")
+    if not used:
+        return graph_ttl, []
+    return merged.serialize(format="turtle"), used
 
 
 def merge_derived_graphs(*, graph_ttl: str, graph_id: str, rule_ids: list[str]) -> str:
@@ -834,6 +908,11 @@ def run_blind_check(payload: BlindCheckRunRequest):
         rule_graph_uri, rule_ttl = fetch_rule_ttl(payload.rule_id)
         building_graph_uri = default_building_graph_uri(payload.graph_id)
         graph_ttl = fetch_building_graph_ttl(building_graph_uri)
+        if payload.options.use_derived_from:
+            graph_ttl = merge_derived_graphs(
+                graph_ttl=graph_ttl, graph_id=payload.graph_id, rule_ids=payload.options.use_derived_from
+            )
+        graph_ttl, _ = merge_schema_graphs(graph_ttl=graph_ttl, rule_ttl=rule_ttl, schema=payload.options.schema)
 
         runner = BlindShaclRuleRunner()
         result = runner.run_rule(
@@ -842,6 +921,7 @@ def run_blind_check(payload: BlindCheckRunRequest):
             graph_ttl=graph_ttl,
             rule_id=payload.rule_id,
             rule_ttl=rule_ttl,
+            target_nodes=list(payload.options.target_nodes),
             include_targets=payload.options.include_targets,
             include_debug=payload.options.include_debug,
             max_steps=payload.options.max_steps,

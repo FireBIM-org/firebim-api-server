@@ -163,7 +163,10 @@ class RuleCompiler:
         unknown_obj = graph.value(node_uri, FB.unknownPath)
         end_kind = graph.value(node_uri, EX.endKind)
         output_text = graph.value(node_uri, EX.outputText)
+        next_rule = graph.value(node_uri, EX.nextRule)
         config: dict[str, Any] = {}
+        if next_rule is not None:
+            config["next_rule"] = str(next_rule)
         if value is not None:
             config["value"] = str(value)
             normalized_value = str(value).strip().lower()
@@ -195,6 +198,7 @@ class RuleCompiler:
                 label=str(label) if label is not None else None,
                 end_kind=str(end_kind) if end_kind is not None else None,
                 output_text=str(output_text) if output_text is not None else None,
+                next_rule=str(next_rule) if next_rule is not None else None,
                 config=config,
             )
             self._validate_end_node(node, true_obj=true_obj, false_obj=false_obj, unknown_obj=unknown_obj)

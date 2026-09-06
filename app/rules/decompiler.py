@@ -116,6 +116,7 @@ def decompile_rule_element_ttl(ttl_text: str) -> dict:
 
     end_kind = g.value(node, EX.endKind)
     output_text = g.value(node, EX.outputText)
+    next_rule = g.value(node, EX.nextRule)
 
     config = {}
     if value is not None:
@@ -124,6 +125,8 @@ def decompile_rule_element_ttl(ttl_text: str) -> dict:
         config["end_kind"] = str(end_kind)
     if output_text is not None:
         config["output_text"] = str(output_text)
+    if next_rule is not None:
+        config["next_rule"] = str(next_rule)
 
     result = {
         "id": node_id,
@@ -206,6 +209,7 @@ def decompile_ruleset_ttl(ttl_text: str) -> dict:
 
         end_kind = g.value(node, EX.endKind)
         output_text = g.value(node, EX.outputText)
+        next_rule = g.value(node, EX.nextRule)
 
         config = {}
         if value is not None:
@@ -214,6 +218,8 @@ def decompile_ruleset_ttl(ttl_text: str) -> dict:
             config["end_kind"] = str(end_kind)
         if output_text is not None:
             config["output_text"] = str(output_text)
+        if next_rule is not None:
+            config["next_rule"] = str(next_rule)
 
         entry_dict = {
             "id": node_id,

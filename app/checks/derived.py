@@ -252,9 +252,15 @@ class DeriveEvaluator:
             inputs[path] = value
             return value
 
+        def resolve_many(path: str) -> list[Any]:
+            segments = expand_property_path(path, prefixes)
+            values = [to_python(v) for v in resolve_path_values(graph, target, segments, overlay)]
+            inputs[path] = values
+            return values
+
         try:
             ast = self.ast(expression)
-            value = evaluate(ast, resolve)
+            value = evaluate(ast, resolve, resolve_many)
         except ExpressionUnknown as exc:
             evidence.update({"inputs": inputs, **exc.evidence})
             return "Unknown", exc.reason_code, f"Derive node '{node_id}': {exc.message}", evidence

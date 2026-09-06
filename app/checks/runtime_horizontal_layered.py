@@ -19,6 +19,7 @@ from app.checks.result_models import (
     TargetTraceStep,
 )
 from app.checks.runtime import CheckRuntime, _TraversalState
+from app.checks.targeting import restrict_targets
 
 
 class HorizontalLayeredCheckRuntime(CheckRuntime):
@@ -54,11 +55,14 @@ class HorizontalLayeredCheckRuntime(CheckRuntime):
         self._new_overlay(graph_ref, compiled)
 
         started_targets = perf_counter()
-        initial_targets = self.target_resolver.resolve_targets_for_decision(
-            graph_ref=graph_ref,
-            node=first_decision,
-            graph_index=execution_context.graph_index,
-            metrics=metrics,
+        initial_targets = restrict_targets(
+            self.target_resolver.resolve_targets_for_decision(
+                graph_ref=graph_ref,
+                node=first_decision,
+                graph_index=execution_context.graph_index,
+                metrics=metrics,
+            ),
+            options.target_nodes,
         )
         accumulate_timing(metrics, "resolve_targets_total", perf_counter() - started_targets)
         execution_context.metrics.record_active_targets(first_decision.node_id, len(initial_targets))
