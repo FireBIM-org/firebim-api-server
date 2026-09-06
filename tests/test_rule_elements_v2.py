@@ -971,3 +971,27 @@ def test_check_response_reports_merged_schemas(api_client, monkeypatch):
 
     res = api_client.post("/checks/run", json={"rule_id": "t-fg", "graph_id": "lt", "options": {"schema": "none"}})
     assert res.json()["engine"]["merged_schemas"] == []
+
+
+def test_missing_linked_rule_is_reported_as_rule_not_found(api_client, monkeypatch):
+    from app.api import checks as checks_api
+    from app.storage.graph_store import GraphStoreNotFoundError
+
+    def missing(rule_id: str):
+        raise GraphStoreNotFoundError(f"Graph not found: {rule_id}")
+
+    monkeypatch.setattr(checks_api, "fetch_rule_ttl", missing)
+    for endpoint in ("/checks/run", "/checks/run-diagnostic", "/checks/run-horisontal", "/checks/run-vertical"):
+        res = api_client.post(endpoint, json={"rule_id": "dk-ak3", "graph_id": "lt"})
+        assert res.status_code == 200, (endpoint, res.text)
+        body = res.json()
+        assert body["success"] is False and body["error"] == "rule_not_found", endpoint
+        assert "dk-ak3" in body["message"]
+
+    def missing_graph(graph_uri: str):
+        raise GraphStoreNotFoundError(f"Graph not found: {graph_uri}")
+
+    monkeypatch.setattr(checks_api, "fetch_rule_ttl", lambda rule_id: ("uri", _ttl(lt_rule())))
+    monkeypatch.setattr(checks_api, "fetch_building_graph_ttl", missing_graph)
+    body = api_client.post("/checks/run", json={"rule_id": "t-fg", "graph_id": "nope"}).json()
+    assert body["error"] == "graph_not_found" and "nope" in body["message"]

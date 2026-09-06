@@ -47,7 +47,17 @@ from app.schemas.checks import (
     CompatibilityMatch,
     CompatibilityWarning,
 )
+from app.storage.graph_store import GraphStoreNotFoundError
 from app.storage.ontology_repository import OntologyRepository
+
+
+class CheckInputNotFoundError(Exception):
+    """The rule or the building graph a check refers to is not in the store (e.g. a dangling `next_rule` link)."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(message)
+        self.code = code
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/checks", tags=["checks"])
@@ -393,12 +403,22 @@ def _execute_check_run(
     request_timings: dict[str, float] = {}
 
     started = perf_counter()
-    rule_graph_uri, rule_ttl = fetch_rule_ttl(payload.rule_id)
+    try:
+        rule_graph_uri, rule_ttl = fetch_rule_ttl(payload.rule_id)
+    except (GraphStoreNotFoundError, ValueError) as exc:
+        raise CheckInputNotFoundError(
+            "rule_not_found", f"Rule '{payload.rule_id}' is not published (is it linked from another rule?)"
+        ) from exc
     request_timings["fetch_rule"] = round((perf_counter() - started) * 1000.0, 3)
 
     building_graph_uri = default_building_graph_uri(payload.graph_id)
     started = perf_counter()
-    graph_ttl = fetch_building_graph_ttl(building_graph_uri)
+    try:
+        graph_ttl = fetch_building_graph_ttl(building_graph_uri)
+    except GraphStoreNotFoundError as exc:
+        raise CheckInputNotFoundError(
+            "graph_not_found", f"Building graph '{payload.graph_id}' is not published"
+        ) from exc
     if payload.options.use_derived_from:
         graph_ttl = merge_derived_graphs(
             graph_ttl=graph_ttl, graph_id=payload.graph_id, rule_ids=payload.options.use_derived_from
@@ -671,11 +691,15 @@ def _error_run_response(
     diagnostics: bool,
     exc: Exception,
 ):
-    error_bits = _error_payload(
-        "check_run_error",
-        "Unexpected error while executing compiled rule against building graph",
-        exc,
-    )
+    if isinstance(exc, CheckInputNotFoundError):
+        # A dangling rule link (end element `next_rule`), a deleted rule or an unknown graph: say which.
+        error_bits = _error_payload(exc.code, str(exc), exc)
+    else:
+        error_bits = _error_payload(
+            "check_run_error",
+            "Unexpected error while executing compiled rule against building graph",
+            exc,
+        )
     error_debug = {
         "requested_solver": requested_solver,
         "selected_solver": selected_solver,
