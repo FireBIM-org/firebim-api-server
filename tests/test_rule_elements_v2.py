@@ -921,3 +921,30 @@ def test_rule_link_end_and_target_restriction():
         target_nodes=["https://example.org/x#c3"],
     )
     assert [h["target_node"].split("#")[-1] for h in blind["end_outputs"]] == ["c3"]
+
+
+def test_aggregates_count_per_node_and_handle_booleans_and_codes():
+    from rdflib import Graph
+
+    from app.checks.derived import resolve_path_values
+    from app.rules.expressions import evaluate, parse_expression
+
+    g = Graph()
+    g.parse(
+        data=f"""
+        @prefix lt: <{LT}> . @prefix ex: <https://example.org/x#> .
+        ex:u lt:has ex:c1, ex:c2 . ex:c1 lt:has ex:d1, ex:d2 . ex:c2 lt:has ex:d3, ex:d1 .
+        ex:d1 lt:Exit true . ex:d2 lt:Exit true . ex:d3 lt:Exit false .
+        ex:c1 lt:RK "RK2" . ex:c2 lt:RK "RK3" .
+        """,
+        format="turtle",
+    )
+    segs = [f"{LT}has", f"{LT}has", f"{LT}Exit"]
+    assert len(resolve_path_values(g, "https://example.org/x#u", segs)) == 2  # decisions: {true, false}
+    assert len(resolve_path_values(g, "https://example.org/x#u", segs, distinct=False)) == 3  # d1 once, d2, d3
+    many = {
+        "e": [v.toPython() for v in resolve_path_values(g, "https://example.org/x#u", segs, distinct=False)],
+        "rk": ["RK2", "RK3"],
+    }
+    assert evaluate(parse_expression("sum($e)"), None, lambda p: many[p]) == 2
+    assert evaluate(parse_expression("max($rk)"), None, lambda p: many[p]) == "RK3"

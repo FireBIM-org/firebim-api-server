@@ -10,6 +10,8 @@ resolve to exactly one value.
 
 Aggregates read *all* values of a path: count($p), sum($p), min($p), max($p), avg($p), any($p), all($p).
 count/sum of nothing are 0; min/max/avg of nothing are Unknown; any(nothing) is false, all(nothing) is true.
+Booleans count as 1/0 in sum/avg/min/max; min/max of strings is lexicographic (enumeration codes RK1 < RK2).
+Aggregates see one value per reached node (two exit doors with IsFireExit true are 2), decisions see distinct values.
 min/max with several scalar arguments keep their old meaning (min($a, 5)).
 
 No comparisons, no conditionals, no loops: branching is the job of decision elements.
@@ -229,7 +231,11 @@ def _aggregate(name: str, path: str, values: list[Any]) -> Any:
         return all(v is True for v in values)
     if not values:
         raise ExpressionUnknown("missing_required_input", f"{name}(${path}): no values", property_path=path)
-    numbers = [_num(v, f"{name}() value") for v in values]
+    if name in ("min", "max") and all(isinstance(v, str) for v in values):
+        # enumeration codes ("RK1" < "RK2", "AK2" < "AK3"): lexicographic min/max
+        return min(values) if name == "min" else max(values)
+    # booleans count as 1/0 so sum($…/IsFireExit) is "number of exit doors"
+    numbers = [1 if v is True else 0 if v is False else _num(v, f"{name}() value") for v in values]
     if name == "sum":
         return sum(numbers)
     if name == "min":
