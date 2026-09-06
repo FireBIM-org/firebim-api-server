@@ -54,6 +54,9 @@ class SHACLBuilder:
             sparql_op = "=" if op == "==" else op
             return f"?h {sparql_op} ?v"
 
+        if op == "exists":
+            return "BOUND(?h)"
+
         if op in ["<=", ">=", "<", ">"]:
             return f"?h {op} {value}"
 
@@ -108,6 +111,11 @@ class SHACLBuilder:
                 if output_text is None:
                     output_text = terminal_text
 
+            next_rule = element.config.get("next_rule")
+            if next_rule:
+                self.graph.add((node_uri, self.EX.nextRule, Literal(str(next_rule))))
+                if end_kind is None:
+                    end_kind = "rule"
             if end_kind is not None:
                 self.graph.add((node_uri, self.EX.endKind, Literal(str(end_kind))))
             if output_text is not None:
@@ -143,7 +151,7 @@ class SHACLBuilder:
         property_path = self._sparql_path(segments)
         comparison = self._build_comparison(element)
         ref_clause = ""
-        unknown_test = "!BOUND(?h)"
+        unknown_test = "false" if element.operator == "exists" else "!BOUND(?h)"
         if is_ref_value(element.value):
             ref_segments = expand_property_path(ref_path(element.value), prefixes)
             ref_clause = f"OPTIONAL {{ ?this {self._sparql_path(ref_segments)} ?v }}"

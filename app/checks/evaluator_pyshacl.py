@@ -164,6 +164,14 @@ class PyShaclAtomicEvaluator(RDFGraphBackedEvaluator):
             property_path=node.property_path,
             ctx=ctx,
         )
+        if node.operator == "exists":
+            present = bool(values)
+            return AtomicOutcome(
+                status="True" if present else "False",
+                reason_code="value_present" if present else "value_absent",
+                message=f"Target '{target}' {'has' if present else 'has no'} value for '{node.property_path}'",
+                evidence={"engine": "pyshacl", "node_id": node.node_id, "target": target},
+            )
         if not values:
             return self.unknown_outcome(
                 reason_code="missing_required_input",
@@ -262,6 +270,9 @@ class PyShaclAtomicEvaluator(RDFGraphBackedEvaluator):
         if operator is None:
             raise ValueError("Decision operator is missing")
 
+        if operator == "exists":
+            shacl_graph.add((property_shape, SH.minCount, Literal(1)))
+            return
         if operator == "<=":
             shacl_graph.add((property_shape, SH.maxInclusive, self._python_to_literal(value)))
             return

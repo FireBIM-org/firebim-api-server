@@ -12,8 +12,9 @@ from app.checks.end_status import status_from_end_kind
 from app.checks.execution_state import ExecutionContext
 from app.checks.pathways import PathwayResolver
 from app.checks.planner import RuleExecutionPlanner
+from app.checks.rdfs_light import materialize
 from app.checks.result_models import CompiledRuleSet, DecisionNode, EndNode, GraphRef, RunOptions, TargetRef
-from app.checks.targeting import TargetResolver
+from app.checks.targeting import TargetResolver, restrict_targets
 from app.rules.paths import expand_property_path, is_ref_value, ref_path
 
 FB = Namespace("http://example.org/firebim/rule/")
@@ -64,6 +65,7 @@ class BlindShaclRuleRunner:
         include_targets: bool = True,
         include_debug: bool = False,
         max_steps: int = 100000,
+        target_nodes: list[str] | None = None,
     ) -> dict[str, Any]:
         started = time.perf_counter()
 
@@ -99,10 +101,13 @@ class BlindShaclRuleRunner:
         )
 
         entry_decision = self._resolve_first_decision(compiled)
-        entry_targets = self.target_resolver.resolve_targets_for_decision(
-            graph_ref=graph_ref,
-            node=entry_decision,
-            graph_index=graph_index,
+        entry_targets = restrict_targets(
+            self.target_resolver.resolve_targets_for_decision(
+                graph_ref=graph_ref,
+                node=entry_decision,
+                graph_index=graph_index,
+            ),
+            target_nodes,
         )
 
         terminal_hits = self._traverse_to_terminal_outputs(
@@ -173,6 +178,7 @@ class BlindShaclRuleRunner:
     def _parse_graph(self, ttl: str) -> Graph:
         graph = Graph()
         graph.parse(data=ttl, format="turtle")
+        materialize(graph)
         return graph
 
     def _resolve_first_decision(self, compiled: CompiledRuleSet) -> DecisionNode:

@@ -10,6 +10,14 @@ from app.checks.graph_index import GraphIndex, GraphIndexBuilder
 from app.checks.result_models import CompiledRuleSet, DecisionNode, GraphRef, TargetRef
 
 
+def restrict_targets(targets: list[TargetRef], allowed: list[str] | None) -> list[TargetRef]:
+    """Keep only the targets listed in `allowed` (RunOptions.target_nodes); no list = no restriction."""
+    if not allowed:
+        return targets
+    wanted = {str(t).strip() for t in allowed if str(t).strip()}
+    return [t for t in targets if t.target_node in wanted]
+
+
 class TargetResolver:
     def __init__(self, cache: CheckExecutionCache | None = None) -> None:
         self.cache = cache or get_default_execution_cache()

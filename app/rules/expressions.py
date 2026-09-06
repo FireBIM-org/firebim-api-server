@@ -5,7 +5,15 @@
     unary   := '-' unary | primary
     primary := NUMBER | STRING | true | false | null | $path | NAME '(' args ')' | '(' expr ')' | '[' args ']'
 
-`$path` references a property path (see app.rules.paths) evaluated on the target being processed.
+`$path` references a property path (see app.rules.paths) evaluated on the target being processed and must
+resolve to exactly one value.
+
+Aggregates read *all* values of a path: count($p), sum($p), min($p), max($p), avg($p), any($p), all($p).
+count/sum of nothing are 0; min/max/avg of nothing are Unknown; any(nothing) is false, all(nothing) is true.
+Booleans count as 1/0 in sum/avg/min/max; min/max of strings is lexicographic (enumeration codes RK1 < RK2).
+Aggregates see one value per reached node (two exit doors with IsFireExit true are 2), decisions see distinct values.
+min/max with several scalar arguments keep their old meaning (min($a, 5)).
+
 No comparisons, no conditionals, no loops: branching is the job of decision elements.
 """
 
@@ -56,7 +64,7 @@ class Token:
 
 @dataclass(frozen=True)
 class Node:
-    kind: str  # num | str | bool | null | ref | list | call | neg | bin
+    kind: str  # num | str | bool | null | ref | list | call | neg | bin | agg
     value: Any = None
     children: tuple[Node, ...] = ()
 
@@ -170,9 +178,13 @@ class _Parser:
                     f"Unknown identifier {tok.text!r} at position {tok.pos} (did you mean ${tok.text}?)"
                 )
             self.take()
-            if lowered not in FUNCTIONS:
+            if lowered not in FUNCTIONS and lowered not in AGGREGATES:
                 raise ExpressionError(f"Unknown function {tok.text!r}")
             arguments = self.args(")")
+            if lowered in AGGREGATES and len(arguments) == 1 and arguments[0].kind == "ref":
+                return Node("agg", lowered, arguments)
+            if lowered in AGGREGATES and lowered not in FUNCTIONS:
+                raise ExpressionError(f"{lowered}() takes exactly one $path argument, e.g. {lowered}($fbo:hasSubitem)")
             arity = FUNCTIONS[lowered][0]
             if arity is not None and len(arguments) != arity:
                 raise ExpressionError(f"Function {lowered}() takes {arity} argument(s), got {len(arguments)}")
@@ -205,6 +217,32 @@ def _lookup(args: list[Any]) -> Any:
         if (lo is None or _num(lo, "lookup lower bound") <= x) and (hi is None or x < _num(hi, "lookup upper bound")):
             return value
     raise ExpressionUnknown("lookup_miss", f"no lookup row matches {x}", key=x)
+
+
+AGGREGATES = ("count", "sum", "min", "max", "avg", "any", "all")
+
+
+def _aggregate(name: str, path: str, values: list[Any]) -> Any:
+    if name == "count":
+        return len(values)
+    if name == "any":
+        return any(v is True for v in values)
+    if name == "all":
+        return all(v is True for v in values)
+    if not values:
+        raise ExpressionUnknown("missing_required_input", f"{name}(${path}): no values", property_path=path)
+    if name in ("min", "max") and all(isinstance(v, str) for v in values):
+        # enumeration codes ("RK1" < "RK2", "AK2" < "AK3"): lexicographic min/max
+        return min(values) if name == "min" else max(values)
+    # booleans count as 1/0 so sum($…/IsFireExit) is "number of exit doors"
+    numbers = [1 if v is True else 0 if v is False else _num(v, f"{name}() value") for v in values]
+    if name == "sum":
+        return sum(numbers)
+    if name == "min":
+        return min(numbers)
+    if name == "max":
+        return max(numbers)
+    return sum(numbers) / len(numbers)
 
 
 FUNCTIONS: dict[str, tuple[int | None, Callable[[list[Any]], Any]]] = {
@@ -255,8 +293,17 @@ def validate_expression(text: str) -> list[str]:
     return referenced_paths(parse_expression(text))
 
 
-def evaluate(node: Node, resolve: Callable[[str], Any]) -> Any:
-    """Evaluate an AST. `resolve(path)` must return exactly one python value or raise ExpressionUnknown."""
+def evaluate(
+    node: Node,
+    resolve: Callable[[str], Any],
+    resolve_many: Callable[[str], list[Any]] | None = None,
+) -> Any:
+    """Evaluate an AST.
+
+    `resolve(path)` must return exactly one python value or raise ExpressionUnknown.
+    `resolve_many(path)` returns every value of the path (for aggregates); when it is not given, aggregates fall
+    back to `resolve` and therefore see at most one value.
+    """
     kind = node.kind
     if kind in ("num", "str", "bool"):
         return node.value
@@ -264,12 +311,24 @@ def evaluate(node: Node, resolve: Callable[[str], Any]) -> Any:
         return None
     if kind == "ref":
         return resolve(node.value)
+    if kind == "agg":
+        path = node.children[0].value
+        if resolve_many is not None:
+            values = list(resolve_many(path))
+        else:
+            try:
+                values = [resolve(path)]
+            except ExpressionUnknown as exc:
+                if exc.reason_code != "missing_required_input":
+                    raise
+                values = []
+        return _aggregate(node.value, path, values)
     if kind == "list":
-        return [evaluate(c, resolve) for c in node.children]
+        return [evaluate(c, resolve, resolve_many) for c in node.children]
     if kind == "neg":
-        return -_num(evaluate(node.children[0], resolve), "negation operand")
+        return -_num(evaluate(node.children[0], resolve, resolve_many), "negation operand")
     if kind == "call":
-        args = [evaluate(c, resolve) for c in node.children]
+        args = [evaluate(c, resolve, resolve_many) for c in node.children]
         try:
             return FUNCTIONS[node.value][1](args)
         except (ValueError, OverflowError, ZeroDivisionError) as exc:
@@ -277,8 +336,8 @@ def evaluate(node: Node, resolve: Callable[[str], Any]) -> Any:
                 "expression_error", f"{node.value}() failed: {exc}", arguments=[repr(a) for a in args]
             ) from exc
     if kind == "bin":
-        left = evaluate(node.children[0], resolve)
-        right = evaluate(node.children[1], resolve)
+        left = evaluate(node.children[0], resolve, resolve_many)
+        right = evaluate(node.children[1], resolve, resolve_many)
         op = node.value
         if op == "+" and isinstance(left, str) and isinstance(right, str):
             return left + right
@@ -312,6 +371,6 @@ def describe(node: Node) -> str:
         return "[" + ", ".join(describe(c) for c in node.children) + "]"
     if kind == "neg":
         return "-" + describe(node.children[0])
-    if kind == "call":
+    if kind in ("call", "agg"):
         return f"{node.value}(" + ", ".join(describe(c) for c in node.children) + ")"
     return "(" + describe(node.children[0]) + f" {node.value} " + describe(node.children[1]) + ")"

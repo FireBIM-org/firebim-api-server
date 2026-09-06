@@ -146,19 +146,24 @@ def resolve_path_values(
     target: str,
     segments: list[str],
     overlay: DerivedOverlay | None = None,
+    *,
+    distinct: bool = True,
 ) -> list[Any]:
     """All *distinct* values reachable from `target` along the sequence path (rdflib terms), overlay-aware per hop.
 
     A segment starting with ``^`` is followed backwards (subjects that point at the current node).
 
-    Duplicates are collapsed at every hop, so a sequence path that reaches the same literal through several
-    intermediate nodes (unit -> compartments -> UseCategory = "AK2", "AK2") yields one value; only genuinely
-    different values are reported as ambiguous by the evaluators.
+    Intermediate nodes are always visited once (a compartment reached through two rooms is one compartment).
+    With ``distinct=True`` (decisions) identical final values collapse too, so unit -> compartments -> UseCategory =
+    "AK2", "AK2" is one value and only genuinely different values are ambiguous. Aggregates pass ``distinct=False``
+    so that count()/sum() see one value per node: two exit doors are two, not one.
     """
     frontier: list[Any] = [URIRef(target)]
-    for prop in segments:
+    last_index = len(segments) - 1
+    for index, prop in enumerate(segments):
         nxt: list[Any] = []
         seen: set[Any] = set()
+        collapse_literals = distinct or index < last_index
         for node in frontier:
             if not isinstance(node, URIRef):
                 continue
@@ -169,9 +174,10 @@ def resolve_path_values(
             else:
                 candidates = list(graph.objects(node, URIRef(prop)))
             for value in candidates:
-                if value in seen:
-                    continue
-                seen.add(value)
+                if isinstance(value, URIRef) or collapse_literals:
+                    if value in seen:
+                        continue
+                    seen.add(value)
                 nxt.append(value)
         frontier = nxt
         if not frontier:
@@ -252,9 +258,15 @@ class DeriveEvaluator:
             inputs[path] = value
             return value
 
+        def resolve_many(path: str) -> list[Any]:
+            segments = expand_property_path(path, prefixes)
+            values = [to_python(v) for v in resolve_path_values(graph, target, segments, overlay, distinct=False)]
+            inputs[path] = values
+            return values
+
         try:
             ast = self.ast(expression)
-            value = evaluate(ast, resolve)
+            value = evaluate(ast, resolve, resolve_many)
         except ExpressionUnknown as exc:
             evidence.update({"inputs": inputs, **exc.evidence})
             return "Unknown", exc.reason_code, f"Derive node '{node_id}': {exc.message}", evidence

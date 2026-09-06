@@ -31,6 +31,7 @@ class RunOptions(BaseModel):
 
     persist_derived: bool = False
     use_derived_from: list[str] = Field(default_factory=list)
+    target_nodes: list[str] = Field(default_factory=list)  # restrict the run to these target IRIs (rule chaining)
 
 
 class GraphRef(BaseModel):
@@ -110,6 +111,7 @@ class EndNode(BaseCompiledNode):
     node_type: Literal["end"] = "end"
     end_kind: str | None = None
     output_text: str | None = None
+    next_rule: str | None = None  # end_kind "rule": the rule that continues for targets reaching this end
 
 
 CompiledNode = StartNode | DecisionNode | DeriveNode | EndNode

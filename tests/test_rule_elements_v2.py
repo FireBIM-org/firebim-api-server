@@ -710,3 +710,288 @@ def test_blind_runner_treats_conflicting_multi_value_results_as_unknown():
         rule_ttl=_ttl(rule),
     )
     assert {h["target_node"].split("#")[-1]: h["final_status"] for h in blind["end_outputs"]} == expected
+
+
+# ------------------------------------------------------------------------------ aggregates + rdfs-light
+UNIT_GRAPH = f"""
+@prefix lt: <{LT}> . @prefix ex: <https://example.org/u#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> . @prefix owl: <http://www.w3.org/2002/07/owl#> .
+# schema subset (what merge_schema_graphs appends)
+lt:Unit rdfs:subClassOf lt:FireSafetyUnit . lt:Compartment rdfs:subClassOf lt:FireSafetyUnit .
+lt:Subcompartment rdfs:subClassOf lt:FireSafetyUnit .
+lt:AreaDK rdfs:subPropertyOf lt:Area . lt:partOf owl:inverseOf lt:hasSubitem .
+lt:CompartmentDK owl:equivalentClass lt:Compartment .
+# data
+ex:u1 a lt:Unit ; lt:hasSubitem ex:c1, ex:c2 .
+ex:u2 a lt:Unit .
+ex:c1 a lt:Compartment ; lt:RiskClass 2 ; lt:AreaDK 120 ; lt:hasSubitem ex:d1 .
+ex:c2 a lt:CompartmentDK ; lt:RiskClass 3 ; lt:AreaDK 80 .
+ex:d1 a lt:Door ; lt:IsFireExit true .
+"""
+
+
+def _unit_rule():
+    rid = "t-unit"
+    return {
+        "id": rid,
+        "entry": f"{rid}-start",
+        "elements": [
+            {"id": f"{rid}-start", "element_type": "start", "true_path": f"{rid}-n", "label": "start"},
+            {
+                "id": f"{rid}-n",
+                "element_type": "derive",
+                "target_class": f"{LT}Unit",
+                "property_path": f"{LT}NumberOfCompartments",
+                "expression": f"count(${LT}hasSubitem)",
+                "true_path": f"{rid}-has",
+                "unknown_path": f"{rid}-ask",
+                "label": "count compartments",
+            },
+            {
+                "id": f"{rid}-has",
+                "element_type": "decision",
+                "target_class": f"{LT}Unit",
+                "property_path": f"{LT}NumberOfCompartments",
+                "operator": ">=",
+                "value": 1,
+                "true_path": f"{rid}-rc",
+                "false_path": f"{rid}-empty",
+                "unknown_path": f"{rid}-ask",
+                "label": "at least one compartment?",
+            },
+            {
+                "id": f"{rid}-rc",
+                "element_type": "derive",
+                "target_class": f"{LT}Unit",
+                "property_path": f"{LT}RiskClass",
+                "expression": f"max(${LT}hasSubitem/{LT}RiskClass)",
+                "true_path": f"{rid}-area",
+                "unknown_path": f"{rid}-ask",
+                "label": "unit risk class = highest of its compartments",
+            },
+            {
+                "id": f"{rid}-area",
+                "element_type": "derive",
+                "target_class": f"{LT}Unit",
+                "property_path": f"{LT}TotalArea",
+                "expression": f"sum(${LT}hasSubitem/{LT}Area)",  # Area is the super-property of AreaDK
+                "true_path": f"{rid}-ok",
+                "unknown_path": f"{rid}-ask",
+                "label": "total area via super-property",
+            },
+            _end(rid, "ok", "pass"),
+            _end(rid, "empty", "fail"),
+            _end(rid, "ask", "missing_data"),
+        ],
+    }
+
+
+def test_aggregates_and_rdfs_light_in_all_runners():
+    rule = _unit_rule()
+    for runtime_cls in (CheckRuntime, HorizontalLayeredCheckRuntime, VerticalPathwayCheckRuntime):
+        result = _run(runtime_cls, rule, UNIT_GRAPH)
+        assert _status_by_target(result) == {"u1": "True", "u2": "False"}
+        derived = {
+            (d["target"].split("#")[-1], d["property"].split("#")[-1]): d["value"] for d in result.derived_values
+        }
+        assert derived[("u1", "NumberOfCompartments")] == 2
+        assert derived[("u1", "RiskClass")] == 3  # c2 is typed with the *equivalent* class and still counted
+        assert derived[("u1", "TotalArea")] == 200  # read through rdfs:subPropertyOf
+        assert derived[("u2", "NumberOfCompartments")] == 0  # count of nothing is 0, not Unknown
+    blind = BlindShaclRuleRunner().run_rule(
+        graph_id="g",
+        graph_uri="https://firebim.org/graphs/buildings/g",
+        graph_ttl=UNIT_GRAPH,
+        rule_id="t-unit",
+        rule_ttl=_ttl(rule),
+        include_debug=True,
+    )
+    assert {h["target_node"].split("#")[-1]: h["final_status"] for h in blind["end_outputs"]} == {
+        "u1": "True",
+        "u2": "False",
+    }
+
+
+def test_subclass_targets_and_inverse_property():
+    rid = "t-fsu"
+    rule = {
+        "id": rid,
+        "entry": f"{rid}-start",
+        "elements": [
+            {"id": f"{rid}-start", "element_type": "start", "true_path": f"{rid}-q", "label": "start"},
+            {
+                "id": f"{rid}-q",
+                "element_type": "decision",
+                "target_class": f"{LT}FireSafetyUnit",  # matches Unit, Compartment, CompartmentDK via the schema
+                "property_path": f"{LT}partOf",  # only materialised through owl:inverseOf hasSubitem
+                "operator": "exists",
+                "value": True,
+                "true_path": f"{rid}-part",
+                "false_path": f"{rid}-top",
+                "unknown_path": f"{rid}-ask",
+                "label": "is part of something?",
+            },
+            _end(rid, "part", "pass"),
+            _end(rid, "top", "fail"),
+            _end(rid, "ask", "missing_data"),
+        ],
+    }
+    result = _run(CheckRuntime, rule, UNIT_GRAPH)
+    statuses = _status_by_target(result)
+    assert set(statuses) == {"u1", "u2", "c1", "c2"}  # d1 (Door) is not a FireSafetyUnit
+    assert statuses["c1"] == "True" and statuses["c2"] == "True"
+    assert statuses["u1"] == "False" and statuses["u2"] == "False"
+
+
+def test_rule_link_end_and_target_restriction():
+    rid = "t-dispatch"
+    rule = {
+        "id": rid,
+        "entry": f"{rid}-start",
+        "elements": [
+            {"id": f"{rid}-start", "element_type": "start", "true_path": f"{rid}-q", "label": "which category?"},
+            {
+                "id": f"{rid}-q",
+                "element_type": "decision",
+                "target_class": f"{LT}Compartment",
+                "property_path": f"{LT}Cat",
+                "operator": "==",
+                "value": "AK2",
+                "true_path": f"{rid}-ak2",
+                "false_path": f"{rid}-other",
+                "unknown_path": f"{rid}-ask",
+                "label": "AK2?",
+            },
+            {
+                "id": f"{rid}-ak2",
+                "element_type": "end",
+                "label": "→ compartment size AK2",
+                "config": {"end_kind": "rule", "next_rule": "dk-compartments-size-ak2", "output_text": "see AK2 rule"},
+            },
+            _end(rid, "other", "not_applicable"),
+            _end(rid, "ask", "missing_data"),
+        ],
+    }
+    errors, _ = lint_rule(rule)
+    assert errors == []
+    bad = {
+        **rule,
+        "elements": [
+            *rule["elements"][:2],
+            {**rule["elements"][2], "config": {"next_rule": rid}},
+            *rule["elements"][3:],
+        ],
+    }
+    assert any("links to its own rule" in e for e in lint_rule(bad)[0])
+
+    ttl = _ttl(rule)
+    back = {n["id"]: n for n in decompile_ruleset_ttl(ttl)["nodes"]}
+    assert back[f"{rid}-ak2"]["config"]["next_rule"] == "dk-compartments-size-ak2"
+    compiled = RuleCompiler().compile_from_ttl(ttl)
+    assert compiled.nodes[f"{rid}-ak2"].next_rule == "dk-compartments-size-ak2"
+
+    data = f"""
+    @prefix lt: <{LT}> . @prefix ex: <https://example.org/x#> .
+    ex:c1 a lt:Compartment ; lt:Cat "AK2" . ex:c2 a lt:Compartment ; lt:Cat "AK3" .
+    ex:c3 a lt:Compartment ; lt:Cat "AK2" .
+    """
+    graph_ref = GraphRef(graph_id="g", graph_uri="https://firebim.org/graphs/buildings/g", ttl=data)
+    result = CheckRuntime(evaluator=HybridAtomicEvaluator()).run_rule(
+        graph_ref=graph_ref, compiled=compiled, options=RunOptions(include_end_node_targets=True)
+    )
+    by_target = {t.target_node.split("#")[-1]: (t.final_status, t.terminal_node_id) for t in result.targets}
+    assert by_target["c1"] == ("True", f"{rid}-ak2") and by_target["c3"] == ("True", f"{rid}-ak2")
+    assert by_target["c2"] == ("True", f"{rid}-other")
+    end_meta = {e["node_id"]: e for e in result.compiled_rule["end_nodes"]}
+    assert end_meta[f"{rid}-ak2"]["next_rule"] == "dk-compartments-size-ak2"
+
+    # the RuleBook chains the next rule only for the targets that reached the link end
+    restricted = CheckRuntime(evaluator=HybridAtomicEvaluator()).run_rule(
+        graph_ref=graph_ref,
+        compiled=compiled,
+        options=RunOptions(target_nodes=["https://example.org/x#c1"]),
+    )
+    assert [t.target_node.split("#")[-1] for t in restricted.targets] == ["c1"]
+    blind = BlindShaclRuleRunner().run_rule(
+        graph_id="g",
+        graph_uri="https://firebim.org/graphs/buildings/g",
+        graph_ttl=data,
+        rule_id=rid,
+        rule_ttl=ttl,
+        target_nodes=["https://example.org/x#c3"],
+    )
+    assert [h["target_node"].split("#")[-1] for h in blind["end_outputs"]] == ["c3"]
+
+
+def test_aggregates_count_per_node_and_handle_booleans_and_codes():
+    from rdflib import Graph
+
+    from app.checks.derived import resolve_path_values
+    from app.rules.expressions import evaluate, parse_expression
+
+    g = Graph()
+    g.parse(
+        data=f"""
+        @prefix lt: <{LT}> . @prefix ex: <https://example.org/x#> .
+        ex:u lt:has ex:c1, ex:c2 . ex:c1 lt:has ex:d1, ex:d2 . ex:c2 lt:has ex:d3, ex:d1 .
+        ex:d1 lt:Exit true . ex:d2 lt:Exit true . ex:d3 lt:Exit false .
+        ex:c1 lt:RK "RK2" . ex:c2 lt:RK "RK3" .
+        """,
+        format="turtle",
+    )
+    segs = [f"{LT}has", f"{LT}has", f"{LT}Exit"]
+    assert len(resolve_path_values(g, "https://example.org/x#u", segs)) == 2  # decisions: {true, false}
+    assert len(resolve_path_values(g, "https://example.org/x#u", segs, distinct=False)) == 3  # d1 once, d2, d3
+    many = {
+        "e": [v.toPython() for v in resolve_path_values(g, "https://example.org/x#u", segs, distinct=False)],
+        "rk": ["RK2", "RK3"],
+    }
+    assert evaluate(parse_expression("sum($e)"), None, lambda p: many[p]) == 2
+    assert evaluate(parse_expression("max($rk)"), None, lambda p: many[p]) == "RK3"
+
+
+def test_check_response_reports_merged_schemas(api_client, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.api import checks as checks_api
+
+    summaries = [
+        {"ontology_family": "fbo", "country": "lt", "canonical_country_uri": LT, "default_version": "2026.09.06"}
+    ]
+    schema_ttl = f"<{LT}Fg> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <{FBO}Fg> ."
+    fetched = SimpleNamespace(ttl=schema_ttl, version=SimpleNamespace(version="2026.09.06"))
+    monkeypatch.setattr(checks_api, "_published_ontology_summaries", lambda: summaries)
+    monkeypatch.setattr(checks_api._ontology_repo, "fetch_version", lambda family, country, version: fetched)
+
+    res = api_client.post(
+        "/checks/run", json={"rule_id": "t-fg", "graph_id": "lt", "options": {"include_trace": False}}
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["engine"]["merged_schemas"] == ["fbo/lt/2026.09.06"]
+
+    res = api_client.post("/checks/run", json={"rule_id": "t-fg", "graph_id": "lt", "options": {"schema": "none"}})
+    assert res.json()["engine"]["merged_schemas"] == []
+
+
+def test_missing_linked_rule_is_reported_as_rule_not_found(api_client, monkeypatch):
+    from app.api import checks as checks_api
+    from app.storage.graph_store import GraphStoreNotFoundError
+
+    def missing(rule_id: str):
+        raise GraphStoreNotFoundError(f"Graph not found: {rule_id}")
+
+    monkeypatch.setattr(checks_api, "fetch_rule_ttl", missing)
+    for endpoint in ("/checks/run", "/checks/run-diagnostic", "/checks/run-horisontal", "/checks/run-vertical"):
+        res = api_client.post(endpoint, json={"rule_id": "dk-ak3", "graph_id": "lt"})
+        assert res.status_code == 200, (endpoint, res.text)
+        body = res.json()
+        assert body["success"] is False and body["error"] == "rule_not_found", endpoint
+        assert "dk-ak3" in body["message"]
+
+    def missing_graph(graph_uri: str):
+        raise GraphStoreNotFoundError(f"Graph not found: {graph_uri}")
+
+    monkeypatch.setattr(checks_api, "fetch_rule_ttl", lambda rule_id: ("uri", _ttl(lt_rule())))
+    monkeypatch.setattr(checks_api, "fetch_building_graph_ttl", missing_graph)
+    body = api_client.post("/checks/run", json={"rule_id": "t-fg", "graph_id": "nope"}).json()
+    assert body["error"] == "graph_not_found" and "nope" in body["message"]

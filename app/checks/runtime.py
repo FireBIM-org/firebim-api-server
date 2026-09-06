@@ -29,7 +29,7 @@ from app.checks.result_models import (
     TargetTrace,
     TargetTraceStep,
 )
-from app.checks.targeting import TargetResolver
+from app.checks.targeting import TargetResolver, restrict_targets
 
 
 @dataclass
@@ -137,11 +137,14 @@ class CheckRuntime:
         self._new_overlay(graph_ref, compiled)
 
         started_targets = perf_counter()
-        initial_targets = self.target_resolver.resolve_targets_for_decision(
-            graph_ref=graph_ref,
-            node=first_decision,
-            graph_index=execution_context.graph_index,
-            metrics=metrics,
+        initial_targets = restrict_targets(
+            self.target_resolver.resolve_targets_for_decision(
+                graph_ref=graph_ref,
+                node=first_decision,
+                graph_index=execution_context.graph_index,
+                metrics=metrics,
+            ),
+            options.target_nodes,
         )
         accumulate_timing(metrics, "resolve_targets_total", perf_counter() - started_targets)
         execution_context.metrics.record_active_targets(first_decision.node_id, len(initial_targets))
@@ -258,6 +261,7 @@ class CheckRuntime:
                     "label": node.label,
                     "end_kind": getattr(node, "end_kind", None),
                     "output_text": getattr(node, "output_text", None),
+                    "next_rule": getattr(node, "next_rule", None),
                     "terminal_value": node.config.get("terminal_value") or node.config.get("value"),
                     "analysis_code": node.config.get("analysis_code"),
                 }

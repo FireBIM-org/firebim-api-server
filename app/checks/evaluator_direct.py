@@ -89,6 +89,25 @@ class DirectAtomicEvaluator(RDFGraphBackedEvaluator):
                     continue
 
                 values = list(prefetched_values.get(target, []))
+                if node.operator == "exists":
+                    present = bool(values)
+                    outcomes[target] = AtomicOutcome(
+                        status="True" if present else "False",
+                        reason_code="value_present" if present else "value_absent",
+                        message=(
+                            f"Target '{target}' {'has' if present else 'has no'} value for "
+                            f"'{node.property_path}' in node '{node.node_id}'"
+                        ),
+                        evidence={
+                            "engine": "direct",
+                            "node_id": node.node_id,
+                            "target": target,
+                            "property_path": node.property_path,
+                            "values": [self.term_to_python(v) for v in values][:10],
+                            "evaluation_shape": evaluation_shape,
+                        },
+                    )
+                    continue
                 if not values:
                     outcomes[target] = self.unknown_outcome(
                         reason_code="missing_required_input",

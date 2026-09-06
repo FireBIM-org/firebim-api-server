@@ -20,6 +20,7 @@ from app.checks.result_models import (
 )
 from app.checks.runtime import _TraversalState
 from app.checks.runtime_horizontal_layered import HorizontalLayeredCheckRuntime
+from app.checks.targeting import restrict_targets
 
 
 class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
@@ -61,11 +62,14 @@ class VerticalPathwayCheckRuntime(HorizontalLayeredCheckRuntime):
         self._new_overlay(graph_ref, compiled)
 
         started_targets = perf_counter()
-        initial_targets = self.target_resolver.resolve_targets_for_decision(
-            graph_ref=graph_ref,
-            node=first_decision,
-            graph_index=execution_context.graph_index,
-            metrics=metrics,
+        initial_targets = restrict_targets(
+            self.target_resolver.resolve_targets_for_decision(
+                graph_ref=graph_ref,
+                node=first_decision,
+                graph_index=execution_context.graph_index,
+                metrics=metrics,
+            ),
+            options.target_nodes,
         )
         if execution_context.plan.strategy == "backward":
             initial_targets = self._filter_initial_targets_backward(

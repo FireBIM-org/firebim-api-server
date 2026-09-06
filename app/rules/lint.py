@@ -141,6 +141,18 @@ def lint_rule(rule: dict[str, Any]) -> tuple[list[str], list[str]]:
                         f"derive '{el.get('id')}' reads {prop}, written by {writers}, "
                         "but not every path to it passes a writer first"
                     )
+    # end elements that hand over to another rule
+    for el in elements:
+        if _etype(el) != "end":
+            continue
+        cfg = el.get("config") if isinstance(el.get("config"), dict) else {}
+        next_rule = cfg.get("next_rule")
+        if next_rule and str(next_rule).strip() == str(rule.get("id") or "").strip():
+            errors.append(f"end '{el.get('id')}' links to its own rule (next_rule = {next_rule})")
+        if next_rule and str(cfg.get("end_kind") or "rule") not in ("rule", "delegate", "link"):
+            warnings.append(
+                f"end '{el.get('id')}' has next_rule but end_kind '{cfg.get('end_kind')}' (expected 'rule')"
+            )
     # unreachable derive/decision elements
     entry = str(rule.get("entry") or rule.get("entry_element") or "")
     if entry in by_id:
