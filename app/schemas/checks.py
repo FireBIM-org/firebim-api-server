@@ -101,6 +101,10 @@ class CheckRunEngineInfo(BaseModel):
     solver_mode: str | None = None
     planner_strategy: str | None = None
     diagnostics_enabled: bool = False
+    merged_schemas: list[str] = Field(
+        default_factory=list,
+        description="Published ontologies (family/country/version) whose schema subset was merged into the graph",
+    )
 
 
 class CheckEndNodeSummary(BaseModel):

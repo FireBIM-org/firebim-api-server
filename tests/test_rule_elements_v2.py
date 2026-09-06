@@ -948,3 +948,26 @@ def test_aggregates_count_per_node_and_handle_booleans_and_codes():
     }
     assert evaluate(parse_expression("sum($e)"), None, lambda p: many[p]) == 2
     assert evaluate(parse_expression("max($rk)"), None, lambda p: many[p]) == "RK3"
+
+
+def test_check_response_reports_merged_schemas(api_client, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.api import checks as checks_api
+
+    summaries = [
+        {"ontology_family": "fbo", "country": "lt", "canonical_country_uri": LT, "default_version": "2026.09.06"}
+    ]
+    schema_ttl = f"<{LT}Fg> <http://www.w3.org/2000/01/rdf-schema#subPropertyOf> <{FBO}Fg> ."
+    fetched = SimpleNamespace(ttl=schema_ttl, version=SimpleNamespace(version="2026.09.06"))
+    monkeypatch.setattr(checks_api, "_published_ontology_summaries", lambda: summaries)
+    monkeypatch.setattr(checks_api._ontology_repo, "fetch_version", lambda family, country, version: fetched)
+
+    res = api_client.post(
+        "/checks/run", json={"rule_id": "t-fg", "graph_id": "lt", "options": {"include_trace": False}}
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["engine"]["merged_schemas"] == ["fbo/lt/2026.09.06"]
+
+    res = api_client.post("/checks/run", json={"rule_id": "t-fg", "graph_id": "lt", "options": {"schema": "none"}})
+    assert res.json()["engine"]["merged_schemas"] == []

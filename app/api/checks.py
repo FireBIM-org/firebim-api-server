@@ -119,6 +119,7 @@ def _to_check_run_engine_info(result: RuleRunResult, options: RunOptions) -> Che
         solver_mode=engine_info.get("solver_mode"),
         planner_strategy=engine_info.get("planner_strategy"),
         diagnostics_enabled=bool(engine_info.get("diagnostics_enabled")) or options.diagnostics,
+        merged_schemas=list(engine_info.get("merged_schemas") or []),
     )
 
 
