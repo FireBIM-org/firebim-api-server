@@ -210,7 +210,27 @@ class PyShaclAtomicEvaluator(RDFGraphBackedEvaluator):
 
         shape_ref = shape_uri
         target_ref = URIRef(target)
-        property_ref = URIRef(node.property_path)
+        from rdflib.collection import Collection
+
+        from app.rules.paths import expand_property_path, is_ref_value
+
+        if is_ref_value(node.value):
+            raise NotImplementedError("pySHACL evaluator cannot compare with a $ref value; use the direct evaluator")
+        segments = expand_property_path(node.property_path)
+
+        def _path_term(seg: str) -> Any:
+            if seg.startswith("^"):
+                inverse = BNode()
+                shacl_graph.add((inverse, SH.inversePath, URIRef(seg[1:])))
+                return inverse
+            return URIRef(seg)
+
+        if len(segments) == 1:
+            property_ref: Any = _path_term(segments[0])
+        else:
+            # SHACL sequence path = RDF list of (possibly inverse) predicates
+            property_ref = BNode()
+            Collection(shacl_graph, property_ref, [_path_term(seg) for seg in segments])
 
         shacl_graph.add((shape_ref, RDF.type, SH.NodeShape))
         shacl_graph.add((shape_ref, SH.targetNode, target_ref))

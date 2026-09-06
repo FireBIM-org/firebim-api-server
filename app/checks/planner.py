@@ -80,7 +80,11 @@ class RuleExecutionPlanner:
         backward_terminal_nodes = self._backward_terminal_nodes(compiled)
         has_branching = any(len(preds) > 1 for preds in predecessor_map.values())
         all_linear = all(self._single_decision_successor(compiled, node_id) <= 1 for node_id in decision_order)
-        backward_safe = bool(decision_order and backward_terminal_nodes and not has_branching and all_linear)
+        has_derive = any(node.node_type == "derive" for node in compiled.nodes.values())
+        # derive elements write values that later decisions read: backward evaluation would read them too early
+        backward_safe = bool(
+            decision_order and backward_terminal_nodes and not has_branching and all_linear and not has_derive
+        )
         strategy = "vertical" if len(decision_order) > 2 else "horizontal"
         if options.planner_strategy == "backward" and backward_safe:
             selected_strategy = "backward"

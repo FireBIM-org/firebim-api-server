@@ -5,15 +5,19 @@ from dataclasses import dataclass, field
 from time import perf_counter
 from typing import Any
 
-from app.checks.caching import accumulate_timing, increment_counter
+from app.checks.caching import accumulate_timing, increment_counter, make_content_hash
+from app.checks.derived import DerivedOverlay, DeriveEvaluator, default_derived_graph_uri
+from app.checks.end_status import status_from_end_kind
 from app.checks.evaluator_base import AtomicEvaluator
 from app.checks.execution_state import BindingFrame, DiagnosticsCollector, ExecutionContext
 from app.checks.pathways import PathwayResolver
 from app.checks.planner import RuleExecutionPlanner
 from app.checks.result_models import (
+    AtomicOutcome,
     CheckStatus,
     CompiledRuleSet,
     DecisionNode,
+    DeriveNode,
     EndNode,
     EvalContext,
     GraphRef,
@@ -52,7 +56,66 @@ class CheckRuntime:
         self.target_resolver = target_resolver or TargetResolver()
         self.pathway_resolver = pathway_resolver or PathwayResolver(cache=self.target_resolver.cache)
         self.planner = planner or RuleExecutionPlanner()
+        self.derive_evaluator = DeriveEvaluator()
         self._active_execution_context: ExecutionContext | None = None
+        self._active_overlay: DerivedOverlay | None = None
+
+    # ------------------------------------------------------------------ derive support
+    EXECUTABLE_TYPES = ("decision", "derive")
+
+    def _new_overlay(self, graph_ref: GraphRef, compiled: CompiledRuleSet) -> DerivedOverlay:
+        overlay = DerivedOverlay(
+            rule_id=compiled.rule_id,
+            graph_id=graph_ref.graph_id,
+            base_graph_hash=make_content_hash(graph_ref.ttl or ""),
+        )
+        self._active_overlay = overlay
+        return overlay
+
+    def _attach_derived(self, result: RuleRunResult, options: RunOptions) -> RuleRunResult:
+        overlay = self._active_overlay
+        if overlay is None:
+            return result
+        result.derived_values = list(overlay.records)
+        if overlay.records:
+            result.derived_graph_uri = default_derived_graph_uri(overlay.graph_id, overlay.rule_id)
+            if options.persist_derived or options.include_report_graph_ttl or options.diagnostics:
+                result.derived_graph_ttl = overlay.to_ttl()
+        result.engine["derived_value_count"] = len(overlay.records)
+        self._active_overlay = None
+        return result
+
+    def _execute_derive(
+        self,
+        *,
+        graph_ref: GraphRef,
+        node: DeriveNode,
+        target: str,
+        metrics: dict[str, Any] | None = None,
+    ) -> AtomicOutcome:
+        overlay = self._active_overlay
+        if overlay is None:
+            raise RuntimeError("Derived overlay is not initialised for this run")
+        graph = self.evaluator.get_graph(graph_ref, None) if hasattr(self.evaluator, "get_graph") else None
+        if graph is None:
+            direct = getattr(self.evaluator, "direct_evaluator", None)
+            if direct is None:
+                raise RuntimeError("Evaluator cannot provide the data graph for derive elements")
+            graph = direct.get_graph(graph_ref, None)
+        status, reason_code, message, evidence = self.derive_evaluator.run(
+            graph=graph,
+            overlay=overlay,
+            target=target,
+            node_id=node.node_id,
+            target_class=node.target_class,
+            property_path=str(node.property_path),
+            expression=str(node.expression),
+            prefixes=node.prefixes,
+        )
+        increment_counter(metrics, "derive_nodes_evaluated")
+        if status == "True":
+            increment_counter(metrics, "derived_values_written")
+        return AtomicOutcome(status=status, reason_code=reason_code, message=message, evidence=evidence)
 
     def run_rule(
         self,
@@ -71,6 +134,7 @@ class CheckRuntime:
             metrics=metrics,
         )
         self._active_execution_context = execution_context
+        self._new_overlay(graph_ref, compiled)
 
         started_targets = perf_counter()
         initial_targets = self.target_resolver.resolve_targets_for_decision(
@@ -132,25 +196,27 @@ class CheckRuntime:
         if not options.include_report_graph_ttl:
             result.report_graph_ttl = None
         self._active_execution_context = None
-        return result
+        return self._attach_derived(result, options)
 
-    def _resolve_entry_decision(self, compiled: CompiledRuleSet) -> DecisionNode:
+    def _resolve_entry_decision(self, compiled: CompiledRuleSet) -> DecisionNode | DeriveNode:
         entry_node = compiled.get_node(compiled.entry_node_id)
-        if entry_node.node_type == "decision":
+        if entry_node.node_type in self.EXECUTABLE_TYPES:
             return entry_node
         if entry_node.node_type == "start":
             return self._resolve_first_decision_from_start(compiled, entry_node)
         raise ValueError(
             f"Compiled rule '{compiled.rule_id}' entry node '{compiled.entry_node_id}' "
-            f"must be a start or decision node, got '{entry_node.node_type}'"
+            f"must be a start, decision or derive node, got '{entry_node.node_type}'"
         )
 
-    def _resolve_first_decision_from_start(self, compiled: CompiledRuleSet, start_node: StartNode) -> DecisionNode:
+    def _resolve_first_decision_from_start(
+        self, compiled: CompiledRuleSet, start_node: StartNode
+    ) -> DecisionNode | DeriveNode:
         if not start_node.next_node_id:
             raise ValueError(f"Start node '{start_node.node_id}' has no next_node_id")
         next_node = compiled.get_node(start_node.next_node_id)
-        if next_node.node_type != "decision":
-            raise ValueError(f"First executable node '{next_node.node_id}' must be a decision node")
+        if next_node.node_type not in self.EXECUTABLE_TYPES:
+            raise ValueError(f"First executable node '{next_node.node_id}' must be a decision or derive node")
         return next_node
 
     def _build_execution_context(
@@ -296,7 +362,7 @@ class CheckRuntime:
                     break
                 continue
 
-            if node.node_type != "decision":
+            if node.node_type not in self.EXECUTABLE_TYPES:
                 traces.append(
                     self._make_terminal_trace(
                         target_node=state.target_node,
@@ -323,31 +389,37 @@ class CheckRuntime:
                     sample_target=state.target_node,
                 )
             started_eval = perf_counter()
-            outcome = self.evaluator.evaluate(
-                graph_ref=graph_ref,
-                node=decision,
-                target=state.target_node,
-                ctx=EvalContext(
-                    rule_id=compiled.rule_id,
-                    graph_id=graph_ref.graph_id,
-                    graph_uri=graph_ref.graph_uri,
-                    inference=options.inference,
-                    advanced=options.advanced,
-                    debug=options.debug,
-                    current_step_index=state.depth,
-                    visited_node_ids=list(state.visited_node_ids),
-                    extra={
-                        "include_report_text": options.include_report_text,
-                        "include_report_graph_ttl": options.include_report_graph_ttl,
-                        "metrics": metrics or {},
-                        "graph_index": self._active_execution_context.graph_index
-                        if self._active_execution_context
-                        else None,
-                        "execution_context": self._active_execution_context,
-                        "binding_frame": state.binding_frame.bindings,
-                    },
-                ),
-            )
+            if decision.node_type == "derive":
+                outcome = self._execute_derive(
+                    graph_ref=graph_ref, node=decision, target=state.target_node, metrics=metrics
+                )
+            else:
+                outcome = self.evaluator.evaluate(
+                    graph_ref=graph_ref,
+                    node=decision,
+                    target=state.target_node,
+                    ctx=EvalContext(
+                        rule_id=compiled.rule_id,
+                        graph_id=graph_ref.graph_id,
+                        graph_uri=graph_ref.graph_uri,
+                        inference=options.inference,
+                        advanced=options.advanced,
+                        debug=options.debug,
+                        current_step_index=state.depth,
+                        visited_node_ids=list(state.visited_node_ids),
+                        extra={
+                            "include_report_text": options.include_report_text,
+                            "include_report_graph_ttl": options.include_report_graph_ttl,
+                            "metrics": metrics or {},
+                            "graph_index": self._active_execution_context.graph_index
+                            if self._active_execution_context
+                            else None,
+                            "execution_context": self._active_execution_context,
+                            "overlay": self._active_overlay,
+                            "binding_frame": state.binding_frame.bindings,
+                        },
+                    ),
+                )
             eval_duration_seconds = perf_counter() - started_eval
             eval_duration_ms = round(eval_duration_seconds * 1000.0, 3)
             accumulate_timing(metrics, "evaluate_node", eval_duration_seconds)
@@ -384,7 +456,8 @@ class CheckRuntime:
                         final_status=outcome.status,
                         terminal_node_id=decision.node_id,
                         message=(
-                            f"Decision node '{decision.node_id}' has no outgoing branch for outcome '{outcome.status}'"
+                            f"{decision.node_type.capitalize()} node '{decision.node_id}' has no outgoing branch "
+                            f"for outcome '{outcome.status}'"
                         ),
                         steps=state.steps + [step],
                         evidence={
@@ -474,7 +547,7 @@ class CheckRuntime:
                     binding_frame,
                 )
             ]
-        if next_node.node_type != "decision":
+        if next_node.node_type not in self.EXECUTABLE_TYPES:
             return [
                 _TraversalState(
                     next_node.node_id,
@@ -486,7 +559,7 @@ class CheckRuntime:
                     binding_frame,
                 )
             ]
-        if current_node.node_type != "decision":
+        if current_node.node_type not in self.EXECUTABLE_TYPES:
             return [
                 _TraversalState(
                     next_node.node_id,
@@ -552,6 +625,15 @@ class CheckRuntime:
             if matching:
                 details["transition_inspection"] = matching[-1]
         return details
+
+    @staticmethod
+    def _step_evidence(outcome: AtomicOutcome) -> dict[str, Any]:
+        evidence = dict(outcome.evidence or {})
+        if outcome.reason_code:
+            evidence.setdefault("reason_code", outcome.reason_code)
+        if outcome.message:
+            evidence.setdefault("message", outcome.message)
+        return evidence
 
     def _branch_next_node_id(self, node: DecisionNode, status: CheckStatus) -> str | None:
         if status == "True":
@@ -643,14 +725,9 @@ class CheckRuntime:
             if terminal_text in {"unknown", "missing_data", "missing-data"}:
                 return "Unknown"
         text = (self._end_message(node) or "").strip().lower()
-        if node.end_kind:
-            end_kind = node.end_kind.strip().lower()
-            if end_kind in {"pass", "passed", "true", "success"}:
-                return "True"
-            if end_kind in {"fail", "failed", "false", "error"}:
-                return "False"
-            if end_kind in {"unknown", "missing_data", "missing-data"}:
-                return "Unknown"
+        kind_status = status_from_end_kind(node.end_kind or node.config.get("end_kind"))
+        if kind_status is not None:
+            return kind_status
         if "missing data" in text or "cannot be evaluated" in text or "unknown" in text:
             return "Unknown"
         if "did not pass" in text or "failed" in text or "not pass" in text:

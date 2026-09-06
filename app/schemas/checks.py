@@ -31,6 +31,14 @@ class CheckRunOptions(BaseModel):
     diagnostic_end_node_ids: list[str] = Field(default_factory=list)
     diagnostic_analysis_codes: list[str] = Field(default_factory=list)
     diagnostic_success_only: bool = False
+    persist_derived: bool = Field(
+        default=False,
+        description="Publish values written by derive elements to the derived named graph of this graph/rule",
+    )
+    use_derived_from: list[str] = Field(
+        default_factory=list,
+        description="Rule ids whose persisted derived graphs are merged into the building graph before evaluation",
+    )
 
 
 class CheckRunRequest(BaseModel):
@@ -95,6 +103,16 @@ class CheckEndNodeTargets(BaseModel):
     target_nodes: list[str] = Field(default_factory=list)
 
 
+class CheckDerivedValue(BaseModel):
+    target: str
+    property: str
+    value: Any = None
+    node_id: str | None = None
+    expression: str | None = None
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    overwrote_previous: Any = None
+
+
 class CheckSimpleRunResponse(CheckApiBaseResponse):
     rule_id: str
     graph_id: str
@@ -107,6 +125,9 @@ class CheckSimpleRunResponse(CheckApiBaseResponse):
     compatibility: dict[str, Any] = Field(default_factory=dict)
     report_text: str | None = None
     debug: dict[str, Any] = Field(default_factory=dict)
+    derived_values: list[CheckDerivedValue] = Field(default_factory=list)
+    derived_graph_uri: str | None = None
+    derived_persisted: bool = False
 
 
 class CheckDiagnosticTimingGroups(BaseModel):
@@ -165,6 +186,7 @@ class BlindCheckRunResponse(CheckApiBaseResponse):
     end_outputs: list[BlindCheckTerminalOutput] = Field(default_factory=list)
     terminal_counts: dict[str, int] = Field(default_factory=dict)
     message_counts: dict[str, int] = Field(default_factory=dict)
+    derived_values: list[CheckDerivedValue] = Field(default_factory=list)
     debug: dict[str, Any] = Field(default_factory=dict)
 
 

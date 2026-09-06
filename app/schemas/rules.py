@@ -11,6 +11,10 @@ class RuleElementPayload(BaseModel):
     property_path: str | None = None
     operator: str | None = None
     value: Any | None = None
+    expression: str | None = Field(
+        default=None,
+        description="derive elements only: expression written to property_path (see app.rules.expressions)",
+    )
 
     true_path: str | None = None
     false_path: str | None = None
@@ -28,6 +32,7 @@ class RuleElementPayload(BaseModel):
             "property_path": self.property_path,
             "operator": self.operator,
             "value": self.value,
+            "expression": self.expression,
             "true_path": self.true_path,
             "false_path": self.false_path,
             "unknown_path": self.unknown_path,
@@ -64,6 +69,7 @@ class RuleValidateResponse(BaseModel):
     entry: str | None = None
     element_count: int
     errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
     success: bool = True
     error: str | None = None
     message: str | None = None
@@ -78,6 +84,7 @@ class RuleCompileResponse(BaseModel):
     rule_id: str
     element_count: int
     ttl: str
+    warnings: list[str] = Field(default_factory=list)
     success: bool = True
     error: str | None = None
     message: str | None = None

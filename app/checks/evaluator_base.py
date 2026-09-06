@@ -6,12 +6,14 @@ from typing import Any
 from rdflib import RDF, Graph, Literal, URIRef
 
 from app.checks.caching import CheckExecutionCache, get_default_execution_cache
+from app.checks.derived import DerivedOverlay, resolve_path_values
 from app.checks.result_models import (
     AtomicOutcome,
     DecisionNode,
     EvalContext,
     GraphRef,
 )
+from app.rules.paths import expand_property_path
 
 
 class AtomicEvaluator(ABC):
@@ -74,11 +76,32 @@ class RDFGraphBackedEvaluator(AtomicEvaluator, ABC):
         if counters is not None:
             counters["property_value_cache_misses"] = int(counters.get("property_value_cache_misses", 0)) + 1
 
-        target_ref = URIRef(target)
-        property_ref = URIRef(property_path)
-        values = list(graph.objects(target_ref, property_ref))
+        segments = expand_property_path(property_path, self._prefixes(ctx))
+        overlay = self._overlay(ctx)
+        if overlay is not None and self._overlay_touches(overlay, segments):
+            # never cache overlay-shadowed reads
+            return list(resolve_path_values(graph, target, segments, overlay))
+        values = list(resolve_path_values(graph, target, segments, None))
         self.cache.set_property_values(graph_cache_key, target, property_path, values)
         return list(values)
+
+    @staticmethod
+    def _overlay(ctx: EvalContext | None) -> DerivedOverlay | None:
+        if ctx is None:
+            return None
+        overlay = ctx.extra.get("overlay")
+        return overlay if isinstance(overlay, DerivedOverlay) else None
+
+    @staticmethod
+    def _prefixes(ctx: EvalContext | None) -> dict[str, str] | None:
+        if ctx is None:
+            return None
+        prefixes = ctx.extra.get("prefixes")
+        return prefixes if isinstance(prefixes, dict) else None
+
+    @staticmethod
+    def _overlay_touches(overlay: DerivedOverlay, segments: list[str]) -> bool:
+        return any(overlay.shadows(seg) for seg in segments)
 
     def prefetch_property_values(
         self,
@@ -87,6 +110,8 @@ class RDFGraphBackedEvaluator(AtomicEvaluator, ABC):
         targets: list[str],
         property_path: str,
         metrics: dict[str, Any] | None = None,
+        overlay: DerivedOverlay | None = None,
+        prefixes: dict[str, str] | None = None,
     ) -> dict[str, list[Any]]:
         if not graph_ref.ttl or not graph_ref.ttl.strip():
             raise ValueError(f"Graph '{graph_ref.graph_id}' has no TTL content loaded")
@@ -96,13 +121,18 @@ class RDFGraphBackedEvaluator(AtomicEvaluator, ABC):
             ttl=graph_ref.ttl,
             metrics=metrics,
         )
+        segments = expand_property_path(property_path, prefixes)
+        if overlay is not None and self._overlay_touches(overlay, segments):
+            # overlay-shadowed: resolve live, bypass every cache
+            return {
+                target: list(resolve_path_values(graph, target, segments, overlay))
+                for target in list(dict.fromkeys(targets))
+            }
         cached = self.cache.get_batch_property_values(graph_cache_key, property_path)
         if cached is None:
-            property_ref = URIRef(property_path)
             batch_values: dict[str, list[Any]] = {}
             for target in list(dict.fromkeys(targets)):
-                target_ref = URIRef(target)
-                values = list(graph.objects(target_ref, property_ref))
+                values = list(resolve_path_values(graph, target, segments, None))
                 batch_values[target] = values
                 self.cache.set_property_values(graph_cache_key, target, property_path, values)
             self.cache.set_batch_property_values(graph_cache_key, property_path, batch_values)
