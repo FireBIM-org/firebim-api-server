@@ -20,6 +20,7 @@ services:
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS-https://firebim.org,https://www.firebim.org,https://app.firebim.org,https://www.app.firebim.org,http://localhost:3000}
       - CHECKS_SOLVER=${CHECKS_SOLVER-standard}
+      - SEED_DEMO_CONTENT=${SEED_DEMO_CONTENT-true}
       - AUTHENTIK_ISSUER_URL=http://localhost:9080/application/o/firebim/
       - AUTHENTIK_INTERNAL_URL=http://authentik-server:9000/application/o/firebim/
     depends_on:
