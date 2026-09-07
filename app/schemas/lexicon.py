@@ -26,10 +26,30 @@ class LexiconBranchReference(BaseModel):
 
 
 class LexiconPropertyRequirement(BaseModel):
+    """A fact the graph has to hold for a target so the rule can decide (rule elements v2 aware).
+
+    `property_path` may be a sequence path (`fbo-dk:partOf/fbo-dk:FunctionType`): `steps` are its expanded IRIs, `via`
+    the relation prefix (None for a direct property) and `property` the last step — the term the fact is stored under.
+    `aggregates` lists the aggregate functions a derive element applies over the path (count, sum, min, max …)."""
+
     property_path: str
+    property: str | None = None
+    via: str | None = None
+    steps: list[str] = Field(default_factory=list)
     node_ids: list[str] = Field(default_factory=list)
     operators: list[str] = Field(default_factory=list)
+    aggregates: list[str] = Field(default_factory=list)
     sample_values: list[str] = Field(default_factory=list)
+
+
+class LexiconDerivedProperty(BaseModel):
+    """A property the rule *writes* with a derive element; it is produced, not required from the graph."""
+
+    property_path: str
+    target_class: str | None = None
+    node_ids: list[str] = Field(default_factory=list)
+    expressions: list[str] = Field(default_factory=list)
+    read_by_node_ids: list[str] = Field(default_factory=list)
 
 
 class LexiconExecutionTarget(BaseModel):
@@ -62,6 +82,7 @@ class LexiconExecutionProfile(BaseModel):
     property_paths: list[str] = Field(default_factory=list)
     relation_paths: list[str] = Field(default_factory=list)
     targets: list[LexiconExecutionTarget] = Field(default_factory=list)
+    derived_properties: list[LexiconDerivedProperty] = Field(default_factory=list)
     nodes: list[LexiconExecutionProfileNode] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
@@ -76,6 +97,11 @@ class LexiconProfileDeriveRequest(BaseModel):
     rule_ids: list[str] = Field(default_factory=list)
     rule: RuleDraft | None = None
     rules: list[RuleDraft] = Field(default_factory=list)
+    graph_id: str | None = Field(
+        default=None,
+        description="Optional stored building graph: when given, the response also says which of the profile's "
+        "requirements that graph can satisfy (graph_coverage), without saving the profile first",
+    )
 
     @model_validator(mode="after")
     def validate_rule_source(self) -> LexiconProfileDeriveRequest:
@@ -98,6 +124,7 @@ class LexiconProfileDeriveResponse(BaseModel):
     rule_ids: list[str] = Field(default_factory=list)
     rule_profiles: list[LexiconExecutionProfile] = Field(default_factory=list)
     profile: LexiconExecutionProfile
+    graph_coverage: LexiconProfileGraphCoverageResponse | None = None
 
 
 class LexiconProfileSummaryResponse(BaseModel):
@@ -241,14 +268,27 @@ class LexiconProfileGraphAssociation(BaseModel):
 
 
 class LexiconProfileGraphCoverageResponse(BaseModel):
+    """Which of a profile's requirements a stored graph can satisfy.
+
+    Evaluated on the graph with the selected ontologies' schema merged (sub-classes count as the target class,
+    `partOf` follows `hasSubitem` backwards …), so sequence paths are followed the way the rule engine follows them.
+    A property is *covered* when at least one instance of the target class has a value at the end of the path;
+    `instances` / `with_value` on each entry say how many. `profile_id` is "derived" for an unsaved profile."""
+
     profile_id: str
     graph_id: str
     graph_uri: str
     complete: bool
+    merged_schemas: list[str] = Field(default_factory=list)
+    target_instances: dict[str, int] = Field(default_factory=dict)
     covered_target_classes: list[str] = Field(default_factory=list)
     missing_target_classes: list[str] = Field(default_factory=list)
     covered_properties: list[LexiconNeededProperty] = Field(default_factory=list)
     missing_properties: list[LexiconNeededProperty] = Field(default_factory=list)
+    partial_properties: list[LexiconNeededProperty] = Field(
+        default_factory=list,
+        description="Covered, but not on every instance — the rule will ask the user for the others",
+    )
     associations: list[LexiconProfileGraphAssociation] = Field(default_factory=list)
 
 
@@ -329,6 +369,9 @@ class LexiconNeededProperty(BaseModel):
     target_class: str
     property_path: str
     node_ids: list[str] = Field(default_factory=list)
+    via: str | None = None
+    instances: int | None = None
+    with_value: int | None = None
 
 
 class LexiconConformityCheckResponse(BaseModel):
@@ -608,15 +651,16 @@ class LexiconRuleTermValidationMatch(BaseModel):
 class LexiconRuleTermValidationIssue(BaseModel):
     rule_id: str
     node_id: str
-    field: Literal["target_class", "property_path"]
+    field: Literal["target_class", "property_path", "value", "expression"]
     expected_kind: Literal["class", "property"]
-    value: str
+    value: str = Field(description="The term that was checked (one step of a path, or the whole field)")
     code: Literal["unknown_term", "wrong_term_kind"]
     message: str
+    context: str | None = Field(default=None, description="The whole field value when `value` is one step of it")
 
 
 class LexiconRuleTermValidationFieldResult(BaseModel):
-    field: Literal["target_class", "property_path"]
+    field: Literal["target_class", "property_path", "value", "expression"]
     expected_kind: Literal["class", "property"]
     value: str
     valid: bool
@@ -939,3 +983,5 @@ class LexiconMappingEvaluateResponse(BaseModel):
 LexiconSourcePatternClause.model_rebuild()
 LexiconSourcePattern.model_rebuild()
 LexiconMappingEvaluationClauseResult.model_rebuild()
+LexiconProfileGraphCoverageResponse.model_rebuild()
+LexiconProfileDeriveResponse.model_rebuild()

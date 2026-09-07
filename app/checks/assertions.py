@@ -108,9 +108,23 @@ def _write_target(graph: Graph, target: str, segments: list[str]) -> tuple[str |
     subjects = [str(v) for v in resolve_path_values(graph, target, segments[:-1]) if isinstance(v, URIRef)]
     if len(subjects) == 1:
         return subjects[0], last, None
+    prefix = "/".join(segments[:-1])
     if not subjects:
-        return None, last, f"the path {'/'.join(segments[:-1])} leads nowhere from this target"
-    return None, last, f"the path {'/'.join(segments[:-1])} leads to {len(subjects)} nodes; answer on one of them"
+        if any(seg.rsplit("#", 1)[-1].rsplit("/", 1)[-1] in ("partOf", "isPartOf") for seg in segments[:-1]):
+            return (
+                None,
+                last,
+                "this target is not part of any unit in the graph (no node has fbo:hasSubitem pointing at it), so the "
+                "unit's fact cannot be read or answered; add the containing bygningsafsnit / compartment to the model "
+                "(the question is about the unit, not about this target)",
+            )
+        return (
+            None,
+            last,
+            f"the graph does not link this target to anything through {prefix}; the fact belongs on the node at the "
+            "end of that path, which does not exist yet",
+        )
+    return None, last, f"the path {prefix} leads to {len(subjects)} nodes; answer on one of them"
 
 
 def open_questions(*, result: Any, graph_ttl: str, compiled: Any) -> list[dict[str, Any]]:

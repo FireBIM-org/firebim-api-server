@@ -20,6 +20,8 @@ from app.lexicon.query_runtime import (
 )
 from app.rules.composer import check_ruleset_completeness
 from app.rules.decompiler import decompile_ruleset_ttl
+from app.rules.expressions import ExpressionError, parse_expression, referenced_paths
+from app.rules.paths import expand_curie, expand_property_path, is_ref_value, ref_path, split_property_path
 from app.schemas.lexicon import (
     LexiconBranchReference,
     LexiconCatalogCompareRequest,
@@ -38,6 +40,7 @@ from app.schemas.lexicon import (
     LexiconCatalogTermSummary,
     LexiconConformityCheckResponse,
     LexiconConformityIssue,
+    LexiconDerivedProperty,
     LexiconEntityInput,
     LexiconExecutionProfile,
     LexiconExecutionProfileNode,
@@ -104,6 +107,20 @@ logger = logging.getLogger(__name__)
 class LexiconOntologyCacheEntry:
     bundle: LexiconOntologyBundle
     created_at: float
+
+
+def _aggregates_by_path(tree: Any) -> dict[str, str]:
+    """`{path: aggregate}` for every `agg($path)` in a parsed expression."""
+    found: dict[str, str] = {}
+
+    def walk(node: Any) -> None:
+        if node.kind == "agg" and node.children and node.children[0].kind == "ref":
+            found[str(node.children[0].value)] = str(node.value)
+        for child in node.children:
+            walk(child)
+
+    walk(tree)
+    return found
 
 
 class LexiconService:
@@ -488,60 +505,112 @@ class LexiconService:
         issues: list[LexiconRuleTermValidationIssue] = []
         validated_field_count = 0
 
+        selected_names = ", ".join(
+            f"{sel.ontology_family}/{sel.country} {sel.version}".strip() for sel in selected_ontologies
+        )
+
+        def check_term(
+            *, rule_id: str, node_id: str, field: str, expected_kind: str, value: str, context: str | None
+        ) -> tuple[list[LexiconRuleTermValidationMatch], LexiconRuleTermValidationIssue | None]:
+            resolved = runtime.resolve_term_matches(value)
+            expected_uris = sorted(resolved[f"{expected_kind}_matches"])
+            opposite_kind = "property" if expected_kind == "class" else "class"
+            opposite_uris = sorted(resolved[f"{opposite_kind}_matches"])
+            matches = self._rule_term_validation_matches(runtime, expected_uris)
+            if matches:
+                return matches, None
+            code = "wrong_term_kind" if opposite_uris else "unknown_term"
+            where = f" (step of {context})" if context and context != value else ""
+            if code == "wrong_term_kind":
+                message = (
+                    f"'{value}'{where} is an ontology {opposite_kind}, not an ontology {expected_kind}. "
+                    f"Pick a {expected_kind} instead."
+                )
+            else:
+                message = (
+                    f"'{value}'{where} is not a {expected_kind} in the selected ontologies ({selected_names}). "
+                    "Pick a term from the suggestions, tick the ontology that defines it on the right, "
+                    "or accept the term if it is intentional."
+                )
+            return matches, LexiconRuleTermValidationIssue(
+                rule_id=rule_id,
+                node_id=node_id,
+                field=field,  # type: ignore[arg-type]
+                expected_kind=expected_kind,  # type: ignore[arg-type]
+                value=value,
+                code=code,  # type: ignore[arg-type]
+                message=message,
+                context=context,
+            )
+
+        def path_steps(value: str) -> list[str]:
+            return [step.lstrip("^") for step in split_property_path(value) if step.lstrip("^")]
+
         for normalized_rule in normalized_rules:
             rule_id = str(normalized_rule.get("id") or "")
             for element in normalized_rule.get("elements", []):
-                if element.get("element_type") != "decision":
+                element_type = element.get("element_type") or element.get("node_type")
+                if element_type not in ("decision", "derive"):
                     continue
 
                 node_id = str(element.get("id") or "")
+                config = element.get("config") if isinstance(element.get("config"), dict) else {}
+                accepted = {str(t) for t in (config.get("accepted_terms") or []) if t}
+                prefixes = config.get("prefixes") if isinstance(config.get("prefixes"), dict) else None
                 field_results: list[LexiconRuleTermValidationFieldResult] = []
-                for field, expected_kind in (
-                    ("target_class", "class"),
-                    ("property_path", "property"),
-                ):
-                    raw_value = element.get(field)
-                    value = str(raw_value).strip() if raw_value is not None else ""
-                    if not value:
-                        continue
 
+                # (field, expected kind, whole value, the terms to check)
+                checks: list[tuple[str, str, str, list[str]]] = []
+                target_class = str(element.get("target_class") or "").strip()
+                if target_class:
+                    checks.append(("target_class", "class", target_class, [target_class]))
+                property_path = str(element.get("property_path") or "").strip()
+                if property_path:
+                    checks.append(("property_path", "property", property_path, path_steps(property_path)))
+                value = element.get("value")
+                if is_ref_value(value):
+                    ref = str(ref_path(value) or "").strip()
+                    if ref:
+                        checks.append(("value", "property", ref, path_steps(ref)))
+                expression = str(element.get("expression") or "").strip()
+                if element_type == "derive" and expression:
+                    try:
+                        refs = referenced_paths(parse_expression(expression))
+                    except Exception:
+                        refs = []
+                    steps: list[str] = []
+                    for ref in refs:
+                        steps.extend(path_steps(ref))
+                    if steps:
+                        checks.append(("expression", "property", expression, steps))
+
+                for field, expected_kind, whole, terms in checks:
                     validated_field_count += 1
-                    resolved = runtime.resolve_term_matches(value)
-                    expected_uris = sorted(resolved[f"{expected_kind}_matches"])
-                    opposite_kind = "property" if expected_kind == "class" else "class"
-                    opposite_uris = sorted(resolved[f"{opposite_kind}_matches"])
-                    matches = self._rule_term_validation_matches(runtime, expected_uris)
-
+                    matches: list[LexiconRuleTermValidationMatch] = []
                     issue = None
-                    if not matches:
-                        code = "wrong_term_kind" if opposite_uris else "unknown_term"
-                        if code == "wrong_term_kind":
-                            message = (
-                                f"{field.replace('_', ' ').capitalize()} '{value}' is an ontology "
-                                f"{opposite_kind}, not an ontology {expected_kind}."
-                            )
-                        else:
-                            message = (
-                                f"{field.replace('_', ' ').capitalize()} '{value}' was not found as an "
-                                f"ontology {expected_kind} in the selected ontologies."
-                            )
-                        issue = LexiconRuleTermValidationIssue(
+                    for term in terms:
+                        term_iri = expand_curie(term, prefixes)
+                        if term_iri in accepted or term in accepted:
+                            continue
+                        found, term_issue = check_term(
                             rule_id=rule_id,
                             node_id=node_id,
                             field=field,
                             expected_kind=expected_kind,
-                            value=value,
-                            code=code,
-                            message=message,
+                            value=term,
+                            context=whole,
                         )
-                        issues.append(issue)
-
+                        matches.extend(found)
+                        if term_issue is not None:
+                            issues.append(term_issue)
+                            if issue is None:
+                                issue = term_issue
                     field_results.append(
                         LexiconRuleTermValidationFieldResult(
-                            field=field,
-                            expected_kind=expected_kind,
-                            value=value,
-                            valid=bool(matches),
+                            field=field,  # type: ignore[arg-type]
+                            expected_kind=expected_kind,  # type: ignore[arg-type]
+                            value=whole,
+                            valid=issue is None,
                             matches=matches,
                             issue=issue,
                         )
@@ -725,73 +794,87 @@ class LexiconService:
         selected_ontologies: list[LexiconSelectedOntology],
         expected_profile: LexiconExecutionProfile,
     ) -> LexiconProfileGraphCoverageResponse:
-        summary = self.summarize_graph_evidence(
-            LexiconGraphEvidenceSummaryRequest(
-                graph_id=graph_id,
-                selected_ontologies=selected_ontologies,
-            )
-        )
-        associations: list[LexiconProfileGraphAssociation] = []
-        covered_target_classes: set[str] = set()
-        covered_property_pairs: set[tuple[str, str]] = set()
+        """Follow every requirement's path on the stored graph, the way the rule engine will.
 
-        for subject in summary.subjects:
-            matched_targets = [
-                target.target_class
-                for target in expected_profile.targets
-                if target.target_class in subject.class_term_ids
-            ]
-            matched_properties = sorted(
-                {
-                    requirement.property_path
-                    for target in expected_profile.targets
-                    if target.target_class in subject.class_term_ids
-                    for requirement in target.property_requirements
-                    if requirement.property_path in subject.property_term_ids
-                }
-            )
-            for target_class in matched_targets:
-                covered_target_classes.add(target_class)
-                for property_path in matched_properties:
-                    covered_property_pairs.add((target_class, property_path))
-            if matched_targets or matched_properties:
-                associations.append(
-                    LexiconProfileGraphAssociation(
-                        source_object_ref=subject.source_object_ref,
-                        matched_target_classes=sorted(set(matched_targets)),
-                        matched_properties=matched_properties,
-                    )
-                )
+        The selected ontologies' schema subset is merged and materialised first, so instances of sub-classes count as
+        the target class and inverse / sub-property declarations (fbo-dk:partOf ⇐ fbo:hasSubitem …) resolve."""
+        from app.checks.derived import resolve_path_values
+        from app.checks.rdfs_light import materialize, schema_subset
 
-        missing_target_classes = sorted(
-            {
-                target.target_class
-                for target in expected_profile.targets
-                if target.target_class not in covered_target_classes
-            }
-        )
+        graph_uri, ttl = self.building_repo.fetch_graph(graph_id)
+        data_graph = Graph()
+        data_graph.parse(data=ttl, format="turtle")
+        merged_schemas: list[str] = []
+        for selection in selected_ontologies:
+            bundle = self._resolve_ontology_bundle(
+                ontology_family=selection.ontology_family,
+                country=selection.country,
+                version=selection.version,
+            )
+            for triple in schema_subset(bundle.graph.serialize(format="turtle")):
+                data_graph.add(triple)
+            merged_schemas.append(
+                f"{bundle.ontology.ontology_family}/{bundle.ontology.country}/{bundle.ontology.version}"
+            )
+        materialize(data_graph)
+
+        target_instances: dict[str, int] = {}
+        covered_target_classes: list[str] = []
+        missing_target_classes: list[str] = []
         covered_properties: list[LexiconNeededProperty] = []
+        partial_properties: list[LexiconNeededProperty] = []
         missing_properties: list[LexiconNeededProperty] = []
+        matched_by_subject: dict[str, dict[str, set[str]]] = defaultdict(
+            lambda: {"classes": set(), "properties": set()}
+        )
+
         for target in expected_profile.targets:
+            instances = sorted({str(sub) for sub in data_graph.subjects(RDF.type, URIRef(target.target_class))})
+            target_instances[target.target_class] = len(instances)
+            (covered_target_classes if instances else missing_target_classes).append(target.target_class)
+            for instance in instances:
+                matched_by_subject[instance]["classes"].add(target.target_class)
             for requirement in target.property_requirements:
+                segments = list(requirement.steps) or expand_property_path(requirement.property_path)
+                with_value = 0
+                for instance in instances:
+                    if resolve_path_values(data_graph, instance, segments):
+                        with_value += 1
+                        matched_by_subject[instance]["properties"].add(requirement.property_path)
                 needed = LexiconNeededProperty(
                     target_class=target.target_class,
                     property_path=requirement.property_path,
                     node_ids=requirement.node_ids,
+                    via=requirement.via,
+                    instances=len(instances),
+                    with_value=with_value,
                 )
-                if (target.target_class, requirement.property_path) in covered_property_pairs:
+                if instances and with_value == len(instances):
                     covered_properties.append(needed)
+                elif with_value:
+                    partial_properties.append(needed)
                 else:
                     missing_properties.append(needed)
 
+        associations = [
+            LexiconProfileGraphAssociation(
+                source_object_ref=subject,
+                matched_target_classes=sorted(match["classes"]),
+                matched_properties=sorted(match["properties"]),
+            )
+            for subject, match in sorted(matched_by_subject.items())
+        ]
         return LexiconProfileGraphCoverageResponse(
             profile_id=profile_id,
             graph_id=graph_id,
-            graph_uri=summary.graph_uri,
-            complete=not missing_target_classes and not missing_properties,
+            graph_uri=graph_uri,
+            complete=not missing_target_classes and not missing_properties and not partial_properties,
+            merged_schemas=merged_schemas,
+            target_instances=target_instances,
             covered_target_classes=sorted(covered_target_classes),
-            missing_target_classes=missing_target_classes,
+            missing_target_classes=sorted(missing_target_classes),
             covered_properties=covered_properties,
+            partial_properties=partial_properties,
             missing_properties=missing_properties,
             associations=associations,
         )
@@ -1198,6 +1281,66 @@ class LexiconService:
         node_models: list[LexiconExecutionProfileNode] = []
         ontology_warnings: list[str] = []
 
+        derived_by: dict[str, list[str]] = defaultdict(list)  # written property -> derive node ids
+        derived_meta: dict[str, dict[str, Any]] = {}
+        for item in normalized_rule["elements"]:
+            if item.get("element_type") == "derive" and item.get("property_path"):
+                written = str(item["property_path"])
+                derived_by[written].append(item["id"])
+                meta = derived_meta.setdefault(
+                    written, {"target_class": item.get("target_class"), "expressions": [], "read_by": []}
+                )
+                if item.get("expression") is not None:
+                    meta["expressions"].append(str(item["expression"]))
+
+        def check_steps(node_id: str, path: str, *, role: str) -> list[str]:
+            """Validate every step of a (sequence) path against the selected ontologies; returns expanded steps."""
+            steps = expand_property_path(path)
+            for step in steps:
+                term = step[1:] if step.startswith("^") else step
+                matches = self._resolve_profile_term_matches(term, runtime)
+                if not matches["property_matches"] and matches["class_matches"]:
+                    ontology_warnings.append(
+                        f"Rule node '{node_id}' uses class URI as {role}: {matches['normalized_uri']}"
+                    )
+                elif not matches["property_matches"]:
+                    ontology_warnings.append(
+                        f"Rule node '{node_id}' uses {role} not declared as property in selected ontologies: "
+                        f"{matches['normalized_uri']}"
+                    )
+                elif len(matches["property_matches"]) > 1:
+                    ontology_warnings.append(
+                        f"Rule node '{node_id}' {role} matches multiple selected ontologies: "
+                        f"{', '.join(sorted(matches['property_matches']))}"
+                    )
+            return steps
+
+        def require(
+            target_class: str, path: str, node_id: str, *, operator: str | None, value: Any, aggregate: str | None
+        ) -> None:
+            steps = expand_property_path(path)
+            if len(steps) == 1 and steps[0] in derived_by:
+                derived_meta[steps[0]]["read_by"].append(node_id)  # produced by this rule, not a fact of the graph
+                return
+            bucket = property_requirements_by_target[target_class].setdefault(
+                path,
+                {"node_ids": [], "operators": [], "aggregates": [], "sample_values": [], "steps": steps},
+            )
+            bucket["node_ids"].append(node_id)
+            if operator:
+                bucket["operators"].append(str(operator))
+            if aggregate:
+                bucket["aggregates"].append(aggregate)
+            if is_ref_value(value):
+                bucket["sample_values"].append(f"$ref {ref_path(value)}")
+                referenced = ref_path(value) or ""
+                if expand_property_path(referenced)[:1] and expand_property_path(referenced)[0] in derived_by:
+                    derived_meta[expand_property_path(referenced)[0]]["read_by"].append(node_id)
+                else:
+                    require(target_class, referenced, node_id, operator=None, value=None, aggregate=None)
+            elif value is not None:
+                bucket["sample_values"].append(str(value))
+
         for item in normalized_rule["elements"]:
             branches = [
                 LexiconBranchReference(branch=branch_name, target_node_id=item.get(target_field))
@@ -1223,6 +1366,7 @@ class LexiconService:
 
             target_class = item.get("target_class")
             property_path = item.get("property_path")
+            element_type = item.get("element_type")
             if target_class:
                 target_matches = self._resolve_profile_term_matches(target_class, runtime)
                 if not target_matches["class_matches"] and target_matches["property_matches"]:
@@ -1243,38 +1387,37 @@ class LexiconService:
                         f"{', '.join(sorted(target_matches['class_matches']))}"
                     )
             if property_path:
-                property_matches = self._resolve_profile_term_matches(property_path, runtime)
-                if not property_matches["property_matches"] and property_matches["class_matches"]:
-                    ontology_warnings.append(
-                        "Rule node "
-                        f"'{item['id']}' uses class URI as property_path: {property_matches['normalized_uri']}"
-                    )
-                elif not property_matches["property_matches"]:
-                    ontology_warnings.append(
-                        "Rule node "
-                        f"'{item['id']}' uses property_path not declared as property in selected ontologies: "
-                        f"{property_matches['normalized_uri']}"
-                    )
-                elif len(property_matches["property_matches"]) > 1:
-                    ontology_warnings.append(
-                        "Rule node "
-                        f"'{item['id']}' property_path matches multiple selected ontologies: "
-                        f"{', '.join(sorted(property_matches['property_matches']))}"
-                    )
+                check_steps(item["id"], str(property_path), role="property_path")
+            if element_type == "derive":
+                # the written property is an output; the paths in the expression are the inputs
+                expression = item.get("expression")
+                if expression is not None and target_class:
+                    try:
+                        tree = parse_expression(str(expression))
+                    except ExpressionError as exc:
+                        ontology_warnings.append(f"Rule node '{item['id']}' has an invalid expression: {exc}")
+                    else:
+                        aggregates_by_path = _aggregates_by_path(tree)
+                        for path in referenced_paths(tree):
+                            check_steps(item["id"], path, role="expression")
+                            require(
+                                target_class,
+                                path,
+                                item["id"],
+                                operator=None,
+                                value=None,
+                                aggregate=aggregates_by_path.get(path),
+                            )
+                continue
             if target_class and property_path:
-                bucket = property_requirements_by_target[target_class].setdefault(
-                    property_path,
-                    {
-                        "node_ids": [],
-                        "operators": [],
-                        "sample_values": [],
-                    },
+                require(
+                    target_class,
+                    str(property_path),
+                    item["id"],
+                    operator=item.get("operator"),
+                    value=item.get("value"),
+                    aggregate=None,
                 )
-                bucket["node_ids"].append(item["id"])
-                if item.get("operator"):
-                    bucket["operators"].append(str(item["operator"]))
-                if item.get("value") is not None:
-                    bucket["sample_values"].append(str(item["value"]))
 
         targets: list[LexiconExecutionTarget] = []
         for target_class, requirements in sorted(property_requirements_by_target.items()):
@@ -1288,15 +1431,39 @@ class LexiconService:
                     property_requirements=[
                         LexiconPropertyRequirement(
                             property_path=property_path,
+                            property=(requirement["steps"] or [None])[-1],
+                            via="/".join(requirement["steps"][:-1]) or None,
+                            steps=list(requirement["steps"]),
                             node_ids=sorted(set(requirement["node_ids"])),
                             operators=sorted(set(requirement["operators"])),
+                            aggregates=sorted(set(requirement["aggregates"])),
                             sample_values=sorted(set(requirement["sample_values"])),
                         )
                         for property_path, requirement in sorted(requirements.items())
                     ],
-                    relation_requirements=[],
+                    relation_requirements=sorted(
+                        {
+                            "/".join(requirement["steps"][:-1])
+                            for requirement in requirements.values()
+                            if len(requirement["steps"]) > 1
+                        }
+                    ),
                 )
             )
+        required_paths = sorted(
+            {path for requirements in property_requirements_by_target.values() for path in requirements}
+        )
+        relation_paths = sorted({rel for target in targets for rel in target.relation_requirements})
+        derived_properties = [
+            LexiconDerivedProperty(
+                property_path=written,
+                target_class=meta.get("target_class"),
+                node_ids=sorted(set(derived_by[written])),
+                expressions=list(dict.fromkeys(meta["expressions"])),
+                read_by_node_ids=sorted(set(meta["read_by"])),
+            )
+            for written, meta in sorted(derived_meta.items())
+        ]
 
         profile = LexiconExecutionProfile(
             rule_id=normalized_rule["id"],
@@ -1309,11 +1476,10 @@ class LexiconService:
             target_classes=sorted(
                 {str(item["target_class"]) for item in normalized_rule["elements"] if item.get("target_class")}
             ),
-            property_paths=sorted(
-                {str(item["property_path"]) for item in normalized_rule["elements"] if item.get("property_path")}
-            ),
-            relation_paths=[],
+            property_paths=required_paths,
+            relation_paths=relation_paths,
             targets=targets,
+            derived_properties=derived_properties,
             nodes=node_models,
             warnings=[str(error) for error in completeness.get("errors", [])]
             + [
@@ -1340,7 +1506,9 @@ class LexiconService:
                     lambda: {
                         "node_ids": set(),
                         "operators": set(),
+                        "aggregates": set(),
                         "sample_values": set(),
+                        "steps": [],
                     }
                 ),
             }
@@ -1378,7 +1546,9 @@ class LexiconService:
                     req_bucket = target_bucket["property_requirements"][requirement.property_path]
                     req_bucket["node_ids"].update(f"{node_prefix}{node_id}" for node_id in requirement.node_ids)
                     req_bucket["operators"].update(requirement.operators)
+                    req_bucket["aggregates"].update(requirement.aggregates)
                     req_bucket["sample_values"].update(requirement.sample_values)
+                    req_bucket["steps"] = list(requirement.steps)
             warnings.extend(profile.warnings)
 
         return LexiconExecutionProfile(
@@ -1399,15 +1569,36 @@ class LexiconService:
                     property_requirements=[
                         LexiconPropertyRequirement(
                             property_path=property_path,
+                            property=(requirement["steps"] or [None])[-1],
+                            via="/".join(requirement["steps"][:-1]) or None,
+                            steps=list(requirement["steps"]),
                             node_ids=sorted(requirement["node_ids"]),
                             operators=sorted(requirement["operators"]),
+                            aggregates=sorted(requirement["aggregates"]),
                             sample_values=sorted(requirement["sample_values"]),
                         )
                         for property_path, requirement in sorted(bucket["property_requirements"].items())
                     ],
-                    relation_requirements=[],
+                    relation_requirements=sorted(
+                        {
+                            "/".join(r["steps"][:-1])
+                            for r in bucket["property_requirements"].values()
+                            if len(r["steps"]) > 1
+                        }
+                    ),
                 )
                 for target_class, bucket in sorted(aggregated_targets.items())
+            ],
+            derived_properties=[
+                LexiconDerivedProperty(
+                    property_path=item.property_path,
+                    target_class=item.target_class,
+                    node_ids=[f"{profile.rule_id}::{node_id}" for node_id in item.node_ids],
+                    expressions=item.expressions,
+                    read_by_node_ids=[f"{profile.rule_id}::{node_id}" for node_id in item.read_by_node_ids],
+                )
+                for profile in rule_profiles
+                for item in profile.derived_properties
             ],
             nodes=aggregated_nodes,
             warnings=list(dict.fromkeys(warnings)),
@@ -2632,6 +2823,13 @@ class LexiconService:
             | {str(subject) for subject in graph.subjects(RDF.type, OWL.ObjectProperty)}
             | {str(subject) for subject in graph.subjects(RDF.type, OWL.DatatypeProperty)}
         )
+        # Terms the ontology relates its own terms to are of that kind by definition, even when it does not type
+        # them itself — typically the core `fbo:` vocabulary a national ontology extends (`fbo-dk:partOf
+        # owl:inverseOf fbo:hasSubitem`, `fbo-dk:X rdfs:subPropertyOf fbo:X`, `… rdfs:subClassOf fbo:Building`).
+        for predicate in (RDFS.subPropertyOf, OWL.inverseOf, OWL.equivalentProperty):
+            declared_properties |= {str(obj) for obj in graph.objects(None, predicate) if isinstance(obj, URIRef)}
+        for predicate in (RDFS.subClassOf, OWL.equivalentClass):
+            declared_classes |= {str(obj) for obj in graph.objects(None, predicate) if isinstance(obj, URIRef)}
         return declared_classes, declared_properties
 
     @staticmethod

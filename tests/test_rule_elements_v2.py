@@ -1154,7 +1154,7 @@ def test_open_questions_name_the_missing_fact_and_where_to_write_it():
     assert by_target["c1"]["write_subject"].endswith("#c1")
     assert by_target["c2"]["kind"] == "choice" and set(by_target["c2"]["options"]) >= {"AK2", "AK3"}
     assert by_target["c4"]["kind"] == "boolean" and by_target["c4"]["options"] == [True, False]
-    assert by_target["c4"]["write_subject"] is None and "leads nowhere" in by_target["c4"]["problem"]
+    assert by_target["c4"]["write_subject"] is None and "not part of any unit" in by_target["c4"]["problem"]
     assert by_target["c4"]["write_property"] == f"{LT}Sprinklered"
 
 

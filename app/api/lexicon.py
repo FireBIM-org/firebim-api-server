@@ -725,6 +725,14 @@ def derive_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconPro
             selected_ontologies=payload.selected_ontologies,
             canonical_target_ontology=payload.canonical_target_ontology,
         )
+        graph_coverage = None
+        if payload.graph_id:
+            graph_coverage = service.compute_profile_graph_coverage(
+                profile_id="derived",
+                graph_id=payload.graph_id,
+                selected_ontologies=selected_ontologies["selected_ontologies"],
+                expected_profile=profile,
+            )
         return LexiconProfileDeriveResponse(
             ontology_family=ontology.ontology_family,
             country=ontology.country,
@@ -736,6 +744,7 @@ def derive_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconPro
             rule_ids=rule_ids,
             rule_profiles=rule_profiles,
             profile=profile,
+            graph_coverage=graph_coverage,
         )
     except (GraphStoreError, GraphStoreNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
