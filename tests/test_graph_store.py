@@ -89,3 +89,17 @@ def test_graph_store_round_trip_and_list(store: GraphStoreClient):
 def test_graph_store_delete_missing_raises(store: GraphStoreClient):
     with pytest.raises(GraphStoreNotFoundError):
         store.delete_graph("rulebook", "https://firebim.org/graphs/rulebook/missing")
+
+
+def test_graph_store_uses_precomputed_triple_count(store: GraphStoreClient, monkeypatch):
+    graph_uri = "https://firebim.org/graphs/ontologies/large"
+    ttl = '@prefix ex: <http://example.org/> .\nex:a ex:b "c" .'
+
+    def fail_if_parsed(_ttl: str) -> int:
+        raise AssertionError("TTL should not be parsed twice")
+
+    monkeypatch.setattr(store, "_triple_count", fail_if_parsed)
+    store.put_graph_ttl("ontologies", graph_uri, ttl, triple_count=123)
+
+    key = store._object_key("ontologies", graph_uri)
+    assert store.client.objects[key]["metadata"]["triple-count"] == "123"
