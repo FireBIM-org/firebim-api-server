@@ -3138,6 +3138,107 @@
         ]
       }
     },
+    "/ontologies/sync/jobs": {
+      "post": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Start Ontology Sync Job",
+        "description": "Queue an ontology sync so large releases do not hold an HTTP request open.",
+        "operationId": "start_ontology_sync_job_ontologies_sync_jobs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/OntologySyncRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologySyncJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/ontologies/sync/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Get Ontology Sync Job",
+        "operationId": "get_ontology_sync_job_ontologies_sync_jobs__job_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologySyncJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ontologies/conversions/dictionary-json-to-ttl": {
       "post": {
         "tags": [
@@ -13489,6 +13590,84 @@
           "reason"
         ],
         "title": "OntologySyncItem"
+      },
+      "OntologySyncJobResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OntologySyncJobStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OntologySyncResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "status",
+          "created_at"
+        ],
+        "title": "OntologySyncJobResponse"
+      },
+      "OntologySyncJobStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "completed",
+          "failed"
+        ],
+        "title": "OntologySyncJobStatus"
       },
       "OntologySyncRequest": {
         "properties": {

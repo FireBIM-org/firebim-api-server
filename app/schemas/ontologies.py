@@ -543,6 +543,23 @@ class OntologySyncResponse(BaseModel):
     items: list[OntologySyncItem] = Field(default_factory=list)
 
 
+class OntologySyncJobStatus(StrEnum):
+    queued = "queued"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+
+
+class OntologySyncJobResponse(BaseModel):
+    job_id: str
+    status: OntologySyncJobStatus
+    created_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    result: OntologySyncResponse | None = None
+    error: str | None = None
+
+
 class OntologySyncSourceResponse(BaseModel):
     default_source_url: str
     registry_format: str = "firebim-ontology-registry"

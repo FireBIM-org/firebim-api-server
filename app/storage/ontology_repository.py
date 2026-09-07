@@ -223,7 +223,12 @@ class OntologyRepository:
         else:
             manifest["default_version"] = manifest.get("default_version") or latest_stable_version or latest_version
 
-        self.client.put_graph_ttl(self.dataset, graph_uri, ttl)
+        self.client.put_graph_ttl(
+            self.dataset,
+            graph_uri,
+            ttl,
+            triple_count=metadata["triple_count"],
+        )
         self._save_manifest(payload.ontology_family, payload.country, manifest)
 
         return {

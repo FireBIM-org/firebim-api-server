@@ -312,3 +312,44 @@ def test_sync_endpoints(monkeypatch):
 
     missing = client.post("/ontologies/sync/preview", json={"source_url": "https://example.org/none.json"})
     assert missing.status_code == 502
+
+
+def test_async_sync_job_endpoints(monkeypatch):
+    from datetime import UTC, datetime
+    from types import SimpleNamespace
+
+    request_payload = {"source_url": f"{BASE}/index.json", "selections": ["ifc/global/2026.04.23"]}
+    record = {
+        "job_id": "2a61b84d-3021-47bd-a5e2-bfe5ad9d052c",
+        "owner_id": "user-1",
+        "status": "queued",
+        "created_at": datetime.now(UTC).isoformat(),
+        "started_at": None,
+        "completed_at": None,
+        "request": request_payload,
+        "result": None,
+        "error": None,
+    }
+    fake_store = SimpleNamespace(
+        create=lambda **_kwargs: record,
+        get=lambda _job_id: record,
+        update=lambda _job_id, **changes: {**record, **changes},
+    )
+    queued: list[tuple[str, list]] = []
+    fake_celery = SimpleNamespace(send_task=lambda name, args: queued.append((name, args)))
+    monkeypatch.setattr(ontologies_api, "sync_job_store", fake_store)
+    monkeypatch.setattr(ontologies_api, "celery_app", fake_celery)
+
+    app = FastAPI()
+    app.include_router(ontologies_api.router)
+    app.dependency_overrides[ontologies_api.get_current_active_user] = lambda: SimpleNamespace(id="user-1")
+    client = TestClient(app)
+
+    started = client.post("/ontologies/sync/jobs", json=request_payload)
+    assert started.status_code == 202
+    assert started.json()["status"] == "queued"
+    assert queued[0][0] == "sync_ontologies_from_registry"
+
+    fetched = client.get(f"/ontologies/sync/jobs/{record['job_id']}")
+    assert fetched.status_code == 200
+    assert fetched.json()["job_id"] == record["job_id"]
