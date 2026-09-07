@@ -20,6 +20,8 @@ from app.lexicon.query_runtime import (
 )
 from app.rules.composer import check_ruleset_completeness
 from app.rules.decompiler import decompile_ruleset_ttl
+from app.rules.expressions import parse_expression, referenced_paths
+from app.rules.paths import expand_curie, is_ref_value, ref_path, split_property_path
 from app.schemas.lexicon import (
     LexiconBranchReference,
     LexiconCatalogCompareRequest,
@@ -488,60 +490,112 @@ class LexiconService:
         issues: list[LexiconRuleTermValidationIssue] = []
         validated_field_count = 0
 
+        selected_names = ", ".join(
+            f"{sel.ontology_family}/{sel.country} {sel.version}".strip() for sel in selected_ontologies
+        )
+
+        def check_term(
+            *, rule_id: str, node_id: str, field: str, expected_kind: str, value: str, context: str | None
+        ) -> tuple[list[LexiconRuleTermValidationMatch], LexiconRuleTermValidationIssue | None]:
+            resolved = runtime.resolve_term_matches(value)
+            expected_uris = sorted(resolved[f"{expected_kind}_matches"])
+            opposite_kind = "property" if expected_kind == "class" else "class"
+            opposite_uris = sorted(resolved[f"{opposite_kind}_matches"])
+            matches = self._rule_term_validation_matches(runtime, expected_uris)
+            if matches:
+                return matches, None
+            code = "wrong_term_kind" if opposite_uris else "unknown_term"
+            where = f" (step of {context})" if context and context != value else ""
+            if code == "wrong_term_kind":
+                message = (
+                    f"'{value}'{where} is an ontology {opposite_kind}, not an ontology {expected_kind}. "
+                    f"Pick a {expected_kind} instead."
+                )
+            else:
+                message = (
+                    f"'{value}'{where} is not a {expected_kind} in the selected ontologies ({selected_names}). "
+                    "Pick a term from the suggestions, tick the ontology that defines it on the right, "
+                    "or accept the term if it is intentional."
+                )
+            return matches, LexiconRuleTermValidationIssue(
+                rule_id=rule_id,
+                node_id=node_id,
+                field=field,  # type: ignore[arg-type]
+                expected_kind=expected_kind,  # type: ignore[arg-type]
+                value=value,
+                code=code,  # type: ignore[arg-type]
+                message=message,
+                context=context,
+            )
+
+        def path_steps(value: str) -> list[str]:
+            return [step.lstrip("^") for step in split_property_path(value) if step.lstrip("^")]
+
         for normalized_rule in normalized_rules:
             rule_id = str(normalized_rule.get("id") or "")
             for element in normalized_rule.get("elements", []):
-                if element.get("element_type") != "decision":
+                element_type = element.get("element_type") or element.get("node_type")
+                if element_type not in ("decision", "derive"):
                     continue
 
                 node_id = str(element.get("id") or "")
+                config = element.get("config") if isinstance(element.get("config"), dict) else {}
+                accepted = {str(t) for t in (config.get("accepted_terms") or []) if t}
+                prefixes = config.get("prefixes") if isinstance(config.get("prefixes"), dict) else None
                 field_results: list[LexiconRuleTermValidationFieldResult] = []
-                for field, expected_kind in (
-                    ("target_class", "class"),
-                    ("property_path", "property"),
-                ):
-                    raw_value = element.get(field)
-                    value = str(raw_value).strip() if raw_value is not None else ""
-                    if not value:
-                        continue
 
+                # (field, expected kind, whole value, the terms to check)
+                checks: list[tuple[str, str, str, list[str]]] = []
+                target_class = str(element.get("target_class") or "").strip()
+                if target_class:
+                    checks.append(("target_class", "class", target_class, [target_class]))
+                property_path = str(element.get("property_path") or "").strip()
+                if property_path:
+                    checks.append(("property_path", "property", property_path, path_steps(property_path)))
+                value = element.get("value")
+                if is_ref_value(value):
+                    ref = str(ref_path(value) or "").strip()
+                    if ref:
+                        checks.append(("value", "property", ref, path_steps(ref)))
+                expression = str(element.get("expression") or "").strip()
+                if element_type == "derive" and expression:
+                    try:
+                        refs = referenced_paths(parse_expression(expression))
+                    except Exception:
+                        refs = []
+                    steps: list[str] = []
+                    for ref in refs:
+                        steps.extend(path_steps(ref))
+                    if steps:
+                        checks.append(("expression", "property", expression, steps))
+
+                for field, expected_kind, whole, terms in checks:
                     validated_field_count += 1
-                    resolved = runtime.resolve_term_matches(value)
-                    expected_uris = sorted(resolved[f"{expected_kind}_matches"])
-                    opposite_kind = "property" if expected_kind == "class" else "class"
-                    opposite_uris = sorted(resolved[f"{opposite_kind}_matches"])
-                    matches = self._rule_term_validation_matches(runtime, expected_uris)
-
+                    matches: list[LexiconRuleTermValidationMatch] = []
                     issue = None
-                    if not matches:
-                        code = "wrong_term_kind" if opposite_uris else "unknown_term"
-                        if code == "wrong_term_kind":
-                            message = (
-                                f"{field.replace('_', ' ').capitalize()} '{value}' is an ontology "
-                                f"{opposite_kind}, not an ontology {expected_kind}."
-                            )
-                        else:
-                            message = (
-                                f"{field.replace('_', ' ').capitalize()} '{value}' was not found as an "
-                                f"ontology {expected_kind} in the selected ontologies."
-                            )
-                        issue = LexiconRuleTermValidationIssue(
+                    for term in terms:
+                        term_iri = expand_curie(term, prefixes)
+                        if term_iri in accepted or term in accepted:
+                            continue
+                        found, term_issue = check_term(
                             rule_id=rule_id,
                             node_id=node_id,
                             field=field,
                             expected_kind=expected_kind,
-                            value=value,
-                            code=code,
-                            message=message,
+                            value=term,
+                            context=whole,
                         )
-                        issues.append(issue)
-
+                        matches.extend(found)
+                        if term_issue is not None:
+                            issues.append(term_issue)
+                            if issue is None:
+                                issue = term_issue
                     field_results.append(
                         LexiconRuleTermValidationFieldResult(
-                            field=field,
-                            expected_kind=expected_kind,
-                            value=value,
-                            valid=bool(matches),
+                            field=field,  # type: ignore[arg-type]
+                            expected_kind=expected_kind,  # type: ignore[arg-type]
+                            value=whole,
+                            valid=issue is None,
                             matches=matches,
                             issue=issue,
                         )
