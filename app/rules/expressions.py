@@ -225,12 +225,14 @@ AGGREGATES = ("count", "sum", "min", "max", "avg", "any", "all")
 def _aggregate(name: str, path: str, values: list[Any]) -> Any:
     if name == "count":
         return len(values)
+    if not values:
+        # count() of nothing is 0; every other aggregate of nothing is *missing data* — in particular all() must not
+        # be vacuously True ("all rooms have an exit to the open" with no room data is not a pass).
+        raise ExpressionUnknown("missing_required_input", f"{name}(${path}): no values", property_path=path)
     if name == "any":
         return any(v is True for v in values)
     if name == "all":
         return all(v is True for v in values)
-    if not values:
-        raise ExpressionUnknown("missing_required_input", f"{name}(${path}): no values", property_path=path)
     if name in ("min", "max") and all(isinstance(v, str) for v in values):
         # enumeration codes ("RK1" < "RK2", "AK2" < "AK3"): lexicographic min/max
         return min(values) if name == "min" else max(values)

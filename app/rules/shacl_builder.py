@@ -157,12 +157,19 @@ class SHACLBuilder:
             ref_clause = f"OPTIONAL {{ ?this {self._sparql_path(ref_segments)} ?v }}"
             unknown_test = "!BOUND(?h) || !BOUND(?v)"
 
+        # `?this` must be bound for every instance of the target class, also when the property is absent —
+        # otherwise a missing value yields no result at all instead of Unknown / False (`exists`).
+        target_iri = (
+            f"<{element.target_class}>"
+            if element.target_class and str(element.target_class).startswith("http")
+            else f"<{self.EX[element.target_class]}>"
+        )
         sparql = f"""
         CONSTRUCT {{
             ?this fb:ruleResult ?result .
         }}
         WHERE {{
-
+            ?this a {target_iri} .
             OPTIONAL {{ ?this {property_path} ?h }}
             {ref_clause}
 

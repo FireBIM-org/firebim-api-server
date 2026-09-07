@@ -699,8 +699,10 @@ def test_blind_runner_treats_conflicting_multi_value_results_as_unknown():
     @prefix lt: <{LT}> . @prefix ex: <https://example.org/x#> .
     ex:c1 a lt:Compartment ; lt:Flag true . ex:c2 a lt:Compartment ; lt:Flag true, false .
     ex:c3 a lt:Compartment ; lt:Flag true, true .
+    ex:c4 a lt:Compartment ; lt:Flag false, "no" .
     """
-    expected = {"c1": "True", "c2": "Unknown", "c3": "True"}
+    # c4: both values disagree with `true` — still Unknown (several distinct values = ambiguous, not False)
+    expected = {"c1": "True", "c2": "Unknown", "c3": "True", "c4": "Unknown"}
     assert _status_by_target(_run(CheckRuntime, rule, ttl)) == expected
     blind = BlindShaclRuleRunner().run_rule(
         graph_id="g",
@@ -948,6 +950,14 @@ def test_aggregates_count_per_node_and_handle_booleans_and_codes():
     }
     assert evaluate(parse_expression("sum($e)"), None, lambda p: many[p]) == 2
     assert evaluate(parse_expression("max($rk)"), None, lambda p: many[p]) == "RK3"
+    assert evaluate(parse_expression("all($e)"), None, lambda p: many[p]) is False
+    assert evaluate(parse_expression("any($e)"), None, lambda p: many[p]) is True
+    # nothing to aggregate: count() is 0, everything else is missing data (all() is never vacuously True)
+    empty = {"e": []}
+    assert evaluate(parse_expression("count($e)"), None, lambda p: empty[p]) == 0
+    for fn in ("all", "any", "sum", "max"):
+        with pytest.raises(ExpressionUnknown):
+            evaluate(parse_expression(f"{fn}($e)"), None, lambda p: empty[p])
 
 
 def test_check_response_reports_merged_schemas(api_client, monkeypatch):
@@ -995,3 +1005,54 @@ def test_missing_linked_rule_is_reported_as_rule_not_found(api_client, monkeypat
     monkeypatch.setattr(checks_api, "fetch_building_graph_ttl", missing_graph)
     body = api_client.post("/checks/run", json={"rule_id": "t-fg", "graph_id": "nope"}).json()
     assert body["error"] == "graph_not_found" and "nope" in body["message"]
+
+
+def test_exists_after_a_derive_is_never_unknown_in_the_blind_runner():
+    """A decision that follows a derive is evaluated lazily by the blind runner; `exists` must still answer
+    True/False on presence, not Unknown when the path is absent."""
+    rid = "t-lazy-exists"
+    rule = {
+        "id": rid,
+        "entry": f"{rid}-start",
+        "elements": [
+            {"id": f"{rid}-start", "element_type": "start", "true_path": f"{rid}-d", "label": "start"},
+            {
+                "id": f"{rid}-d",
+                "element_type": "derive",
+                "target_class": f"{LT}Compartment",
+                "property_path": f"{LT}Flag",
+                "expression": "1",
+                "true_path": f"{rid}-q",
+                "unknown_path": f"{rid}-ask",
+                "label": "derive something first",
+            },
+            {
+                "id": f"{rid}-q",
+                "element_type": "decision",
+                "target_class": f"{LT}Compartment",
+                "property_path": f"{LT}Lighting",
+                "operator": "exists",
+                "true_path": f"{rid}-ok",
+                "false_path": f"{rid}-no",
+                "unknown_path": f"{rid}-ask",
+                "label": "lighting present?",
+            },
+            _end(rid, "ok", "pass"),
+            _end(rid, "no", "fail"),
+            _end(rid, "ask", "missing_data"),
+        ],
+    }
+    ttl = f"""
+    @prefix lt: <{LT}> . @prefix ex: <https://example.org/x#> .
+    ex:c1 a lt:Compartment ; lt:Lighting ex:sys1, ex:sys2 . ex:c2 a lt:Compartment .
+    """
+    expected = {"c1": "True", "c2": "False"}
+    assert _status_by_target(_run(CheckRuntime, rule, ttl)) == expected
+    blind = BlindShaclRuleRunner().run_rule(
+        graph_id="g",
+        graph_uri="https://firebim.org/graphs/buildings/g",
+        graph_ttl=ttl,
+        rule_id=rid,
+        rule_ttl=_ttl(rule),
+    )
+    assert {h["target_node"].split("#")[-1]: h["final_status"] for h in blind["end_outputs"]} == expected
