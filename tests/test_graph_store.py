@@ -82,8 +82,27 @@ def test_graph_store_round_trip_and_list(store: GraphStoreClient):
         {
             "graph_uri": graph_uri,
             "triple_count": 1,
+            "label": None,
+            "description": None,
         }
     ]
+
+
+def test_graph_store_lists_the_graphs_self_description(store: GraphStoreClient):
+    """A graph that labels its own graph URI is listed with that label and comment (non-ASCII survives)."""
+    graph_uri = "https://firebim.org/graphs/buildings/dk-office-1.0.0"
+    ttl = (
+        "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+        f'<{graph_uri}> rdfs:label "Office · 1.0.0" ;\n'
+        '  rdfs:comment "Expected: dk-compartments-size-ak1 → Pass; dk-unit-composition → Fail (≥ 1 exit)" .\n'
+    )
+    store.put_graph_ttl("buildings", graph_uri, ttl)
+    metadata = store.client.objects[next(iter(store.client.objects))]["metadata"]
+    assert metadata["label"].isascii() and metadata["description"].isascii()
+
+    [item] = store.list_named_graphs("buildings", "https://firebim.org/graphs/buildings/")
+    assert item["label"] == "Office · 1.0.0"
+    assert item["description"].startswith("Expected: dk-compartments-size-ak1 → Pass")
 
 
 def test_graph_store_delete_missing_raises(store: GraphStoreClient):
