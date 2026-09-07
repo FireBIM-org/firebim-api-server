@@ -51,7 +51,11 @@ class GraphAnswersResponse(BaseModel):
 class GraphListItem(BaseModel):
     graph_uri: str
     triple_count: int | None = None
-    label: str | None = None
+    label: str | None = Field(default=None, description="What the graph calls itself (`<graph_uri> rdfs:label`)")
+    description: str | None = Field(
+        default=None,
+        description="What the graph says about itself (`<graph_uri> rdfs:comment`), e.g. which rules it is meant for",
+    )
     source: str | None = None
 
 

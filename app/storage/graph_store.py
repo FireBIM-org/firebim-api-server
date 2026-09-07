@@ -6,7 +6,7 @@ from urllib.parse import quote, unquote
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
-from rdflib import Graph
+from rdflib import DCTERMS, RDFS, Graph, URIRef
 
 from app.core.config import settings
 from app.core.observability import is_request_profiling_enabled, log_event, record_metric
@@ -71,12 +71,43 @@ class GraphStoreClient:
 
     @staticmethod
     def _triple_count(ttl: str) -> int:
+        return len(GraphStoreClient._parse(ttl))
+
+    @staticmethod
+    def _parse(ttl: str) -> Graph:
         graph = Graph()
         try:
             graph.parse(data=ttl, format="turtle")
         except Exception as exc:
             raise ValueError(f"Invalid Turtle content: {exc}") from exc
-        return len(graph)
+        return graph
+
+    @staticmethod
+    def _self_description(graph: Graph, graph_uri: str) -> dict[str, str]:
+        """`label` / `description` a graph states about itself (rdfs:label / rdfs:comment / dcterms:* on the graph URI).
+
+        Stored as object metadata so a listing can show what a graph is for without fetching it. S3 metadata must be
+        ASCII and small, so the text is percent-encoded and capped."""
+        subject = URIRef(graph_uri)
+        found: dict[str, str] = {}
+        for key, predicates, limit in (
+            ("label", (RDFS.label, DCTERMS.title), 200),
+            ("description", (RDFS.comment, DCTERMS.description), 1500),
+        ):
+            for predicate in predicates:
+                value = graph.value(subject, predicate)
+                if value is not None and str(value).strip():
+                    found[key] = quote(str(value).strip()[:limit], safe="")
+                    break
+        return found
+
+    @staticmethod
+    def _decode_self_description(metadata: dict) -> dict[str, str | None]:
+        out: dict[str, str | None] = {}
+        for key in ("label", "description"):
+            raw = metadata.get(key)
+            out[key] = unquote(raw) if raw else None
+        return out
 
     @staticmethod
     def _is_not_found(exc: ClientError) -> bool:
@@ -103,8 +134,9 @@ class GraphStoreClient:
         *,
         triple_count: int | None = None,
     ) -> None:
+        graph = self._parse(ttl)
         if triple_count is None:
-            triple_count = self._triple_count(ttl)
+            triple_count = len(graph)
         key = self._object_key(dataset, graph_uri)
         try:
             self.client.put_object(
@@ -115,6 +147,7 @@ class GraphStoreClient:
                 Metadata={
                     "graph-uri": graph_uri,
                     "triple-count": str(triple_count),
+                    **self._self_description(graph, graph_uri),
                 },
             )
         except (BotoCoreError, ClientError) as exc:
@@ -188,31 +221,25 @@ class GraphStoreClient:
                 if not graph_uri.startswith(base_uri):
                     continue
 
+                # list_objects_v2 does not return user metadata; one HEAD per graph gives count, label, description
+                try:
+                    head = self.client.head_object(Bucket=self.bucket_name, Key=key)
+                except (BotoCoreError, ClientError) as exc:
+                    raise GraphStoreError(f"Graph store list failed: {exc}") from exc
+                metadata = head.get("Metadata") or {}
                 triple_count = None
-                metadata = obj.get("Metadata") or {}
-                if "triple-count" in metadata:
+                raw_count = metadata.get("triple-count")
+                if raw_count is not None:
                     try:
-                        triple_count = int(metadata["triple-count"])
+                        triple_count = int(raw_count)
                     except (TypeError, ValueError):
                         triple_count = None
-
-                if triple_count is None:
-                    try:
-                        head = self.client.head_object(Bucket=self.bucket_name, Key=key)
-                    except (BotoCoreError, ClientError) as exc:
-                        raise GraphStoreError(f"Graph store list failed: {exc}") from exc
-                    metadata = head.get("Metadata") or {}
-                    raw_count = metadata.get("triple-count")
-                    if raw_count is not None:
-                        try:
-                            triple_count = int(raw_count)
-                        except (TypeError, ValueError):
-                            triple_count = None
 
                 items.append(
                     {
                         "graph_uri": graph_uri,
                         "triple_count": triple_count,
+                        **self._decode_self_description(metadata),
                     }
                 )
 
