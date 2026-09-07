@@ -1216,3 +1216,28 @@ def test_overrides_and_graph_answers_endpoint(api_client, monkeypatch):
     assert (
         client.post("/graphs/lt/answers", json={"assertions": overrides, "answered_graph_id": "lt"}).status_code == 400
     )
+
+
+def test_standalone_derive_element_publishes_and_bad_elements_are_400(api_client, monkeypatch):
+    from app.api import rules as rules_api
+
+    monkeypatch.setattr(rules_api, "publish_graph_ttl", lambda **kwargs: None)
+    element = {
+        "id": "derive-example",
+        "element_type": "derive",
+        "target_class": f"{DK}FireCompartment",
+        "property_path": f"{DK}MaxAreaFireCompartment",
+        "expression": "2000",
+        "label": "Derive — permitted area",
+        "config": {"library_category": "Examples"},
+    }
+    res = api_client.post("/rules/rule-elements", json=element)  # a library element has no paths yet
+    assert res.status_code == 200 and res.json()["published"] is True, res.text
+    res = api_client.post("/rules/rule-elements", json={**element, "expression": "2000 +"})
+    assert res.status_code == 400 and "expression" in res.json()["detail"]
+
+    # in a rule, a derive without true_path is a lint error
+    rule = lt_rule()
+    rule["elements"][2]["true_path"] = None
+    res = api_client.post("/rules/validate", json={"rule": rule})
+    assert res.json()["valid"] is False and any("true_path" in e for e in res.json()["errors"])

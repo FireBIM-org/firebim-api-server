@@ -764,9 +764,9 @@ def derive_rule_element(payload: RuleElementDeriveRequest):
 def publish_rule_element(payload: RuleElementPublishRequest):
     graph_uri = _resolve_rule_element_graph_uri(payload.id)
     node_data = payload.as_internal_dict()
-    validate_rule_element_payload(node_data)
 
     try:
+        validate_rule_element_payload(node_data)
         element = fbRuleElement(
             id=payload.id,
             target_class=payload.target_class,

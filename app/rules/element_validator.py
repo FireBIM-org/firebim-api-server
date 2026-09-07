@@ -58,8 +58,7 @@ def validate_rule_element_payload(node: dict) -> None:
         forbidden = [name for name in ["operator", "value", "false_path"] if node.get(name) is not None]
         if forbidden:
             raise ValueError(f"Derive node '{node_id}' must not define: {', '.join(forbidden)}")
-        if not node.get("true_path"):
-            raise ValueError(f"Derive node '{node_id}' must define true_path (the element after the value is written)")
+        # true_path is required in a *rule* (lint E-derive-dangling), not on a library element that is not connected yet
         try:
             refs = validate_expression(str(node.get("expression")))
         except ExpressionError as exc:
