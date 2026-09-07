@@ -54,8 +54,11 @@ async def lifespan(app: FastAPI):
     if settings.ENVIRONMENT == "local":
         seeded_ontologies = bootstrap_default_ontologies(ontologies_repo)
         logger.info("Ontology bootstrap completed", extra={"seeded_ontologies": seeded_ontologies})
-        seeded_demo_content = bootstrap_default_demo_content()
-        logger.info("Demo content bootstrap completed", extra={"seeded_demo_content": seeded_demo_content})
+        if settings.SEED_DEMO_CONTENT:
+            seeded_demo_content = bootstrap_default_demo_content()
+            logger.info("Demo content bootstrap completed", extra={"seeded_demo_content": seeded_demo_content})
+        else:
+            logger.info("Demo content bootstrap skipped (SEED_DEMO_CONTENT=false)")
 
     yield
 
