@@ -90,16 +90,32 @@ class GraphStoreClient:
         ASCII and small, so the text is percent-encoded and capped."""
         subject = URIRef(graph_uri)
         found: dict[str, str] = {}
+        # S3 allows 2 KB of user metadata per object in total; graph-uri and triple-count take a little of it.
+        # The caps apply to the *encoded* text (non-ASCII becomes %XX%XX…), cut at a whole character.
         for key, predicates, limit in (
-            ("label", (RDFS.label, DCTERMS.title), 200),
-            ("description", (RDFS.comment, DCTERMS.description), 1500),
+            ("label", (RDFS.label, DCTERMS.title), 240),
+            ("description", (RDFS.comment, DCTERMS.description), 1400),
         ):
             for predicate in predicates:
                 value = graph.value(subject, predicate)
                 if value is not None and str(value).strip():
-                    found[key] = quote(str(value).strip()[:limit], safe="")
+                    found[key] = GraphStoreClient._encode_capped(str(value).strip(), limit)
                     break
         return found
+
+    @staticmethod
+    def _encode_capped(text: str, limit: int) -> str:
+        encoded = quote(text, safe="")
+        if len(encoded) <= limit:
+            return encoded
+        ellipsis = quote("…", safe="")
+        out = ""
+        for char in text:
+            piece = quote(char, safe="")
+            if len(out) + len(piece) + len(ellipsis) > limit:
+                break
+            out += piece
+        return out + ellipsis
 
     @staticmethod
     def _decode_self_description(metadata: dict) -> dict[str, str | None]:
