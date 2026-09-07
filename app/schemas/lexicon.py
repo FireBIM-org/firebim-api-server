@@ -608,15 +608,16 @@ class LexiconRuleTermValidationMatch(BaseModel):
 class LexiconRuleTermValidationIssue(BaseModel):
     rule_id: str
     node_id: str
-    field: Literal["target_class", "property_path"]
+    field: Literal["target_class", "property_path", "value", "expression"]
     expected_kind: Literal["class", "property"]
-    value: str
+    value: str = Field(description="The term that was checked (one step of a path, or the whole field)")
     code: Literal["unknown_term", "wrong_term_kind"]
     message: str
+    context: str | None = Field(default=None, description="The whole field value when `value` is one step of it")
 
 
 class LexiconRuleTermValidationFieldResult(BaseModel):
-    field: Literal["target_class", "property_path"]
+    field: Literal["target_class", "property_path", "value", "expression"]
     expected_kind: Literal["class", "property"]
     value: str
     valid: bool
