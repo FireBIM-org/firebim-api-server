@@ -93,7 +93,7 @@ def test_graph_store_lists_the_graphs_self_description(store: GraphStoreClient):
     graph_uri = "https://firebim.org/graphs/buildings/dk-office-1.0.0"
     ttl = (
         "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
-        f"<{graph_uri}> rdfs:label \"Office · 1.0.0\" ;\n"
+        f'<{graph_uri}> rdfs:label "Office · 1.0.0" ;\n'
         '  rdfs:comment "Expected: dk-compartments-size-ak1 → Pass; dk-unit-composition → Fail (≥ 1 exit)" .\n'
     )
     store.put_graph_ttl("buildings", graph_uri, ttl)
