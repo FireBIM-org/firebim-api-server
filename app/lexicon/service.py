@@ -2823,6 +2823,13 @@ class LexiconService:
             | {str(subject) for subject in graph.subjects(RDF.type, OWL.ObjectProperty)}
             | {str(subject) for subject in graph.subjects(RDF.type, OWL.DatatypeProperty)}
         )
+        # Terms the ontology relates its own terms to are of that kind by definition, even when it does not type
+        # them itself — typically the core `fbo:` vocabulary a national ontology extends (`fbo-dk:partOf
+        # owl:inverseOf fbo:hasSubitem`, `fbo-dk:X rdfs:subPropertyOf fbo:X`, `… rdfs:subClassOf fbo:Building`).
+        for predicate in (RDFS.subPropertyOf, OWL.inverseOf, OWL.equivalentProperty):
+            declared_properties |= {str(obj) for obj in graph.objects(None, predicate) if isinstance(obj, URIRef)}
+        for predicate in (RDFS.subClassOf, OWL.equivalentClass):
+            declared_classes |= {str(obj) for obj in graph.objects(None, predicate) if isinstance(obj, URIRef)}
         return declared_classes, declared_properties
 
     @staticmethod
