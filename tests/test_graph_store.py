@@ -122,3 +122,16 @@ def test_graph_store_uses_precomputed_triple_count(store: GraphStoreClient, monk
 
     key = store._object_key("ontologies", graph_uri)
     assert store.client.objects[key]["metadata"]["triple-count"] == "123"
+
+
+def test_graph_store_caps_self_description_to_the_s3_metadata_budget(store: GraphStoreClient):
+    """A long, non-ASCII rdfs:comment is cut to fit S3's 2 KB user-metadata limit, at a whole character."""
+    graph_uri = "https://firebim.org/graphs/buildings/long"
+    comment = "• dk-compartments-size → Pass ×15 · " * 80  # ~2.9 K characters, ~7 K bytes once percent-encoded
+    ttl = f'@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n<{graph_uri}> rdfs:comment """{comment}""" .'
+    store.put_graph_ttl("buildings", graph_uri, ttl)
+    metadata = store.client.objects[next(iter(store.client.objects))]["metadata"]
+    assert len(metadata["description"]) <= 1400
+    assert sum(len(k) + len(v) for k, v in metadata.items()) < 2048
+    [item] = store.list_named_graphs("buildings", "https://firebim.org/graphs/buildings/")
+    assert item["description"].startswith("• dk-compartments-size → Pass ×15") and item["description"].endswith("…")
