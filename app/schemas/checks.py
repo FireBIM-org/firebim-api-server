@@ -12,6 +12,36 @@ class CheckApiBaseResponse(BaseModel):
     fallback: bool = False
 
 
+class GraphAssertion(BaseModel):
+    """A fact supplied by a person: `subject property value` (replaces existing values of that property)."""
+
+    subject: str = Field(..., description="IRI of the node the fact is about")
+    property: str = Field(..., description="IRI of the property")
+    value: Any = Field(..., description='Literal value (bool / number / string) or {"iri": ...} for a resource')
+    datatype: str | None = Field(default=None, description="Optional XSD local name or IRI, or 'iri'")
+    replace: bool = Field(default=True, description="Remove the existing values of the property first")
+
+
+class CheckQuestion(BaseModel):
+    """What a rule would need to know about one target to get past an Unknown."""
+
+    target_node: str
+    node_id: str
+    node_type: str = "decision"
+    label: str | None = None
+    property_path: str
+    operator: str | None = None
+    value: Any | None = None
+    reason_code: str | None = None
+    message: str | None = None
+    kind: str = Field(default="text", description="boolean | choice | number | text")
+    options: list[Any] = Field(default_factory=list)
+    current_value: Any | None = None
+    write_subject: str | None = Field(default=None, description="Where an answer is written (None if ambiguous)")
+    write_property: str | None = None
+    problem: str | None = None
+
+
 class CheckRunOptions(BaseModel):
     inference: str = Field(default="rdfs", description="none | rdfs | owlrl | both")
     advanced: bool = True
@@ -38,6 +68,13 @@ class CheckRunOptions(BaseModel):
     use_derived_from: list[str] = Field(
         default_factory=list,
         description="Rule ids whose persisted derived graphs are merged into the building graph before evaluation",
+    )
+    overrides: list[GraphAssertion] = Field(
+        default_factory=list,
+        description="Facts to assert on the building graph for this run only (a person's answers / what-if)",
+    )
+    include_questions: bool = Field(
+        default=True, description="Return open questions for the targets that ended Unknown"
     )
     target_nodes: list[str] = Field(
         default_factory=list,
@@ -148,6 +185,11 @@ class CheckSimpleRunResponse(CheckApiBaseResponse):
     derived_values: list[CheckDerivedValue] = Field(default_factory=list)
     derived_graph_uri: str | None = None
     derived_persisted: bool = False
+    questions: list[CheckQuestion] = Field(
+        default_factory=list,
+        description="What the rule would need to know for the targets that ended Unknown (answer with "
+        "options.overrides or POST /graphs/{graph_id}/answers and run again)",
+    )
 
 
 class CheckDiagnosticTimingGroups(BaseModel):
@@ -186,6 +228,7 @@ class BlindCheckRunOptions(BaseModel):
     schema: str = Field(default="auto", description="see CheckRunOptions.schema")
     use_derived_from: list[str] = Field(default_factory=list, description="see CheckRunOptions.use_derived_from")
     target_nodes: list[str] = Field(default_factory=list, description="see CheckRunOptions.target_nodes")
+    overrides: list[GraphAssertion] = Field(default_factory=list, description="see CheckRunOptions.overrides")
 
 
 class BlindCheckRunRequest(BaseModel):

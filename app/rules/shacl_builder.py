@@ -157,12 +157,19 @@ class SHACLBuilder:
             ref_clause = f"OPTIONAL {{ ?this {self._sparql_path(ref_segments)} ?v }}"
             unknown_test = "!BOUND(?h) || !BOUND(?v)"
 
+        # `?this` must be bound for every instance of the target class, also when the property is absent —
+        # otherwise a missing value yields no result at all instead of Unknown / False (`exists`).
+        target_iri = (
+            f"<{element.target_class}>"
+            if element.target_class and str(element.target_class).startswith("http")
+            else f"<{self.EX[element.target_class]}>"
+        )
         sparql = f"""
         CONSTRUCT {{
             ?this fb:ruleResult ?result .
         }}
         WHERE {{
-
+            ?this a {target_iri} .
             OPTIONAL {{ ?this {property_path} ?h }}
             {ref_clause}
 
@@ -221,6 +228,15 @@ class SHACLBuilder:
 
         self.graph.add((ruleset_uri, RDF.type, self.EX.RuleSet))
         self.graph.add((ruleset_uri, self.EX.entryPoint, entry_uri))
+        title = getattr(rule_set, "title", None)
+        if title:
+            self.graph.add((ruleset_uri, self.EX.title, Literal(str(title))))
+        description = getattr(rule_set, "description", None)
+        if description:
+            self.graph.add((ruleset_uri, self.EX.description, Literal(str(description))))
+        source = getattr(rule_set, "source", None)
+        if source:
+            self.graph.add((ruleset_uri, self.EX.sourceJson, Literal(json.dumps(source, ensure_ascii=False))))
 
         for element in rule_set.elements.values():
             self.add_rule_element(element)

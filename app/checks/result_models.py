@@ -185,6 +185,8 @@ class RuleRunResult(BaseModel):
     derived_graph_uri: str | None = None
     derived_graph_ttl: str | None = None
 
+    questions: list[dict[str, Any]] = Field(default_factory=list)  # open questions for Unknown targets
+
 
 class CheckRunResult(BaseModel):
     graph_id: str

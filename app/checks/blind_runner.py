@@ -267,6 +267,15 @@ class BlindShaclRuleRunner:
             previous = statuses.get(str(subject))
             statuses[str(subject)] = status if previous is None or previous == status else "Unknown"
 
+        # Identical bindings collapse into one triple ({"AK2","AK3"} == "AK1" constructs a single False), so the
+        # multiplicity has to be checked on the data: a comparison over several distinct values is ambiguous.
+        # `exists` asks about presence and is fine with any number of values.
+        if statuses and node.property_path and str(node.operator or "").strip().lower() != "exists":
+            segments = expand_property_path(node.property_path)
+            for subject in list(statuses):
+                if len(resolve_path_values(data_graph, subject, segments)) > 1:
+                    statuses[subject] = "Unknown"
+
         return statuses
 
     def _status_from_result_iri(self, iri: str) -> str:
@@ -396,6 +405,9 @@ class BlindShaclRuleRunner:
         evaluator = DirectAtomicEvaluator()
         segments = expand_property_path(node.property_path)
         values = resolve_path_values(data_graph, target, segments, overlay)
+        if str(node.operator or "").strip().lower() == "exists":
+            # presence check: never Unknown (same as the CONSTRUCT form and the direct evaluator)
+            return "True" if values else "False"
         if len(values) != 1:
             return "Unknown"
         expected = node.value

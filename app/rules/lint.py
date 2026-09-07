@@ -93,6 +93,8 @@ def lint_rule(rule: dict[str, Any]) -> tuple[list[str], list[str]]:
             validate_expression(str(el.get("expression") or ""))
         except ExpressionError as exc:
             errors.append(f"derive '{el.get('id')}': {exc}")
+        if not el.get("true_path"):
+            errors.append(f"derive '{el.get('id')}' has no true_path (the element after the value is written)")
         if not el.get("unknown_path"):
             warnings.append(f"derive '{el.get('id')}' has no unknown_path: missing inputs end the run as Unknown")
 

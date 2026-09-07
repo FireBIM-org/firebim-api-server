@@ -22,6 +22,7 @@ from app.rules.publisher import (
     default_rule_element_graph_uri,
     default_rule_graph_uri,
     delete_graph_ttl,
+    display_title,
     fetch_graph_ttl,
     forget_graph,
     list_rule_element_entries,
@@ -127,6 +128,9 @@ def _normalize_rule_dict(rule: dict | None) -> dict | None:
         "id": rule.get("id"),
         "entry": rule.get("entry"),
         "elements": [],
+        "title": rule.get("title"),
+        "description": rule.get("description"),
+        "source": rule.get("source"),
     }
     for raw in elements:
         item = dict(raw)
@@ -147,6 +151,9 @@ def _rule_to_composer_dict(rule: dict) -> dict:
         "id": rule.get("id"),
         "entry": rule.get("entry"),
         "nodes": nodes,
+        "title": rule.get("title"),
+        "description": rule.get("description"),
+        "source": rule.get("source"),
     }
 
 
@@ -175,7 +182,23 @@ def _build_rule(rule_payload) -> Rule:
 
     rule.start(rule_payload.entry)
     rule.validate()
+    rule.title = _rule_title(rule_payload)
+    rule.description = rule_payload.description
+    rule.source = rule_payload.source
     return rule
+
+
+def _rule_title(rule_payload) -> str | None:
+    """Explicit title, else the start element's `config.rule_title`, else its label without 'Start:'."""
+    if rule_payload.title and rule_payload.title.strip():
+        return rule_payload.title.strip()
+    for element in rule_payload.elements:
+        if element.id == rule_payload.entry:
+            config = element.config or {}
+            if config.get("rule_title"):
+                return str(config["rule_title"]).strip()
+            return display_title(None, element.label)
+    return None
 
 
 def _lint_rule_payload(rule_payload) -> list[str]:
@@ -741,9 +764,9 @@ def derive_rule_element(payload: RuleElementDeriveRequest):
 def publish_rule_element(payload: RuleElementPublishRequest):
     graph_uri = _resolve_rule_element_graph_uri(payload.id)
     node_data = payload.as_internal_dict()
-    validate_rule_element_payload(node_data)
 
     try:
+        validate_rule_element_payload(node_data)
         element = fbRuleElement(
             id=payload.id,
             target_class=payload.target_class,

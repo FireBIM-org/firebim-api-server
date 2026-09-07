@@ -699,8 +699,10 @@ def test_blind_runner_treats_conflicting_multi_value_results_as_unknown():
     @prefix lt: <{LT}> . @prefix ex: <https://example.org/x#> .
     ex:c1 a lt:Compartment ; lt:Flag true . ex:c2 a lt:Compartment ; lt:Flag true, false .
     ex:c3 a lt:Compartment ; lt:Flag true, true .
+    ex:c4 a lt:Compartment ; lt:Flag false, "no" .
     """
-    expected = {"c1": "True", "c2": "Unknown", "c3": "True"}
+    # c4: both values disagree with `true` — still Unknown (several distinct values = ambiguous, not False)
+    expected = {"c1": "True", "c2": "Unknown", "c3": "True", "c4": "Unknown"}
     assert _status_by_target(_run(CheckRuntime, rule, ttl)) == expected
     blind = BlindShaclRuleRunner().run_rule(
         graph_id="g",
@@ -948,6 +950,14 @@ def test_aggregates_count_per_node_and_handle_booleans_and_codes():
     }
     assert evaluate(parse_expression("sum($e)"), None, lambda p: many[p]) == 2
     assert evaluate(parse_expression("max($rk)"), None, lambda p: many[p]) == "RK3"
+    assert evaluate(parse_expression("all($e)"), None, lambda p: many[p]) is False
+    assert evaluate(parse_expression("any($e)"), None, lambda p: many[p]) is True
+    # nothing to aggregate: count() is 0, everything else is missing data (all() is never vacuously True)
+    empty = {"e": []}
+    assert evaluate(parse_expression("count($e)"), None, lambda p: empty[p]) == 0
+    for fn in ("all", "any", "sum", "max"):
+        with pytest.raises(ExpressionUnknown):
+            evaluate(parse_expression(f"{fn}($e)"), None, lambda p: empty[p])
 
 
 def test_check_response_reports_merged_schemas(api_client, monkeypatch):
@@ -995,3 +1005,239 @@ def test_missing_linked_rule_is_reported_as_rule_not_found(api_client, monkeypat
     monkeypatch.setattr(checks_api, "fetch_building_graph_ttl", missing_graph)
     body = api_client.post("/checks/run", json={"rule_id": "t-fg", "graph_id": "nope"}).json()
     assert body["error"] == "graph_not_found" and "nope" in body["message"]
+
+
+def test_exists_after_a_derive_is_never_unknown_in_the_blind_runner():
+    """A decision that follows a derive is evaluated lazily by the blind runner; `exists` must still answer
+    True/False on presence, not Unknown when the path is absent."""
+    rid = "t-lazy-exists"
+    rule = {
+        "id": rid,
+        "entry": f"{rid}-start",
+        "elements": [
+            {"id": f"{rid}-start", "element_type": "start", "true_path": f"{rid}-d", "label": "start"},
+            {
+                "id": f"{rid}-d",
+                "element_type": "derive",
+                "target_class": f"{LT}Compartment",
+                "property_path": f"{LT}Flag",
+                "expression": "1",
+                "true_path": f"{rid}-q",
+                "unknown_path": f"{rid}-ask",
+                "label": "derive something first",
+            },
+            {
+                "id": f"{rid}-q",
+                "element_type": "decision",
+                "target_class": f"{LT}Compartment",
+                "property_path": f"{LT}Lighting",
+                "operator": "exists",
+                "true_path": f"{rid}-ok",
+                "false_path": f"{rid}-no",
+                "unknown_path": f"{rid}-ask",
+                "label": "lighting present?",
+            },
+            _end(rid, "ok", "pass"),
+            _end(rid, "no", "fail"),
+            _end(rid, "ask", "missing_data"),
+        ],
+    }
+    ttl = f"""
+    @prefix lt: <{LT}> . @prefix ex: <https://example.org/x#> .
+    ex:c1 a lt:Compartment ; lt:Lighting ex:sys1, ex:sys2 . ex:c2 a lt:Compartment .
+    """
+    expected = {"c1": "True", "c2": "False"}
+    assert _status_by_target(_run(CheckRuntime, rule, ttl)) == expected
+    blind = BlindShaclRuleRunner().run_rule(
+        graph_id="g",
+        graph_uri="https://firebim.org/graphs/buildings/g",
+        graph_ttl=ttl,
+        rule_id=rid,
+        rule_ttl=_ttl(rule),
+    )
+    assert {h["target_node"].split("#")[-1]: h["final_status"] for h in blind["end_outputs"]} == expected
+
+
+def test_rule_title_round_trip_and_fallback(api_client):
+    from app.rules.publisher import display_title
+
+    assert display_title(None, "Start: Flow-CompartmentsSize AK5 (v2)") == "Flow-CompartmentsSize AK5 (v2)"
+    assert display_title(None, "Starting point") == "Starting point"
+    assert display_title(" Miro title ", "Start: x") == "Miro title"
+
+    rule = lt_rule()
+    rule["title"] = "What is the maximum area of fire compartments? (LT)"
+    rule["description"] = "Fg formula"
+    rule["source"] = {"system": "miro", "frame_title": "Fg"}
+    res = api_client.post("/rules/compile", json={"rule": rule})
+    assert res.status_code == 200, res.text
+    back = api_client.post("/rules/decompile", json={"ttl": res.json()["ttl"]}).json()["rule"]
+    assert back["title"] == rule["title"]
+    assert back["description"] == "Fg formula"
+    assert back["source"] == {"system": "miro", "frame_title": "Fg"}
+
+    # no explicit title: the start label without "Start:" is the title
+    rule = lt_rule()
+    rule["elements"][0]["label"] = "Start: Fg check"
+    res = api_client.post("/rules/compile", json={"rule": rule})
+    back = api_client.post("/rules/decompile", json={"ttl": res.json()["ttl"]}).json()["rule"]
+    assert back["title"] == "Fg check"
+
+
+# ------------------------------------------------------------------------------ answers: questions + overrides
+def test_open_questions_name_the_missing_fact_and_where_to_write_it():
+    from app.checks.assertions import open_questions
+
+    rid = "t-q"
+    rule = {
+        "id": rid,
+        "entry": f"{rid}-start",
+        "elements": [
+            {"id": f"{rid}-start", "element_type": "start", "true_path": f"{rid}-spr", "label": "start"},
+            {
+                "id": f"{rid}-spr",
+                "element_type": "decision",
+                "target_class": f"{LT}Compartment",
+                "property_path": f"{LT}partOf/{LT}Sprinklered",  # declared on the unit
+                "operator": "==",
+                "value": True,
+                "true_path": f"{rid}-ak",
+                "false_path": f"{rid}-ak",
+                "unknown_path": f"{rid}-ask",
+                "label": "Sprinklered? (unit)",
+            },
+            {
+                "id": f"{rid}-ak",
+                "element_type": "decision",
+                "target_class": f"{LT}Compartment",
+                "property_path": f"{LT}UseCategory",
+                "operator": "==",
+                "value": "AK2",
+                "true_path": f"{rid}-area",
+                "false_path": f"{rid}-area",
+                "unknown_path": f"{rid}-ask",
+                "label": "AK2?",
+            },
+            {
+                "id": f"{rid}-area",
+                "element_type": "decision",
+                "target_class": f"{LT}Compartment",
+                "property_path": f"{LT}Area",
+                "operator": "<=",
+                "value": 2000,
+                "true_path": f"{rid}-ok",
+                "false_path": f"{rid}-no",
+                "unknown_path": f"{rid}-ask",
+                "label": "area ok?",
+            },
+            _end(rid, "ok", "pass"),
+            _end(rid, "no", "fail"),
+            _end(rid, "ask", "missing_data"),
+        ],
+    }
+    ttl = f"""
+    @prefix lt: <{LT}> . @prefix ex: <https://example.org/q#> .
+    @prefix owl: <http://www.w3.org/2002/07/owl#> .
+    lt:partOf owl:inverseOf lt:has .
+    ex:u1 a lt:Unit ; lt:has ex:c1, ex:c2, ex:c3 ; lt:Sprinklered false .
+    ex:c1 a lt:Compartment ; lt:UseCategory "AK2" .              # area missing -> number question
+    ex:c2 a lt:Compartment ; lt:UseCategory "AK2", "AK3" .       # ambiguous -> choice question
+    ex:c3 a lt:Compartment ; lt:UseCategory "AK2" ; lt:Area 100 .
+    ex:c4 a lt:Compartment ; lt:UseCategory "AK2" ; lt:Area 100 . # no unit -> boolean question, nowhere to write
+    """
+    result = _run(CheckRuntime, rule, ttl)
+    assert _status_by_target(result) == {"c1": "Unknown", "c2": "Unknown", "c3": "True", "c4": "Unknown"}
+    questions = open_questions(result=result, graph_ttl=ttl, compiled=RuleCompiler().compile_from_ttl(_ttl(rule)))
+    by_target = {q["target_node"].split("#")[-1]: q for q in questions}
+    assert set(by_target) == {"c1", "c2", "c4"}
+    assert by_target["c1"]["kind"] == "number" and by_target["c1"]["write_property"] == f"{LT}Area"
+    assert by_target["c1"]["write_subject"].endswith("#c1")
+    assert by_target["c2"]["kind"] == "choice" and set(by_target["c2"]["options"]) >= {"AK2", "AK3"}
+    assert by_target["c4"]["kind"] == "boolean" and by_target["c4"]["options"] == [True, False]
+    assert by_target["c4"]["write_subject"] is None and "leads nowhere" in by_target["c4"]["problem"]
+    assert by_target["c4"]["write_property"] == f"{LT}Sprinklered"
+
+
+def test_overrides_and_graph_answers_endpoint(api_client, monkeypatch):
+    from app.api import graphs as graphs_api
+
+    # c3 has no FireCompartmentHeight / HabsCalculatedAltitude -> the Fg derive asks for them
+    res = api_client.post("/checks/run", json={"rule_id": "t-fg", "graph_id": "lt", "options": {}})
+    body = res.json()
+    assert body["summary"]["unknown"] == 1
+    asks = [q for q in body["questions"] if q["target_node"].endswith("#c3")]
+    assert asks and asks[0]["node_type"] == "derive" and asks[0]["kind"] == "number"
+    missing = asks[0]["write_property"]
+    assert missing in (f"{LT}FireCompartmentHeight", f"{LT}HabsCalculatedAltitude")
+
+    # answer for this run only: overrides
+    overrides = [
+        {"subject": "https://example.org/building/7#c3", "property": f"{LT}FireCompartmentHeight", "value": 12},
+        {"subject": "https://example.org/building/7#c3", "property": f"{LT}HabsCalculatedAltitude", "value": 28},
+    ]
+    res = api_client.post(
+        "/checks/run", json={"rule_id": "t-fg", "graph_id": "lt", "options": {"overrides": overrides}}
+    )
+    assert res.json()["summary"]["unknown"] == 0 and res.json()["questions"] == []
+
+    # answer persistently: an answered copy of the graph
+    store: dict[str, str] = {"lt": LT_GRAPH}
+
+    class FakeRepo:
+        def fetch_graph(self, graph_id):
+            from app.storage.graph_store import GraphStoreNotFoundError
+
+            if graph_id not in store:
+                raise GraphStoreNotFoundError(graph_id)
+            return f"https://firebim.org/graphs/buildings/{graph_id}", store[graph_id]
+
+        def publish_graph(self, graph_id, ttl):
+            existed = graph_id in store
+            store[graph_id] = ttl
+            return f"https://firebim.org/graphs/buildings/{graph_id}", existed
+
+    monkeypatch.setattr(graphs_api, "repo", FakeRepo())
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    app = FastAPI()
+    app.include_router(graphs_api.router)
+    client = TestClient(app)
+    res = client.post("/graphs/lt/answers", json={"assertions": overrides[:1]})
+    assert res.status_code == 200, res.text
+    assert res.json()["graph_id"] == "lt--answered" and res.json()["created"] is True
+    res = client.post("/graphs/lt/answers", json={"assertions": overrides[1:]})
+    assert res.json()["created"] is False and res.json()["applied"] == 1
+    answered = store["lt--answered"]
+    assert "FireCompartmentHeight" in answered and "answeredFromGraph" in answered
+    assert "https://firebim.org/graphs/buildings/lt>" in answered  # provenance points at the base graph
+    assert "lt" in store and store["lt"] == LT_GRAPH  # the base graph is untouched
+    # the base graph is never overwritten, not even on request
+    assert (
+        client.post("/graphs/lt/answers", json={"assertions": overrides, "answered_graph_id": "lt"}).status_code == 400
+    )
+
+
+def test_standalone_derive_element_publishes_and_bad_elements_are_400(api_client, monkeypatch):
+    from app.api import rules as rules_api
+
+    monkeypatch.setattr(rules_api, "publish_graph_ttl", lambda **kwargs: None)
+    element = {
+        "id": "derive-example",
+        "element_type": "derive",
+        "target_class": f"{DK}FireCompartment",
+        "property_path": f"{DK}MaxAreaFireCompartment",
+        "expression": "2000",
+        "label": "Derive — permitted area",
+        "config": {"library_category": "Examples"},
+    }
+    res = api_client.post("/rules/rule-elements", json=element)  # a library element has no paths yet
+    assert res.status_code == 200 and res.json()["published"] is True, res.text
+    res = api_client.post("/rules/rule-elements", json={**element, "expression": "2000 +"})
+    assert res.status_code == 400 and "expression" in res.json()["detail"]
+
+    # in a rule, a derive without true_path is a lint error
+    rule = lt_rule()
+    rule["elements"][2]["true_path"] = None
+    res = api_client.post("/rules/validate", json={"rule": rule})
+    assert res.json()["valid"] is False and any("true_path" in e for e in res.json()["errors"])

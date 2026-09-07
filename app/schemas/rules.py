@@ -45,6 +45,15 @@ class RuleDraft(BaseModel):
     id: str
     entry: str
     elements: list[RuleElementPayload] = Field(default_factory=list)
+    title: str | None = Field(
+        default=None,
+        description="Human-facing name of the rule (e.g. the Miro frame title). Falls back to the start "
+        "element's label without a leading 'Start:'.",
+    )
+    description: str | None = None
+    source: dict | None = Field(
+        default=None, description="Where the rule comes from, e.g. {system: miro, board, frame_id, frame_title, url}"
+    )
 
     def as_internal_dict(self) -> dict:
         elements = [element.as_internal_dict() for element in self.elements]
@@ -52,6 +61,9 @@ class RuleDraft(BaseModel):
             "id": self.id,
             "entry": self.entry,
             "elements": elements,
+            "title": self.title,
+            "description": self.description,
+            "source": self.source,
         }
 
 
@@ -229,6 +241,8 @@ class RuleListItem(BaseModel):
     graph_uri: str
     entry: str | None = None
     label: str | None = None
+    title: str | None = None
+    description: str | None = None
     element_count: int = 0
 
 
