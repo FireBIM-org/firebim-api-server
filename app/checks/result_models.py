@@ -5,7 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 CheckStatus = Literal["True", "False", "Unknown"]
-NodeType = Literal["start", "decision", "end"]
+NodeType = Literal["start", "decision", "derive", "end"]
 
 
 class RunOptions(BaseModel):
@@ -28,6 +28,10 @@ class RunOptions(BaseModel):
     diagnostic_end_node_ids: list[str] = Field(default_factory=list)
     diagnostic_analysis_codes: list[str] = Field(default_factory=list)
     diagnostic_success_only: bool = False
+
+    persist_derived: bool = False
+    use_derived_from: list[str] = Field(default_factory=list)
+    target_nodes: list[str] = Field(default_factory=list)  # restrict the run to these target IRIs (rule chaining)
 
 
 class GraphRef(BaseModel):
@@ -86,13 +90,32 @@ class DecisionNode(BaseCompiledNode):
     sparql_construct: str | None = None
 
 
+class DeriveNode(BaseCompiledNode):
+    node_type: Literal["derive"] = "derive"
+
+    target_class: str | None = None
+    property_path: str | None = None
+    expression: str | None = None
+    prefixes: dict[str, str] | None = None
+
+    true_node_id: str | None = None
+    unknown_node_id: str | None = None
+
+    # kept so code that reads decision-like fields keeps working
+    false_node_id: str | None = None
+    operator: str | None = None
+    value: Any = None
+
+
 class EndNode(BaseCompiledNode):
     node_type: Literal["end"] = "end"
     end_kind: str | None = None
     output_text: str | None = None
+    next_rule: str | None = None  # end_kind "rule": the rule that continues for targets reaching this end
 
 
-CompiledNode = StartNode | DecisionNode | EndNode
+CompiledNode = StartNode | DecisionNode | DeriveNode | EndNode
+ExecutableNode = DecisionNode | DeriveNode
 
 
 class CompiledRuleSet(BaseModel):
@@ -157,6 +180,10 @@ class RuleRunResult(BaseModel):
 
     report_text: str | None = None
     report_graph_ttl: str | None = None
+
+    derived_values: list[dict[str, Any]] = Field(default_factory=list)
+    derived_graph_uri: str | None = None
+    derived_graph_ttl: str | None = None
 
 
 class CheckRunResult(BaseModel):

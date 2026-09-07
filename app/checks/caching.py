@@ -8,6 +8,8 @@ from typing import Any
 
 from rdflib import Graph
 
+from app.checks.rdfs_light import materialize
+
 
 def accumulate_timing(metrics: dict[str, Any] | None, key: str, delta_seconds: float) -> None:
     if metrics is None:
@@ -76,6 +78,9 @@ class CheckExecutionCache:
         started = perf_counter()
         graph = Graph()
         graph.parse(data=ttl, format="turtle")
+        inferred = materialize(graph)
+        if inferred:
+            increment_counter(metrics, "rdfs_inferred_triples", inferred)
         accumulate_timing(metrics, "parse_graph", perf_counter() - started)
         increment_counter(metrics, "parsed_graph_cache_misses")
         self.parsed_graphs[cache_key] = graph

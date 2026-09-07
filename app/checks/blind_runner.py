@@ -7,11 +7,15 @@ from typing import Any
 from rdflib import Graph, Namespace
 
 from app.checks.compiler import RuleCompiler
+from app.checks.derived import DerivedOverlay, DeriveEvaluator, resolve_path_values
+from app.checks.end_status import status_from_end_kind
 from app.checks.execution_state import ExecutionContext
 from app.checks.pathways import PathwayResolver
 from app.checks.planner import RuleExecutionPlanner
+from app.checks.rdfs_light import materialize
 from app.checks.result_models import CompiledRuleSet, DecisionNode, EndNode, GraphRef, RunOptions, TargetRef
-from app.checks.targeting import TargetResolver
+from app.checks.targeting import TargetResolver, restrict_targets
+from app.rules.paths import expand_property_path, is_ref_value, ref_path
 
 FB = Namespace("http://example.org/firebim/rule/")
 EX = Namespace("http://example.org/firebim/")
@@ -44,6 +48,7 @@ class BlindShaclRuleRunner:
     """
 
     def __init__(self) -> None:
+        self.derive_evaluator = DeriveEvaluator()
         self.compiler = RuleCompiler()
         self.target_resolver = TargetResolver()
         self.pathway_resolver = PathwayResolver(cache=self.target_resolver.cache)
@@ -60,6 +65,7 @@ class BlindShaclRuleRunner:
         include_targets: bool = True,
         include_debug: bool = False,
         max_steps: int = 100000,
+        target_nodes: list[str] | None = None,
     ) -> dict[str, Any]:
         started = time.perf_counter()
 
@@ -77,16 +83,31 @@ class BlindShaclRuleRunner:
             plan=self.planner.plan(compiled=compiled, schema=graph_index.schema, options=RunOptions()),
         )
 
+        overlay = DerivedOverlay(rule_id=rule_id, graph_id=graph_id)
+        derived_props = {
+            str(node.property_path)
+            for node in compiled.nodes.values()
+            if node.node_type == "derive" and node.property_path
+        }
+        lazy_nodes = {
+            node.node_id
+            for node in compiled.nodes.values()
+            if node.node_type == "decision" and self._reads_any(node, derived_props)
+        }
         decision_results = self._precompute_decision_results(
             data_graph=data_graph,
             compiled=compiled,
+            skip_node_ids=lazy_nodes,
         )
 
         entry_decision = self._resolve_first_decision(compiled)
-        entry_targets = self.target_resolver.resolve_targets_for_decision(
-            graph_ref=graph_ref,
-            node=entry_decision,
-            graph_index=graph_index,
+        entry_targets = restrict_targets(
+            self.target_resolver.resolve_targets_for_decision(
+                graph_ref=graph_ref,
+                node=entry_decision,
+                graph_index=graph_index,
+            ),
+            target_nodes,
         )
 
         terminal_hits = self._traverse_to_terminal_outputs(
@@ -97,6 +118,9 @@ class BlindShaclRuleRunner:
             initial_node_id=entry_decision.node_id,
             initial_targets=[item.target_node for item in entry_targets],
             max_steps=max_steps,
+            data_graph=data_graph,
+            overlay=overlay,
+            lazy_nodes=lazy_nodes,
         )
 
         terminal_counts = Counter(hit["terminal_node_id"] for hit in terminal_hits)
@@ -133,11 +157,14 @@ class BlindShaclRuleRunner:
                 "conforms": failed == 0 and unknown == 0,
             },
             "end_outputs": terminal_hits if include_targets else [],
+            "derived_values": list(overlay.records),
             "terminal_counts": dict(terminal_counts),
             "message_counts": dict(message_counts),
             "debug": {
                 "elapsed_ms": elapsed_ms,
                 "decision_node_count": sum(1 for node in compiled.nodes.values() if node.node_type == "decision"),
+                "derive_node_count": sum(1 for node in compiled.nodes.values() if node.node_type == "derive"),
+                "lazy_decision_nodes": sorted(lazy_nodes),
                 "end_node_count": sum(1 for node in compiled.nodes.values() if node.node_type == "end"),
                 "decision_result_sizes": {node_id: len(result_map) for node_id, result_map in decision_results.items()},
                 "compiled_rule_id": compiled.rule_id,
@@ -151,6 +178,7 @@ class BlindShaclRuleRunner:
     def _parse_graph(self, ttl: str) -> Graph:
         graph = Graph()
         graph.parse(data=ttl, format="turtle")
+        materialize(graph)
         return graph
 
     def _resolve_first_decision(self, compiled: CompiledRuleSet) -> DecisionNode:
@@ -161,15 +189,25 @@ class BlindShaclRuleRunner:
             raise ValueError(f"Start node '{entry.node_id}' has no next_node_id")
 
         next_node = compiled.get_node(entry.next_node_id)
-        if next_node.node_type != "decision":
-            raise ValueError(f"First executable node '{next_node.node_id}' is not a decision node")
+        if next_node.node_type not in ("decision", "derive"):
+            raise ValueError(f"First executable node '{next_node.node_id}' is not a decision or derive node")
         return next_node
+
+    @staticmethod
+    def _reads_any(node: DecisionNode, props: set[str]) -> bool:
+        if not props:
+            return False
+        segments = set(expand_property_path(node.property_path))
+        if is_ref_value(node.value):
+            segments |= set(expand_property_path(ref_path(node.value)))
+        return bool(segments & props)
 
     def _precompute_decision_results(
         self,
         *,
         data_graph: Graph,
         compiled: CompiledRuleSet,
+        skip_node_ids: set[str] | None = None,
     ) -> dict[str, dict[str, str]]:
         """
         Returns:
@@ -183,6 +221,8 @@ class BlindShaclRuleRunner:
 
         for node in compiled.nodes.values():
             if node.node_type != "decision":
+                continue
+            if skip_node_ids and node.node_id in skip_node_ids:
                 continue
 
             result[node.node_id] = self._execute_construct_for_node(
@@ -201,7 +241,10 @@ class BlindShaclRuleRunner:
         if not node.sparql_construct or not str(node.sparql_construct).strip():
             return {}
 
-        constructed = data_graph.query(str(node.sparql_construct))
+        query_text = str(node.sparql_construct)
+        if "PREFIX fb:" not in query_text:
+            query_text = f"PREFIX fb: <{FB}>\nPREFIX ex: <http://example.org/firebim/>\n" + query_text
+        constructed = data_graph.query(query_text)
         constructed_graph = Graph()
 
         if isinstance(constructed, Graph):
@@ -216,8 +259,13 @@ class BlindShaclRuleRunner:
 
         statuses: dict[str, str] = {}
 
+        # A multi-valued (or sequence/inverse) path binds ?h several times, so one subject can receive several
+        # fb:ruleResult triples. The direct evaluator reports such inputs as ambiguous -> Unknown; do the same here
+        # instead of letting the last triple win.
         for subject, _, obj in constructed_graph.triples((None, FB.ruleResult, None)):
-            statuses[str(subject)] = self._status_from_result_iri(str(obj))
+            status = self._status_from_result_iri(str(obj))
+            previous = statuses.get(str(subject))
+            statuses[str(subject)] = status if previous is None or previous == status else "Unknown"
 
         return statuses
 
@@ -240,7 +288,11 @@ class BlindShaclRuleRunner:
         initial_node_id: str,
         initial_targets: list[str],
         max_steps: int,
+        data_graph: Graph | None = None,
+        overlay: DerivedOverlay | None = None,
+        lazy_nodes: set[str] | None = None,
     ) -> list[dict[str, Any]]:
+        lazy_nodes = lazy_nodes or set()
         queue = deque((initial_node_id, target, 0) for target in initial_targets)
         seen: set[tuple[str, str]] = set()
         terminal_hits: list[dict[str, Any]] = []
@@ -270,11 +322,25 @@ class BlindShaclRuleRunner:
                 )
                 continue
 
-            if node.node_type != "decision":
+            if node.node_type == "derive" and overlay is not None and data_graph is not None:
+                status, _reason, _message, _evidence = self.derive_evaluator.run(
+                    graph=data_graph,
+                    overlay=overlay,
+                    target=target,
+                    node_id=node.node_id,
+                    target_class=node.target_class,
+                    property_path=str(node.property_path),
+                    expression=str(node.expression),
+                    prefixes=node.prefixes,
+                )
+                outcome = status
+            elif node.node_type != "decision":
                 continue
-
-            node_result_map = decision_results.get(node.node_id, {})
-            outcome = node_result_map.get(target, "Unknown")
+            elif node.node_id in lazy_nodes and data_graph is not None:
+                outcome = self._evaluate_lazily(node=node, target=target, data_graph=data_graph, overlay=overlay)
+            else:
+                node_result_map = decision_results.get(node.node_id, {})
+                outcome = node_result_map.get(target, "Unknown")
 
             next_node_id = self._branch_next_node_id(node=node, outcome=outcome)
             if not next_node_id:
@@ -301,7 +367,7 @@ class BlindShaclRuleRunner:
                 )
                 continue
 
-            if next_node.node_type != "decision":
+            if next_node.node_type not in ("decision", "derive"):
                 continue
 
             if next_node.target_class == node.target_class:
@@ -321,6 +387,31 @@ class BlindShaclRuleRunner:
 
         return terminal_hits
 
+    def _evaluate_lazily(
+        self, *, node: DecisionNode, target: str, data_graph: Graph, overlay: DerivedOverlay | None
+    ) -> str:
+        """Direct evaluation against base graph + overlay for decisions that read derived properties."""
+        from app.checks.evaluator_direct import DirectAtomicEvaluator
+
+        evaluator = DirectAtomicEvaluator()
+        segments = expand_property_path(node.property_path)
+        values = resolve_path_values(data_graph, target, segments, overlay)
+        if len(values) != 1:
+            return "Unknown"
+        expected = node.value
+        if is_ref_value(expected):
+            ref_values = resolve_path_values(data_graph, target, expand_property_path(ref_path(expected)), overlay)
+            if len(ref_values) != 1:
+                return "Unknown"
+            expected = evaluator.term_to_python(ref_values[0])
+        try:
+            ok = evaluator._compare(
+                actual=evaluator.term_to_python(values[0]), operator=node.operator or "", expected=expected
+            )
+        except Exception:
+            return "Unknown"
+        return "True" if ok else "False"
+
     def _branch_next_node_id(self, *, node: DecisionNode, outcome: str) -> str | None:
         if outcome == "True":
             return node.true_node_id
@@ -338,6 +429,11 @@ class BlindShaclRuleRunner:
         return node.label or node.node_id
 
     def _status_from_end_node(self, node: EndNode) -> str:
+        # same vocabulary as CheckRuntime._infer_end_status
+        kind_status = status_from_end_kind(node.end_kind or node.config.get("end_kind"))
+        if kind_status is not None:
+            return kind_status
+
         text = self._end_value(node).strip().lower()
 
         if "missing data" in text or "cannot be evaluated" in text or "unknown" in text:

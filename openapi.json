@@ -5793,6 +5793,28 @@
             "type": "integer",
             "title": "Max Steps",
             "default": 100000
+          },
+          "schema": {
+            "type": "string",
+            "title": "Schema",
+            "description": "see CheckRunOptions.schema",
+            "default": "auto"
+          },
+          "use_derived_from": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Use Derived From",
+            "description": "see CheckRunOptions.use_derived_from"
+          },
+          "target_nodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Nodes",
+            "description": "see CheckRunOptions.target_nodes"
           }
         },
         "type": "object",
@@ -5889,6 +5911,13 @@
             },
             "type": "object",
             "title": "Message Counts"
+          },
+          "derived_values": {
+            "items": {
+              "$ref": "#/components/schemas/CheckDerivedValue"
+            },
+            "type": "array",
+            "title": "Derived Values"
           },
           "debug": {
             "additionalProperties": true,
@@ -6135,6 +6164,57 @@
         ],
         "title": "CheckCompatibilityResponse"
       },
+      "CheckDerivedValue": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "property": {
+            "type": "string",
+            "title": "Property"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "expression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expression"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Inputs"
+          },
+          "overwrote_previous": {
+            "title": "Overwrote Previous"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "property"
+        ],
+        "title": "CheckDerivedValue"
+      },
       "CheckDiagnosticResponse": {
         "properties": {
           "success": {
@@ -6232,6 +6312,29 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Debug"
+          },
+          "derived_values": {
+            "items": {
+              "$ref": "#/components/schemas/CheckDerivedValue"
+            },
+            "type": "array",
+            "title": "Derived Values"
+          },
+          "derived_graph_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived Graph Uri"
+          },
+          "derived_persisted": {
+            "type": "boolean",
+            "title": "Derived Persisted",
+            "default": false
           },
           "compiled_rule": {
             "additionalProperties": true,
@@ -6419,6 +6522,18 @@
               }
             ],
             "title": "Analysis Code"
+          },
+          "next_rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Rule",
+            "description": "end_kind 'rule': rule that continues for these targets"
           },
           "count": {
             "type": "integer",
@@ -6649,6 +6764,34 @@
             "type": "boolean",
             "title": "Diagnostic Success Only",
             "default": false
+          },
+          "persist_derived": {
+            "type": "boolean",
+            "title": "Persist Derived",
+            "description": "Publish values written by derive elements to the derived named graph of this graph/rule",
+            "default": false
+          },
+          "use_derived_from": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Use Derived From",
+            "description": "Rule ids whose persisted derived graphs are merged into the building graph before evaluation"
+          },
+          "target_nodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Nodes",
+            "description": "Restrict the run to these target IRIs (used by the RuleBook to chain a rule only for the targets that reached an end element with next_rule)"
+          },
+          "schema": {
+            "type": "string",
+            "title": "Schema",
+            "description": "Which published ontologies' schema triples (subClassOf, subPropertyOf, equivalentClass/Property, inverseOf) are merged into the building graph before evaluation: 'auto' = every ontology whose namespace the rule uses, 'none' = no merge, or a comma-separated list of family/country[/version]",
+            "default": "auto"
           }
         },
         "type": "object",
@@ -6817,6 +6960,29 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Debug"
+          },
+          "derived_values": {
+            "items": {
+              "$ref": "#/components/schemas/CheckDerivedValue"
+            },
+            "type": "array",
+            "title": "Derived Values"
+          },
+          "derived_graph_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived Graph Uri"
+          },
+          "derived_persisted": {
+            "type": "boolean",
+            "title": "Derived Persisted",
+            "default": false
           }
         },
         "type": "object",
@@ -14841,6 +15007,13 @@
             "type": "string",
             "title": "Ttl"
           },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
           "success": {
             "type": "boolean",
             "title": "Success",
@@ -15448,6 +15621,18 @@
             ],
             "title": "Value"
           },
+          "expression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expression",
+            "description": "derive elements only: expression written to property_path (see app.rules.expressions)"
+          },
           "true_path": {
             "anyOf": [
               {
@@ -15678,6 +15863,18 @@
             ],
             "title": "Value"
           },
+          "expression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expression",
+            "description": "derive elements only: expression written to property_path (see app.rules.expressions)"
+          },
           "true_path": {
             "anyOf": [
               {
@@ -15786,6 +15983,18 @@
               }
             ],
             "title": "Value"
+          },
+          "expression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expression",
+            "description": "derive elements only: expression written to property_path (see app.rules.expressions)"
           },
           "true_path": {
             "anyOf": [
@@ -16740,6 +16949,13 @@
             },
             "type": "array",
             "title": "Errors"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
           },
           "success": {
             "type": "boolean",

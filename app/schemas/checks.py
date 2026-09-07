@@ -31,6 +31,29 @@ class CheckRunOptions(BaseModel):
     diagnostic_end_node_ids: list[str] = Field(default_factory=list)
     diagnostic_analysis_codes: list[str] = Field(default_factory=list)
     diagnostic_success_only: bool = False
+    persist_derived: bool = Field(
+        default=False,
+        description="Publish values written by derive elements to the derived named graph of this graph/rule",
+    )
+    use_derived_from: list[str] = Field(
+        default_factory=list,
+        description="Rule ids whose persisted derived graphs are merged into the building graph before evaluation",
+    )
+    target_nodes: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Restrict the run to these target IRIs (used by the RuleBook to chain a rule only for the targets "
+            "that reached an end element with next_rule)"
+        ),
+    )
+    schema: str = Field(
+        default="auto",
+        description=(
+            "Which published ontologies' schema triples (subClassOf, subPropertyOf, equivalentClass/Property, "
+            "inverseOf) are merged into the building graph before evaluation: 'auto' = every ontology whose "
+            "namespace the rule uses, 'none' = no merge, or a comma-separated list of family/country[/version]"
+        ),
+    )
 
 
 class CheckRunRequest(BaseModel):
@@ -78,6 +101,10 @@ class CheckRunEngineInfo(BaseModel):
     solver_mode: str | None = None
     planner_strategy: str | None = None
     diagnostics_enabled: bool = False
+    merged_schemas: list[str] = Field(
+        default_factory=list,
+        description="Published ontologies (family/country/version) whose schema subset was merged into the graph",
+    )
 
 
 class CheckEndNodeSummary(BaseModel):
@@ -87,12 +114,23 @@ class CheckEndNodeSummary(BaseModel):
     label: str | None = None
     output_text: str | None = None
     analysis_code: str | None = None
+    next_rule: str | None = Field(default=None, description="end_kind 'rule': rule that continues for these targets")
     count: int = 0
 
 
 class CheckEndNodeTargets(BaseModel):
     end_node_id: str
     target_nodes: list[str] = Field(default_factory=list)
+
+
+class CheckDerivedValue(BaseModel):
+    target: str
+    property: str
+    value: Any = None
+    node_id: str | None = None
+    expression: str | None = None
+    inputs: dict[str, Any] = Field(default_factory=dict)
+    overwrote_previous: Any = None
 
 
 class CheckSimpleRunResponse(CheckApiBaseResponse):
@@ -107,6 +145,9 @@ class CheckSimpleRunResponse(CheckApiBaseResponse):
     compatibility: dict[str, Any] = Field(default_factory=dict)
     report_text: str | None = None
     debug: dict[str, Any] = Field(default_factory=dict)
+    derived_values: list[CheckDerivedValue] = Field(default_factory=list)
+    derived_graph_uri: str | None = None
+    derived_persisted: bool = False
 
 
 class CheckDiagnosticTimingGroups(BaseModel):
@@ -142,6 +183,9 @@ class BlindCheckRunOptions(BaseModel):
     include_targets: bool = True
     include_debug: bool = True
     max_steps: int = 100000
+    schema: str = Field(default="auto", description="see CheckRunOptions.schema")
+    use_derived_from: list[str] = Field(default_factory=list, description="see CheckRunOptions.use_derived_from")
+    target_nodes: list[str] = Field(default_factory=list, description="see CheckRunOptions.target_nodes")
 
 
 class BlindCheckRunRequest(BaseModel):
@@ -165,6 +209,7 @@ class BlindCheckRunResponse(CheckApiBaseResponse):
     end_outputs: list[BlindCheckTerminalOutput] = Field(default_factory=list)
     terminal_counts: dict[str, int] = Field(default_factory=dict)
     message_counts: dict[str, int] = Field(default_factory=dict)
+    derived_values: list[CheckDerivedValue] = Field(default_factory=list)
     debug: dict[str, Any] = Field(default_factory=dict)
 
 

@@ -23,6 +23,8 @@ GRAPH_FIXTURES: dict[str, str] = {
     "ifc-rir-fbo-graph-compliant": "building_ifc_rir_fbo_compliant.ttl",
     "synthetic-three-storey-office-fbo-be": "synthetic-three-storey-office-fbo-be.ttl",
     "synthetic-three-storey-office-fbo-dk": "synthetic-three-storey-office-fbo-dk.ttl",
+    "synthetic-three-storey-office-fbo-dk-v2": "synthetic-three-storey-office-fbo-dk-v2.ttl",
+    "synthetic-rules-v2-aggregate-cases-fbo-dk": "synthetic-rules-v2-aggregate-cases-fbo-dk.ttl",
     "synthetic-three-storey-office-fbo-lt": "synthetic-three-storey-office-fbo-lt.ttl",
     "synthetic-three-storey-office-fbo-nl": "synthetic-three-storey-office-fbo-nl.ttl",
     "synthetic-three-storey-office-fbo-pt": "synthetic-three-storey-office-fbo-pt.ttl",
