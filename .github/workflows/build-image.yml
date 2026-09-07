@@ -4,6 +4,16 @@ on:
   push:
     branches: [main, 'release/*']
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: 'Exact staging commit SHA or immutable ref to publish'
+        required: true
+        type: string
+      version:
+        description: 'Production version without a prefix (for example 0.2.0)'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -27,6 +37,32 @@ jobs:
             dockerfile: docker/worker/Dockerfile
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref }}
+          fetch-depth: 0
+
+      - name: Validate production version
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "version must be semantic, for example 0.2.0" >&2
+            exit 1
+          fi
+
+      - name: Resolve image source
+        id: source
+        env:
+          SOURCE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.ref_name }}
+        run: |
+          full_sha="$(git rev-parse HEAD)"
+          {
+            echo "sha=$full_sha"
+            echo "short_sha=${full_sha:0:7}"
+            echo "ref_name=$SOURCE_REF"
+            echo "build_time=$(git show -s --format=%cI HEAD)"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v4
 
@@ -41,11 +77,13 @@ jobs:
         with:
           images: ${{ env.IMAGE_BASE }}/${{ matrix.name }}
           tags: |
-            type=sha,prefix=sha-
-            type=ref,event=branch
-            type=semver,pattern=v{{version}}
-            type=semver,pattern=v{{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=sha-${{ steps.source.outputs.short_sha }}
+            type=ref,event=branch,enable=${{ github.event_name == 'push' && github.ref_type == 'branch' }}
+            type=semver,pattern=v{{version}},enable=${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+            type=semver,pattern=v{{major}}.{{minor}},enable=${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+            type=raw,value=${{ inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=production-${{ inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
       - id: build
         uses: docker/build-push-action@v7
@@ -56,9 +94,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            GIT_COMMIT=${{ github.sha }}
-            GIT_BRANCH=${{ github.ref_name }}
-            BUILD_TIME=${{ github.event.head_commit.timestamp }}
+            GIT_COMMIT=${{ steps.source.outputs.sha }}
+            GIT_BRANCH=${{ steps.source.outputs.ref_name }}
+            BUILD_TIME=${{ steps.source.outputs.build_time }}
             APT_CACHE_BUSTER=${{ vars.APT_CACHE_BUSTER }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
