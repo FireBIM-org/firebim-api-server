@@ -83,6 +83,10 @@ class Settings(BaseSettings):
     ONTOLOGY_REGISTRY_URL: str = "https://firebim.org/documentation/ontologies/index.json"
     ONTOLOGY_SYNC_TIMEOUT_SECONDS: float = 120.0
 
+    # Local development only: (re)publish the bundled demo graphs and demo rules at startup.
+    # Set to false to keep a hand-curated workspace — nothing is seeded and nothing you deleted comes back.
+    SEED_DEMO_CONTENT: bool = True
+
     # S3
     S3_ENDPOINT_URL: str
     S3_BUCKET_NAME: str
