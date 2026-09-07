@@ -162,6 +162,15 @@ def decompile_ruleset_ttl(ttl_text: str) -> dict:
 
     entry_obj = g.value(ruleset_uri, EX.entryPoint)
     entry = _local_name(entry_obj) if entry_obj else None
+    title_obj = g.value(ruleset_uri, EX.title)
+    description_obj = g.value(ruleset_uri, EX.description)
+    source_obj = g.value(ruleset_uri, EX.sourceJson)
+    source = None
+    if source_obj is not None:
+        try:
+            source = json.loads(str(source_obj))
+        except ValueError:
+            source = None
 
     nodes = []
 
@@ -245,4 +254,7 @@ def decompile_ruleset_ttl(ttl_text: str) -> dict:
         "id": ruleset_id,
         "entry": entry,
         "nodes": nodes,
+        "title": str(title_obj) if title_obj is not None else None,
+        "description": str(description_obj) if description_obj is not None else None,
+        "source": source,
     }

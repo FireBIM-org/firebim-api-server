@@ -228,6 +228,15 @@ class SHACLBuilder:
 
         self.graph.add((ruleset_uri, RDF.type, self.EX.RuleSet))
         self.graph.add((ruleset_uri, self.EX.entryPoint, entry_uri))
+        title = getattr(rule_set, "title", None)
+        if title:
+            self.graph.add((ruleset_uri, self.EX.title, Literal(str(title))))
+        description = getattr(rule_set, "description", None)
+        if description:
+            self.graph.add((ruleset_uri, self.EX.description, Literal(str(description))))
+        source = getattr(rule_set, "source", None)
+        if source:
+            self.graph.add((ruleset_uri, self.EX.sourceJson, Literal(json.dumps(source, ensure_ascii=False))))
 
         for element in rule_set.elements.values():
             self.add_rule_element(element)

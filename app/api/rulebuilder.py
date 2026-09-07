@@ -86,6 +86,9 @@ def _normalize_rule_draft(raw_rule: dict | None) -> RuleDraft:
     return RuleDraft(
         id=raw_rule["id"],
         entry=raw_rule["entry"],
+        title=raw_rule.get("title"),
+        description=raw_rule.get("description"),
+        source=raw_rule.get("source"),
         elements=[
             RuleElementPayload(
                 id=element["id"],

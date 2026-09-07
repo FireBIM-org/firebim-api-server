@@ -16,6 +16,8 @@ try:
 except Exception:  # pragma: no cover
     BlindShaclRuleRunner = None
 
+from app.checks.assertions import apply_assertions, open_questions
+from app.checks.compiler import RuleCompiler
 from app.checks.derived import default_derived_graph_uri
 from app.checks.result_models import RuleRunResult, RunOptions
 from app.checks.schema_service import extract_graph_schema_payload
@@ -38,6 +40,7 @@ from app.schemas.checks import (
     CheckDiagnosticTimingGroups,
     CheckEndNodeSummary,
     CheckEndNodeTargets,
+    CheckQuestion,
     CheckRunEngineInfo,
     CheckRunRequest,
     CheckRunSummary,
@@ -423,6 +426,8 @@ def _execute_check_run(
         graph_ttl = merge_derived_graphs(
             graph_ttl=graph_ttl, graph_id=payload.graph_id, rule_ids=payload.options.use_derived_from
         )
+    if payload.options.overrides:
+        graph_ttl, _ = apply_assertions(graph_ttl, payload.options.overrides)
     graph_ttl, merged_schemas = merge_schema_graphs(
         graph_ttl=graph_ttl, rule_ttl=rule_ttl, schema=payload.options.schema
     )
@@ -453,6 +458,14 @@ def _execute_check_run(
     request_timings["run_rule"] = round((perf_counter() - started) * 1000.0, 3)
     if merged_schemas and isinstance(getattr(result, "engine", None), dict):
         result.engine["merged_schemas"] = merged_schemas
+    if payload.options.include_questions and hasattr(result, "targets"):
+        started = perf_counter()
+        try:
+            compiled = RuleCompiler().compile_from_ttl(rule_ttl)
+            result.questions = open_questions(result=result, graph_ttl=graph_ttl, compiled=compiled)
+        except Exception as exc:  # questions are a convenience, never a reason to fail the run
+            logger.info("Could not derive open questions: %s", exc)
+        request_timings["questions"] = round((perf_counter() - started) * 1000.0, 3)
     if (
         options.persist_derived
         and getattr(result, "derived_graph_ttl", None)
@@ -617,6 +630,7 @@ def _build_simple_response(
         derived_values=_to_derived_values(result),
         derived_graph_uri=getattr(result, "derived_graph_uri", None),
         derived_persisted=bool(result.engine.get("derived_persisted")),
+        questions=[CheckQuestion(**q) for q in (getattr(result, "questions", None) or [])],
     )
 
 
@@ -667,6 +681,7 @@ def _build_diagnostic_response(
         derived_values=_to_derived_values(result),
         derived_graph_uri=getattr(result, "derived_graph_uri", None),
         derived_persisted=bool(result.engine.get("derived_persisted")),
+        questions=[CheckQuestion(**q) for q in (getattr(result, "questions", None) or [])],
         targets=_to_check_target_results(result),
         trace=trace_payload,
         timings=_build_timings_payload(
@@ -937,6 +952,8 @@ def run_blind_check(payload: BlindCheckRunRequest):
             graph_ttl = merge_derived_graphs(
                 graph_ttl=graph_ttl, graph_id=payload.graph_id, rule_ids=payload.options.use_derived_from
             )
+        if payload.options.overrides:
+            graph_ttl, _ = apply_assertions(graph_ttl, payload.options.overrides)
         graph_ttl, _ = merge_schema_graphs(graph_ttl=graph_ttl, rule_ttl=rule_ttl, schema=payload.options.schema)
 
         runner = BlindShaclRuleRunner()
