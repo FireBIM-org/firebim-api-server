@@ -7,13 +7,13 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.141.1",
     "fastapi-cli",
-    "uvicorn==0.52.4",
+    "uvicorn==0.54.0",
     "pydantic==2.13.5",
     "python-multipart>=0.0.32",
-    "boto3==1.43.88",
-    "psycopg2-binary==2.9.12",
-    "sqlmodel==0.0.42",
-    "alembic==1.19.2",
+    "boto3==1.43.107",
+    "psycopg2-binary==2.9.13",
+    "sqlmodel==0.0.47",
+    "alembic==1.20.0",
     "httpx==0.28.1",
     "uuid==1.30",
     "pyjwt[crypto]>=2.13.0",
@@ -37,9 +37,9 @@ dev = [
     "pytest-cov>=6.0",
 ]
 worker = [
-    "ifcopenshell==0.8.5",
-    "ifctester==0.8.5",
-    "bcf-client==0.8.5",
+    "ifcopenshell==0.9.0",
+    "ifctester==0.9.0",
+    "bcf-client==0.9.0",
 ]
 
 
