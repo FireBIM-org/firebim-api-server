@@ -37,7 +37,7 @@ dev = [
     "pytest-cov>=6.0",
 ]
 worker = [
-    "ifcopenshell==0.9.0",
+    "ifcopenshell==0.9.0.post1",
     "ifctester==0.9.0",
     "bcf-client==0.9.0",
 ]
