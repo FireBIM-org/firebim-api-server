@@ -1,0 +1,939 @@
+"""Dependency-free authoring capabilities for IFC4 ADD2 TC1, not IFC4X3.
+
+Entity identities and immediate supertypes are transcribed from the EXPRESS
+ENTITY headers in the pinned buildingSMART source below. All 776 entities,
+including abstract entities, are recognised; this is not an instantiation or
+whole-model conformance checker. Names are case-sensitive EXPRESS identities.
+The compact tables omit the common ``Ifc`` prefix, never from caller input.
+The scalar projection has 372 explicit declarations plus inheritance; 137
+PredefinedType enums cover 251 declaring entities plus inheritance. No source
+download, EXPRESS parsing, third-party library or model file is needed at runtime.
+
+To refresh metadata, verify the source digest, remove EXPRESS block comments,
+read ENTITY headers for single SUBTYPE OF parents, and read explicit attribute
+declarations before DERIVE/INVERSE/UNIQUE/WHERE. Resolve PredefinedType through
+its named ENUMERATION OF declaration. Scalar types require the conservative
+policy documented at the scalar table, not automatic primitive-type coercion.
+Keep derived overrides blocked and revalidate helpers against the source.
+
+Source: buildingSMART International Limited, copyright 1996-2020, issue date
+2017-10-29. Its notice permits use in software development and translation into
+another computer language with full attribution. This capability projection
+does not alter the technical specification and is provided without warranty.
+The declared edition is metadata provenance, not an inferred pilot-file edition.
+"""
+
+from __future__ import annotations
+
+__all__ = ["SCHEMA_PROVENANCE", "is_entity", "is_subtype", "attribute_datatype", "predefined_types"]
+
+SCHEMA_PROVENANCE = {
+    "schema": "IFC4",
+    "edition": "IFC4 ADD2 TC1",
+    "issue_date": "2017-10-29",
+    "publisher": "buildingSMART International Limited",
+    "source": "https://standards.buildingsmart.org/IFC/RELEASE/IFC4/ADD2_TC1/EXPRESS/IFC4_ADD2_TC1.exp",
+    "mirror": (
+        "https://raw.githubusercontent.com/buildingSMART/IFC4.3.x-development/"
+        "119bf71c8049cd0683df0109844605e975025db2/reference_schemas/IFC4_ADD2_TC1.exp"
+    ),
+    "sha256": "a2704ba20a1b3d0b7d9b61d6fd37d0baa3b4996ba3e90d968a1d2ca2819d1046",
+    "entity_count": 776,
+    "scalar_attribute_count": 372,
+    "predefined_enum_count": 137,
+    "predefined_declaring_entity_count": 251,
+}
+
+# Each row is an immediate parent followed by its children; '-' means no parent.
+# Extract ENTITY ... END_ENTITY blocks, then SUBTYPE OF from each header only.
+_ENTITY_CHILDREN = """
+- ActorRole Address Application AppliedValue Approval BoundaryCondition ConnectionGeometry Constraint
+- CoordinateOperation CoordinateReferenceSystem DerivedUnit DerivedUnitElement DimensionalExponents
+- ExternalInformation ExternalReference GridAxis IrregularTimeSeriesValue LightDistributionData
+- LightIntensityDistribution MaterialClassificationRelationship MaterialDefinition MaterialList MaterialUsageDefinition
+- MeasureWithUnit MonetaryUnit NamedUnit ObjectPlacement Organization OwnerHistory Person PersonAndOrganization
+- PhysicalQuantity PresentationItem PresentationLayerAssignment PresentationStyle PresentationStyleAssignment
+- ProductRepresentation ProfileDef PropertyAbstraction RecurrencePattern Reference Representation RepresentationContext
+- RepresentationItem RepresentationMap ResourceLevelRelationship Root SchedulingTime ShapeAspect
+- StructuralConnectionCondition StructuralLoad Table TableColumn TableRow TimePeriod TimeSeries TimeSeriesValue
+- UnitAssignment VirtualGridIntersection
+Actor Occupant
+Address PostalAddress TelecomAddress
+AdvancedBrep AdvancedBrepWithVoids
+AppliedValue CostValue
+ArbitraryClosedProfileDef ArbitraryProfileDefWithVoids
+ArbitraryOpenProfileDef CenterLineProfileDef
+BSplineCurve BSplineCurveWithKnots
+BSplineCurveWithKnots RationalBSplineCurveWithKnots
+BSplineSurface BSplineSurfaceWithKnots
+BSplineSurfaceWithKnots RationalBSplineSurfaceWithKnots
+Beam BeamStandardCase
+BooleanResult BooleanClippingResult
+BoundaryCondition BoundaryEdgeCondition BoundaryFaceCondition BoundaryNodeCondition
+BoundaryCurve OuterBoundaryCurve
+BoundaryNodeCondition BoundaryNodeConditionWarping
+BoundedCurve BSplineCurve CompositeCurve IndexedPolyCurve Polyline TrimmedCurve
+BoundedSurface BSplineSurface CurveBoundedPlane CurveBoundedSurface RectangularTrimmedSurface
+BuildingElement Beam BuildingElementProxy Chimney Column Covering CurtainWall Door Footing Member Pile Plate Railing
+BuildingElement Ramp RampFlight Roof ShadingDevice Slab Stair StairFlight Wall Window
+BuildingElementType BeamType BuildingElementProxyType ChimneyType ColumnType CoveringType CurtainWallType DoorType
+BuildingElementType FootingType MemberType PileType PlateType RailingType RampFlightType RampType RoofType
+BuildingElementType ShadingDeviceType SlabType StairFlightType StairType WallType WindowType
+CartesianPointList CartesianPointList2D CartesianPointList3D
+CartesianTransformationOperator CartesianTransformationOperator2D CartesianTransformationOperator3D
+CartesianTransformationOperator2D CartesianTransformationOperator2DnonUniform
+CartesianTransformationOperator3D CartesianTransformationOperator3DnonUniform
+CircleProfileDef CircleHollowProfileDef
+ColourSpecification ColourRgb
+Column ColumnStandardCase
+CompositeCurve CompositeCurveOnSurface
+CompositeCurveOnSurface BoundaryCurve
+CompositeCurveSegment ReparametrisedCompositeCurveSegment
+Conic Circle Ellipse
+ConnectedFaceSet ClosedShell OpenShell
+ConnectionGeometry ConnectionCurveGeometry ConnectionPointGeometry ConnectionSurfaceGeometry ConnectionVolumeGeometry
+ConnectionPointGeometry ConnectionPointEccentricity
+Constraint Metric Objective
+ConstructionResource ConstructionEquipmentResource ConstructionMaterialResource ConstructionProductResource
+ConstructionResource CrewResource LaborResource SubContractResource
+ConstructionResourceType ConstructionEquipmentResourceType ConstructionMaterialResourceType
+ConstructionResourceType ConstructionProductResourceType
+ConstructionResourceType CrewResourceType LaborResourceType SubContractResourceType
+Context Project ProjectLibrary
+Control ActionRequest CostItem CostSchedule PerformanceHistory Permit ProjectOrder WorkCalendar WorkControl
+ConversionBasedUnit ConversionBasedUnitWithOffset
+CoordinateOperation MapConversion
+CoordinateReferenceSystem ProjectedCRS
+CsgPrimitive3D Block RectangularPyramid RightCircularCone RightCircularCylinder Sphere
+Curve BoundedCurve Conic Line OffsetCurve2D OffsetCurve3D Pcurve SurfaceCurve
+DerivedProfileDef MirroredProfileDef
+DistributionControlElement Actuator Alarm Controller FlowInstrument ProtectiveDeviceTrippingUnit Sensor
+DistributionControlElement UnitaryControlElement
+DistributionControlElementType ActuatorType AlarmType ControllerType FlowInstrumentType ProtectiveDeviceTrippingUnitType
+DistributionControlElementType SensorType UnitaryControlElementType
+DistributionElement DistributionControlElement DistributionFlowElement
+DistributionElementType DistributionControlElementType DistributionFlowElementType
+DistributionFlowElement DistributionChamberElement EnergyConversionDevice FlowController FlowFitting FlowMovingDevice
+DistributionFlowElement FlowSegment FlowStorageDevice FlowTerminal FlowTreatmentDevice
+DistributionFlowElementType DistributionChamberElementType EnergyConversionDeviceType FlowControllerType FlowFittingType
+DistributionFlowElementType FlowMovingDeviceType FlowSegmentType FlowStorageDeviceType FlowTerminalType
+DistributionFlowElementType FlowTreatmentDeviceType
+DistributionSystem DistributionCircuit
+Door DoorStandardCase
+Edge EdgeCurve OrientedEdge Subedge
+Element BuildingElement CivilElement DistributionElement ElementAssembly ElementComponent FeatureElement
+Element FurnishingElement
+Element GeographicElement TransportElement VirtualElement
+ElementComponent BuildingElementPart DiscreteAccessory Fastener MechanicalFastener ReinforcingElement VibrationIsolator
+ElementComponentType BuildingElementPartType DiscreteAccessoryType FastenerType MechanicalFastenerType
+ElementComponentType ReinforcingElementType
+ElementComponentType VibrationIsolatorType
+ElementType BuildingElementType CivilElementType DistributionElementType ElementAssemblyType ElementComponentType
+ElementType FurnishingElementType GeographicElementType TransportElementType
+ElementarySurface CylindricalSurface Plane SphericalSurface ToroidalSurface
+EnergyConversionDevice AirToAirHeatRecovery Boiler Burner Chiller Coil Condenser CooledBeam CoolingTower
+EnergyConversionDevice ElectricGenerator
+EnergyConversionDevice ElectricMotor Engine EvaporativeCooler Evaporator HeatExchanger Humidifier MotorConnection
+EnergyConversionDevice SolarDevice
+EnergyConversionDevice Transformer TubeBundle UnitaryEquipment
+EnergyConversionDeviceType AirToAirHeatRecoveryType BoilerType BurnerType ChillerType CoilType CondenserType
+EnergyConversionDeviceType CooledBeamType
+EnergyConversionDeviceType CoolingTowerType ElectricGeneratorType ElectricMotorType EngineType EvaporativeCoolerType
+EnergyConversionDeviceType EvaporatorType HeatExchangerType HumidifierType MotorConnectionType SolarDeviceType
+EnergyConversionDeviceType TransformerType
+EnergyConversionDeviceType TubeBundleType UnitaryEquipmentType
+ExtendedProperties MaterialProperties ProfileProperties
+ExternalInformation Classification DocumentInformation LibraryInformation
+ExternalReference ClassificationReference DocumentReference ExternallyDefinedHatchStyle ExternallyDefinedSurfaceStyle
+ExternalReference ExternallyDefinedTextFont LibraryReference
+ExternalSpatialStructureElement ExternalSpatialElement
+ExtrudedAreaSolid ExtrudedAreaSolidTapered
+Face FaceSurface
+FaceBound FaceOuterBound
+FaceSurface AdvancedFace
+FacetedBrep FacetedBrepWithVoids
+FeatureElement FeatureElementAddition FeatureElementSubtraction SurfaceFeature
+FeatureElementAddition ProjectionElement
+FeatureElementSubtraction OpeningElement VoidingFeature
+FlowController AirTerminalBox Damper ElectricDistributionBoard ElectricTimeControl FlowMeter ProtectiveDevice
+FlowController SwitchingDevice Valve
+FlowControllerType AirTerminalBoxType DamperType ElectricDistributionBoardType ElectricTimeControlType FlowMeterType
+FlowControllerType ProtectiveDeviceType SwitchingDeviceType ValveType
+FlowFitting CableCarrierFitting CableFitting DuctFitting JunctionBox PipeFitting
+FlowFittingType CableCarrierFittingType CableFittingType DuctFittingType JunctionBoxType PipeFittingType
+FlowMovingDevice Compressor Fan Pump
+FlowMovingDeviceType CompressorType FanType PumpType
+FlowSegment CableCarrierSegment CableSegment DuctSegment PipeSegment
+FlowSegmentType CableCarrierSegmentType CableSegmentType DuctSegmentType PipeSegmentType
+FlowStorageDevice ElectricFlowStorageDevice Tank
+FlowStorageDeviceType ElectricFlowStorageDeviceType TankType
+FlowTerminal AirTerminal AudioVisualAppliance CommunicationsAppliance ElectricAppliance FireSuppressionTerminal Lamp
+FlowTerminal LightFixture MedicalDevice Outlet SanitaryTerminal SpaceHeater StackTerminal WasteTerminal
+FlowTerminalType AirTerminalType AudioVisualApplianceType CommunicationsApplianceType ElectricApplianceType
+FlowTerminalType FireSuppressionTerminalType LampType LightFixtureType MedicalDeviceType OutletType SanitaryTerminalType
+FlowTerminalType SpaceHeaterType StackTerminalType WasteTerminalType
+FlowTreatmentDevice DuctSilencer Filter Interceptor
+FlowTreatmentDeviceType DuctSilencerType FilterType InterceptorType
+FurnishingElement Furniture SystemFurnitureElement
+FurnishingElementType FurnitureType SystemFurnitureElementType
+GeometricRepresentationContext GeometricRepresentationSubContext
+GeometricRepresentationItem AnnotationFillArea BooleanResult BoundingBox CartesianPointList
+GeometricRepresentationItem CartesianTransformationOperator
+GeometricRepresentationItem CompositeCurveSegment CsgPrimitive3D Curve Direction FaceBasedSurfaceModel
+GeometricRepresentationItem FillAreaStyleHatching
+GeometricRepresentationItem FillAreaStyleTiles GeometricSet HalfSpaceSolid LightSource Placement PlanarExtent Point
+GeometricRepresentationItem SectionedSpine ShellBasedSurfaceModel SolidModel Surface TessellatedItem TextLiteral Vector
+GeometricSet GeometricCurveSet
+Group Asset Inventory StructuralLoadGroup StructuralResultGroup System
+HalfSpaceSolid BoxedHalfSpace PolygonalBoundedHalfSpace
+IndexedPolygonalFace IndexedPolygonalFaceWithVoids
+IndexedTextureMap IndexedTriangleTextureMap
+LightSource LightSourceAmbient LightSourceDirectional LightSourceGoniometric LightSourcePositional
+LightSourcePositional LightSourceSpot
+Loop EdgeLoop PolyLoop VertexLoop
+ManifoldSolidBrep AdvancedBrep FacetedBrep
+MaterialDefinition Material MaterialConstituent MaterialConstituentSet MaterialLayer MaterialLayerSet MaterialProfile
+MaterialDefinition MaterialProfileSet
+MaterialLayer MaterialLayerWithOffsets
+MaterialProfile MaterialProfileWithOffsets
+MaterialProfileSetUsage MaterialProfileSetUsageTapering
+MaterialUsageDefinition MaterialLayerSetUsage MaterialProfileSetUsage
+Member MemberStandardCase
+NamedUnit ContextDependentUnit ConversionBasedUnit SIUnit
+Object Actor Control Group Process Product Resource
+ObjectDefinition Context Object TypeObject
+ObjectPlacement GridPlacement LocalPlacement
+OpeningElement OpeningStandardCase
+ParameterizedProfileDef AsymmetricIShapeProfileDef CShapeProfileDef CircleProfileDef EllipseProfileDef IShapeProfileDef
+ParameterizedProfileDef LShapeProfileDef RectangleProfileDef TShapeProfileDef TrapeziumProfileDef UShapeProfileDef
+ParameterizedProfileDef ZShapeProfileDef
+PhysicalQuantity PhysicalComplexQuantity PhysicalSimpleQuantity
+PhysicalSimpleQuantity QuantityArea QuantityCount QuantityLength QuantityTime QuantityVolume QuantityWeight
+Placement Axis1Placement Axis2Placement2D Axis2Placement3D
+PlanarExtent PlanarBox
+Plate PlateStandardCase
+Point CartesianPoint PointOnCurve PointOnSurface
+Port DistributionPort
+PreDefinedColour DraughtingPreDefinedColour
+PreDefinedCurveFont DraughtingPreDefinedCurveFont
+PreDefinedItem PreDefinedColour PreDefinedCurveFont PreDefinedTextFont
+PreDefinedProperties ReinforcementBarProperties SectionProperties SectionReinforcementProperties
+PreDefinedPropertySet DoorLiningProperties DoorPanelProperties PermeableCoveringProperties
+PreDefinedPropertySet ReinforcementDefinitionProperties
+PreDefinedPropertySet WindowLiningProperties WindowPanelProperties
+PreDefinedTextFont TextStyleFontModel
+PresentationItem ColourRgbList ColourSpecification CurveStyleFont CurveStyleFontAndScaling CurveStyleFontPattern
+PresentationItem IndexedColourMap PreDefinedItem SurfaceStyleLighting SurfaceStyleRefraction SurfaceStyleShading
+PresentationItem SurfaceStyleWithTextures SurfaceTexture TextStyleForDefinedFont TextStyleTextModel TextureCoordinate
+PresentationItem TextureVertex TextureVertexList
+PresentationLayerAssignment PresentationLayerWithStyle
+PresentationStyle CurveStyle FillAreaStyle SurfaceStyle TextStyle
+Process Event Procedure Task
+Product Annotation Element Grid Port Proxy SpatialElement StructuralActivity StructuralItem
+ProductRepresentation MaterialDefinitionRepresentation ProductDefinitionShape
+ProfileDef ArbitraryClosedProfileDef ArbitraryOpenProfileDef CompositeProfileDef DerivedProfileDef
+ProfileDef ParameterizedProfileDef
+Property ComplexProperty SimpleProperty
+PropertyAbstraction ExtendedProperties PreDefinedProperties Property PropertyEnumeration
+PropertyDefinition PropertySetDefinition PropertyTemplateDefinition
+PropertySetDefinition PreDefinedPropertySet PropertySet QuantitySet
+PropertyTemplate ComplexPropertyTemplate SimplePropertyTemplate
+PropertyTemplateDefinition PropertySetTemplate PropertyTemplate
+QuantitySet ElementQuantity
+RectangleProfileDef RectangleHollowProfileDef RoundedRectangleProfileDef
+ReinforcingElement ReinforcingBar ReinforcingMesh Tendon TendonAnchor
+ReinforcingElementType ReinforcingBarType ReinforcingMeshType TendonAnchorType TendonType
+RelAssigns RelAssignsToActor RelAssignsToControl RelAssignsToGroup RelAssignsToProcess RelAssignsToProduct
+RelAssigns RelAssignsToResource
+RelAssignsToGroup RelAssignsToGroupByFactor
+RelAssociates RelAssociatesApproval RelAssociatesClassification RelAssociatesConstraint RelAssociatesDocument
+RelAssociates RelAssociatesLibrary RelAssociatesMaterial
+RelConnects RelConnectsElements RelConnectsPortToElement RelConnectsPorts RelConnectsStructuralActivity
+RelConnects RelConnectsStructuralMember RelContainedInSpatialStructure RelCoversBldgElements RelCoversSpaces
+RelConnects RelFillsElement
+RelConnects RelFlowControlElements RelInterferesElements RelReferencedInSpatialStructure RelSequence
+RelConnects RelServicesBuildings
+RelConnects RelSpaceBoundary
+RelConnectsElements RelConnectsPathElements RelConnectsWithRealizingElements
+RelConnectsStructuralMember RelConnectsWithEccentricity
+RelDecomposes RelAggregates RelNests RelProjectsElement RelVoidsElement
+RelDefines RelDefinesByObject RelDefinesByProperties RelDefinesByTemplate RelDefinesByType
+RelSpaceBoundary RelSpaceBoundary1stLevel
+RelSpaceBoundary1stLevel RelSpaceBoundary2ndLevel
+Relationship RelAssigns RelAssociates RelConnects RelDeclares RelDecomposes RelDefines
+Representation ShapeModel StyleModel
+RepresentationContext GeometricRepresentationContext
+RepresentationItem GeometricRepresentationItem MappedItem StyledItem TopologicalRepresentationItem
+Resource ConstructionResource
+ResourceLevelRelationship ApprovalRelationship CurrencyRelationship DocumentInformationRelationship
+ResourceLevelRelationship ExternalReferenceRelationship MaterialRelationship OrganizationRelationship
+ResourceLevelRelationship PropertyDependencyRelationship ResourceApprovalRelationship ResourceConstraintRelationship
+RevolvedAreaSolid RevolvedAreaSolidTapered
+Root ObjectDefinition PropertyDefinition Relationship
+SchedulingTime EventTime LagTime ResourceTime TaskTime WorkTime
+ShapeModel ShapeRepresentation TopologyRepresentation
+SimpleProperty PropertyBoundedValue PropertyEnumeratedValue PropertyListValue PropertyReferenceValue PropertySingleValue
+SimpleProperty PropertyTableValue
+Slab SlabElementedCase SlabStandardCase
+SolidModel CsgSolid ManifoldSolidBrep SweptAreaSolid SweptDiskSolid
+SpatialElement ExternalSpatialStructureElement SpatialStructureElement SpatialZone
+SpatialElementType SpatialStructureElementType SpatialZoneType
+SpatialStructureElement Building BuildingStorey Site Space
+SpatialStructureElementType SpaceType
+StructuralAction StructuralCurveAction StructuralPointAction StructuralSurfaceAction
+StructuralActivity StructuralAction StructuralReaction
+StructuralConnection StructuralCurveConnection StructuralPointConnection StructuralSurfaceConnection
+StructuralConnectionCondition FailureConnectionCondition SlippageConnectionCondition
+StructuralCurveAction StructuralLinearAction
+StructuralCurveMember StructuralCurveMemberVarying
+StructuralItem StructuralConnection StructuralMember
+StructuralLoad StructuralLoadConfiguration StructuralLoadOrResult
+StructuralLoadGroup StructuralLoadCase
+StructuralLoadOrResult StructuralLoadStatic SurfaceReinforcementArea
+StructuralLoadSingleDisplacement StructuralLoadSingleDisplacementDistortion
+StructuralLoadSingleForce StructuralLoadSingleForceWarping
+StructuralLoadStatic StructuralLoadLinearForce StructuralLoadPlanarForce StructuralLoadSingleDisplacement
+StructuralLoadStatic StructuralLoadSingleForce StructuralLoadTemperature
+StructuralMember StructuralCurveMember StructuralSurfaceMember
+StructuralReaction StructuralCurveReaction StructuralPointReaction StructuralSurfaceReaction
+StructuralSurfaceAction StructuralPlanarAction
+StructuralSurfaceMember StructuralSurfaceMemberVarying
+StyleModel StyledRepresentation
+Surface BoundedSurface ElementarySurface SweptSurface
+SurfaceCurve IntersectionCurve SeamCurve
+SurfaceStyleShading SurfaceStyleRendering
+SurfaceTexture BlobTexture ImageTexture PixelTexture
+SweptAreaSolid ExtrudedAreaSolid FixedReferenceSweptAreaSolid RevolvedAreaSolid SurfaceCurveSweptAreaSolid
+SweptDiskSolid SweptDiskSolidPolygonal
+SweptSurface SurfaceOfLinearExtrusion SurfaceOfRevolution
+System BuildingSystem DistributionSystem StructuralAnalysisModel Zone
+TaskTime TaskTimeRecurring
+TessellatedFaceSet PolygonalFaceSet TriangulatedFaceSet
+TessellatedItem IndexedPolygonalFace TessellatedFaceSet
+TextLiteral TextLiteralWithExtent
+TextureCoordinate IndexedTextureMap TextureCoordinateGenerator TextureMap
+TimeSeries IrregularTimeSeries RegularTimeSeries
+TopologicalRepresentationItem ConnectedFaceSet Edge Face FaceBound Loop Path Vertex
+TypeObject TypeProcess TypeProduct TypeResource
+TypeProcess EventType ProcedureType TaskType
+TypeProduct DoorStyle ElementType SpatialElementType WindowStyle
+TypeResource ConstructionResourceType
+Vertex VertexPoint
+Wall WallElementedCase WallStandardCase
+Window WindowStandardCase
+WorkControl WorkPlan WorkSchedule
+"""
+
+_PARENTS: dict[str, str | None] = {}
+for _row in _ENTITY_CHILDREN.splitlines():
+    if _row:
+        _parent, *_children = _row.split()
+        _PARENTS.update({"Ifc" + child: None if _parent == "-" else "Ifc" + _parent for child in _children})
+
+# Explicit attributes only, before DERIVE/INVERSE/UNIQUE/WHERE in each ENTITY.
+# STRING aliases (including date/time lexical strings), BOOLEAN and unitless
+# INTEGER aliases are supported. Ratios, counts and reviewed unitless IfcReal
+# fields map to double. LOGICAL's UNKNOWN is not a Boolean. SELECTs, aggregates,
+# entity references, enums and all unlisted attributes fail closed.
+# Never map a measure merely because its EXPRESS representation is REAL/INTEGER:
+# lengths, areas, angles, times, currency etc. need separate unit semantics.
+# Even IfcReal Precision, ConversionOffset and light attenuation can carry units.
+# ExchangeRate is deliberately outside this unit-independent scalar projection.
+# '-' blocks a supported inherited attribute redeclared as DERIVE.
+_SCALAR_ATTRIBUTES = """
+ActionRequest s Status LongDescription
+ActorRole s UserDefinedRole Description
+Address s Description UserDefinedPurpose
+Application s Version ApplicationFullName ApplicationIdentifier
+AppliedValue s Name Description ApplicableDate FixedUntilDate Category Condition
+Approval s Identifier Name Description TimeOfApproval Status Level Qualifier
+Asset s Identification IncorporationDate
+BSplineCurve i Degree
+BSplineSurface i UDegree VDegree
+BlobTexture s RasterFormat
+BoundaryCondition s Name
+BuildingSystem s LongName
+CartesianTransformationOperator d Scale
+CartesianTransformationOperator2DnonUniform d Scale2
+CartesianTransformationOperator3DnonUniform d Scale2 Scale3
+Classification s Source Edition EditionDate Name Description Location
+ClassificationReference s Description Sort
+ColourRgb d Red Green Blue
+ColourSpecification s Name
+ComplexProperty s UsageName
+ComplexPropertyTemplate s UsageName
+CompositeCurveSegment b SameSense
+CompositeProfileDef s Label
+Constraint s Name Description ConstraintSource CreationTime UserDefinedGrade
+Context s ObjectType LongName Phase
+ContextDependentUnit s Name
+Control s Identification
+ConversionBasedUnit s Name
+CoordinateReferenceSystem s Name Description GeodeticDatum VerticalDatum
+CostSchedule s Status SubmittedOn UpdateDate
+CurrencyRelationship s RateDateTime
+CurveBoundedSurface b ImplicitOuter
+CurveStyle b ModelOrDraughting
+CurveStyleFont s Name
+CurveStyleFontAndScaling d CurveFontScaling
+CurveStyleFontAndScaling s Name
+DerivedProfileDef s Label
+DerivedUnit s UserDefinedType
+DistributionSystem s LongName
+DocumentInformation s Identification Name Description Location Purpose IntendedUse Scope Revision CreationTime
+DocumentInformation s LastRevisionTime ElectronicFormat ValidFrom ValidUntil
+DocumentInformationRelationship s RelationshipType
+DocumentReference s Description
+Door s UserDefinedOperationType
+DoorPanelProperties d PanelWidth
+DoorStyle b ParameterTakesPrecedence Sizeable
+DoorType b ParameterTakesPrecedence
+DoorType s UserDefinedOperationType
+EdgeCurve b SameSense
+Element s Tag
+ElementQuantity s MethodOfMeasurement
+ElementType s ElementType
+Event s UserDefinedEventTriggerType
+EventTime s ActualDate EarlyDate LateDate ScheduleDate
+EventType s UserDefinedEventTriggerType
+ExtendedProperties s Name Description
+ExternalReference s Location Identification Name
+FaceBound b Orientation
+FaceSurface b SameSense
+FillAreaStyle b ModelorDraughting
+FillAreaStyleTiles d TilingScale
+GeometricRepresentationContext i CoordinateSpaceDimension
+GeometricRepresentationSubContext - CoordinateSpaceDimension
+GeometricRepresentationSubContext d TargetScale
+GeometricRepresentationSubContext s UserDefinedTargetView
+GridAxis b SameSense
+GridAxis s AxisTag
+HalfSpaceSolid b AgreementFlag
+ImageTexture s URLReference
+IndexedColourMap d Opacity
+IndexedPolyCurve b SelfIntersect
+Inventory s LastUpdateDate
+IrregularTimeSeriesValue s TimeStamp
+LibraryInformation s Name Version VersionDate Location Description
+LibraryReference s Description Language
+LightSource d AmbientIntensity Intensity
+LightSource s Name
+LightSourcePositional d ConstantAttenuation
+LightSourceSpot d ConcentrationExponent
+MapConversion d XAxisAbscissa XAxisOrdinate Scale
+Material s Name Description Category
+MaterialConstituent d Fraction
+MaterialConstituent s Name Description Category
+MaterialConstituentSet s Name Description
+MaterialLayer i Priority
+MaterialLayer s Name Description Category
+MaterialLayerSet s LayerSetName Description
+MaterialProfile i Priority
+MaterialProfile s Name Description Category
+MaterialProfileSet s Name Description
+MaterialProfileSetUsage i CardinalPoint
+MaterialProfileSetUsageTapering i CardinalEndPoint
+MaterialRelationship s Expression
+Metric s ValueSource
+MonetaryUnit s Currency
+Object s ObjectType
+Objective s UserDefinedQualifier
+Organization s Identification Name Description
+OrientedEdge b Orientation
+OwnerHistory i LastModifiedDate CreationDate
+PerformanceHistory s LifeCyclePhase
+Permit s Status LongDescription
+Person s Identification FamilyName GivenName
+PhysicalComplexQuantity s Discrimination Quality Usage
+PhysicalQuantity s Name Description
+PixelTexture i Width Height ColourComponents
+PolygonalFaceSet b Closed
+PostalAddress s InternalLocation PostalBox Town Region PostalCode Country
+PreDefinedItem s Name
+PresentationLayerAssignment s Name Description Identifier
+PresentationStyle s Name
+Process s Identification LongDescription
+ProductRepresentation s Name Description
+ProfileDef s ProfileName
+ProjectOrder s Status LongDescription
+ProjectedCRS s MapProjection MapZone
+Property s Name Description
+PropertyDependencyRelationship s Expression
+PropertyEnumeration s Name
+PropertyReferenceValue s UsageName
+PropertySetTemplate s ApplicableEntity
+Proxy s Tag
+QuantityArea s Formula
+QuantityCount d CountValue
+QuantityCount s Formula
+QuantityLength s Formula
+QuantityTime s Formula
+QuantityVolume s Formula
+QuantityWeight s Formula
+RectangularTrimmedSurface b Usense Vsense
+RecurrencePattern i Position Interval Occurrences
+Reference s TypeIdentifier AttributeIdentifier InstanceName
+ReinforcementBarProperties d BarCount
+ReinforcementBarProperties s SteelGrade
+ReinforcementDefinitionProperties s DefinitionType
+ReinforcingBarType s BendingShapeCode
+ReinforcingElement s SteelGrade
+ReinforcingMeshType s BendingShapeCode
+RelAssignsToGroupByFactor d Factor
+RelAssociatesConstraint s Intent
+RelConnectsWithRealizingElements s ConnectionType
+RelInterferesElements s InterferenceType
+RelSequence s UserDefinedSequenceType
+Representation s RepresentationIdentifier RepresentationType
+RepresentationContext s ContextIdentifier ContextType
+Resource s Identification LongDescription
+ResourceLevelRelationship s Name Description
+ResourceTime b IsOverAllocated
+ResourceTime d ScheduleUsage ActualUsage RemainingUsage Completion
+ResourceTime s ScheduleWork ScheduleStart ScheduleFinish ScheduleContour LevelingDelay StatusTime
+ResourceTime s ActualWork ActualStart ActualFinish RemainingWork
+Root s GlobalId Name Description
+SchedulingTime s Name UserDefinedDataOrigin
+ShapeAspect s Name Description
+SimplePropertyTemplate s PrimaryMeasureType SecondaryMeasureType Expression
+Site s LandTitleNumber
+SpaceType s LongName
+SpatialElement s LongName
+SpatialElementType s ElementType
+SpatialZoneType s LongName
+StairFlight i NumberOfRisers NumberOfTreads
+StructuralAction b DestabilizingLoad
+StructuralConnectionCondition s Name
+StructuralLoad s Name
+StructuralLoadGroup d Coefficient
+StructuralLoadGroup s Purpose
+StructuralResultGroup b IsLinear
+StyledItem s Name
+SurfaceReinforcementArea d ShearReinforcement
+SurfaceStyleRefraction d RefractionIndex DispersionFactor
+SurfaceStyleShading d Transparency
+SurfaceTexture b RepeatS RepeatT
+SurfaceTexture s Mode
+Table s Name
+TableColumn s Identifier Name Description
+TableRow b IsHeading
+Task b IsMilestone
+Task i Priority
+Task s Status WorkMethod
+TaskTime b IsCritical
+TaskTime d Completion
+TaskTime s ScheduleDuration ScheduleStart ScheduleFinish EarlyStart EarlyFinish LateStart LateFinish FreeFloat
+TaskTime s TotalFloat
+TaskTime s StatusTime ActualDuration ActualStart ActualFinish RemainingTime
+TaskType s WorkMethod
+TelecomAddress s PagerNumber WWWHomePageURL
+Tendon d FrictionCoefficient
+TextLiteral s Literal
+TextLiteralWithExtent s BoxAlignment
+TextStyle b ModelOrDraughting
+TextStyleFontModel s FontStyle FontVariant FontWeight
+TextStyleTextModel s TextAlign TextDecoration TextTransform
+TextureCoordinateGenerator s Mode
+TimePeriod s StartTime EndTime
+TimeSeries s Name Description StartTime EndTime UserDefinedDataOrigin
+TriangulatedFaceSet b Closed
+TrimmedCurve b SenseAgreement
+TypeObject s ApplicableOccurrence
+TypeProcess s Identification LongDescription ProcessType
+TypeResource s Identification LongDescription ResourceType
+Window s UserDefinedPartitioningType
+WindowLiningProperties d FirstTransomOffset SecondTransomOffset FirstMullionOffset SecondMullionOffset
+WindowStyle b ParameterTakesPrecedence Sizeable
+WindowType b ParameterTakesPrecedence
+WindowType s UserDefinedPartitioningType
+WorkControl s CreationDate Purpose Duration TotalFloat StartTime FinishTime
+WorkTime s Start Finish
+Zone s LongName
+"""
+
+_XSD = "http://www.w3.org/2001/XMLSchema#"
+_DATATYPES = {"s": _XSD + "string", "b": _XSD + "boolean", "i": _XSD + "integer", "d": _XSD + "double", "-": None}
+_ATTRIBUTE_TYPES: dict[tuple[str, str], str | None] = {}
+for _row in _SCALAR_ATTRIBUTES.splitlines():
+    if _row:
+        _entity, _datatype, *_attributes = _row.split()
+        _ATTRIBUTE_TYPES.update({("Ifc" + _entity, attr): _DATATYPES[_datatype] for attr in _attributes})
+
+# Group explicit PredefinedType declarations by their referenced ENUMERATION OF
+# type. Unindented lines name declaring entities; indented lines are enum items.
+# This is all 137 referenced enums (251 declaring entities), not all IFC enums.
+_PREDEFINED_ENUMS = """
+ActionRequest
+ EMAIL FAX PHONE POST VERBAL USERDEFINED NOTDEFINED
+Actuator ActuatorType
+ ELECTRICACTUATOR HANDOPERATEDACTUATOR HYDRAULICACTUATOR PNEUMATICACTUATOR THERMOSTATICACTUATOR
+ USERDEFINED NOTDEFINED
+AirTerminalBox AirTerminalBoxType
+ CONSTANTFLOW VARIABLEFLOWPRESSUREDEPENDANT VARIABLEFLOWPRESSUREINDEPENDANT USERDEFINED NOTDEFINED
+AirTerminal AirTerminalType
+ DIFFUSER GRILLE LOUVRE REGISTER USERDEFINED NOTDEFINED
+AirToAirHeatRecovery AirToAirHeatRecoveryType
+ FIXEDPLATECOUNTERFLOWEXCHANGER FIXEDPLATECROSSFLOWEXCHANGER FIXEDPLATEPARALLELFLOWEXCHANGER ROTARYWHEEL
+ RUNAROUNDCOILLOOP HEATPIPE TWINTOWERENTHALPYRECOVERYLOOPS THERMOSIPHONSEALEDTUBEHEATEXCHANGERS
+ THERMOSIPHONCOILTYPEHEATEXCHANGERS USERDEFINED NOTDEFINED
+Alarm AlarmType
+ BELL BREAKGLASSBUTTON LIGHT MANUALPULLBOX SIREN WHISTLE USERDEFINED NOTDEFINED
+StructuralAnalysisModel
+ IN_PLANE_LOADING_2D OUT_PLANE_LOADING_2D LOADING_3D USERDEFINED NOTDEFINED
+AudioVisualAppliance AudioVisualApplianceType
+ AMPLIFIER CAMERA DISPLAY MICROPHONE PLAYER PROJECTOR RECEIVER SPEAKER SWITCHER TELEPHONE TUNER USERDEFINED NOTDEFINED
+Beam BeamType
+ BEAM JOIST HOLLOWCORE LINTEL SPANDREL T_BEAM USERDEFINED NOTDEFINED
+Boiler BoilerType
+ WATER STEAM USERDEFINED NOTDEFINED
+BuildingElementPart BuildingElementPartType
+ INSULATION PRECASTPANEL USERDEFINED NOTDEFINED
+BuildingElementProxy BuildingElementProxyType
+ COMPLEX ELEMENT PARTIAL PROVISIONFORVOID PROVISIONFORSPACE USERDEFINED NOTDEFINED
+BuildingSystem
+ FENESTRATION FOUNDATION LOADBEARING OUTERSHELL SHADING TRANSPORT USERDEFINED NOTDEFINED
+Burner BurnerType
+ USERDEFINED NOTDEFINED
+CableCarrierFitting CableCarrierFittingType
+ BEND CROSS REDUCER TEE USERDEFINED NOTDEFINED
+CableCarrierSegment CableCarrierSegmentType
+ CABLELADDERSEGMENT CABLETRAYSEGMENT CABLETRUNKINGSEGMENT CONDUITSEGMENT USERDEFINED NOTDEFINED
+CableFitting CableFittingType
+ CONNECTOR ENTRY EXIT JUNCTION TRANSITION USERDEFINED NOTDEFINED
+CableSegment CableSegmentType
+ BUSBARSEGMENT CABLESEGMENT CONDUCTORSEGMENT CORESEGMENT USERDEFINED NOTDEFINED
+Chiller ChillerType
+ AIRCOOLED WATERCOOLED HEATRECOVERY USERDEFINED NOTDEFINED
+Chimney ChimneyType
+ USERDEFINED NOTDEFINED
+Coil CoilType
+ DXCOOLINGCOIL ELECTRICHEATINGCOIL GASHEATINGCOIL HYDRONICCOIL STEAMHEATINGCOIL WATERCOOLINGCOIL WATERHEATINGCOIL
+ USERDEFINED NOTDEFINED
+Column ColumnType
+ COLUMN PILASTER USERDEFINED NOTDEFINED
+CommunicationsAppliance CommunicationsApplianceType
+ ANTENNA COMPUTER FAX GATEWAY MODEM NETWORKAPPLIANCE NETWORKBRIDGE NETWORKHUB PRINTER REPEATER ROUTER SCANNER
+ USERDEFINED NOTDEFINED
+Compressor CompressorType
+ DYNAMIC RECIPROCATING ROTARY SCROLL TROCHOIDAL SINGLESTAGE BOOSTER OPENTYPE HERMETIC SEMIHERMETIC WELDEDSHELLHERMETIC
+ ROLLINGPISTON ROTARYVANE SINGLESCREW TWINSCREW USERDEFINED NOTDEFINED
+Condenser CondenserType
+ AIRCOOLED EVAPORATIVECOOLED WATERCOOLED WATERCOOLEDBRAZEDPLATE WATERCOOLEDSHELLCOIL WATERCOOLEDSHELLTUBE
+ WATERCOOLEDTUBEINTUBE USERDEFINED NOTDEFINED
+ConstructionEquipmentResource ConstructionEquipmentResourceType
+ DEMOLISHING EARTHMOVING ERECTING HEATING LIGHTING PAVING PUMPING TRANSPORTING USERDEFINED NOTDEFINED
+ConstructionMaterialResource ConstructionMaterialResourceType
+ AGGREGATES CONCRETE DRYWALL FUEL GYPSUM MASONRY METAL PLASTIC WOOD NOTDEFINED USERDEFINED
+ConstructionProductResource ConstructionProductResourceType
+ ASSEMBLY FORMWORK USERDEFINED NOTDEFINED
+Controller ControllerType
+ FLOATING PROGRAMMABLE PROPORTIONAL MULTIPOSITION TWOPOSITION USERDEFINED NOTDEFINED
+CooledBeam CooledBeamType
+ ACTIVE PASSIVE USERDEFINED NOTDEFINED
+CoolingTower CoolingTowerType
+ NATURALDRAFT MECHANICALINDUCEDDRAFT MECHANICALFORCEDDRAFT USERDEFINED NOTDEFINED
+CostItem
+ USERDEFINED NOTDEFINED
+CostSchedule
+ BUDGET COSTPLAN ESTIMATE TENDER PRICEDBILLOFQUANTITIES UNPRICEDBILLOFQUANTITIES SCHEDULEOFRATES USERDEFINED NOTDEFINED
+Covering CoveringType
+ CEILING FLOORING CLADDING ROOFING MOLDING SKIRTINGBOARD INSULATION MEMBRANE SLEEVING WRAPPING USERDEFINED NOTDEFINED
+CrewResource CrewResourceType
+ OFFICE SITE USERDEFINED NOTDEFINED
+CurtainWall CurtainWallType
+ USERDEFINED NOTDEFINED
+Damper DamperType
+ BACKDRAFTDAMPER BALANCINGDAMPER BLASTDAMPER CONTROLDAMPER FIREDAMPER FIRESMOKEDAMPER FUMEHOODEXHAUST
+ GRAVITYDAMPER GRAVITYRELIEFDAMPER RELIEFDAMPER SMOKEDAMPER USERDEFINED NOTDEFINED
+DiscreteAccessory DiscreteAccessoryType
+ ANCHORPLATE BRACKET SHOE USERDEFINED NOTDEFINED
+DistributionChamberElement DistributionChamberElementType
+ FORMEDDUCT INSPECTIONCHAMBER INSPECTIONPIT MANHOLE METERCHAMBER SUMP TRENCH VALVECHAMBER USERDEFINED NOTDEFINED
+DistributionPort
+ CABLE CABLECARRIER DUCT PIPE USERDEFINED NOTDEFINED
+DistributionSystem
+ AIRCONDITIONING AUDIOVISUAL CHEMICAL CHILLEDWATER COMMUNICATION COMPRESSEDAIR CONDENSERWATER CONTROL CONVEYING DATA
+ DISPOSAL DOMESTICCOLDWATER DOMESTICHOTWATER DRAINAGE EARTHING ELECTRICAL ELECTROACOUSTIC EXHAUST FIREPROTECTION
+ FUEL GAS
+ HAZARDOUS HEATING LIGHTING LIGHTNINGPROTECTION MUNICIPALSOLIDWASTE OIL OPERATIONAL POWERGENERATION RAINWATER
+ REFRIGERATION SECURITY SEWAGE SIGNAL STORMWATER TELEPHONE TV VACUUM VENT VENTILATION WASTEWATER WATERSUPPLY
+ USERDEFINED NOTDEFINED
+Door DoorType
+ DOOR GATE TRAPDOOR USERDEFINED NOTDEFINED
+DuctFitting DuctFittingType
+ BEND CONNECTOR ENTRY EXIT JUNCTION OBSTRUCTION TRANSITION USERDEFINED NOTDEFINED
+DuctSegment DuctSegmentType
+ RIGIDSEGMENT FLEXIBLESEGMENT USERDEFINED NOTDEFINED
+DuctSilencer DuctSilencerType
+ FLATOVAL RECTANGULAR ROUND USERDEFINED NOTDEFINED
+ElectricAppliance ElectricApplianceType
+ DISHWASHER ELECTRICCOOKER FREESTANDINGELECTRICHEATER FREESTANDINGFAN FREESTANDINGWATERHEATER FREESTANDINGWATERCOOLER
+ FREEZER FRIDGE_FREEZER HANDDRYER KITCHENMACHINE MICROWAVE PHOTOCOPIER REFRIGERATOR TUMBLEDRYER VENDINGMACHINE
+ WASHINGMACHINE USERDEFINED NOTDEFINED
+ElectricDistributionBoard ElectricDistributionBoardType
+ CONSUMERUNIT DISTRIBUTIONBOARD MOTORCONTROLCENTRE SWITCHBOARD USERDEFINED NOTDEFINED
+ElectricFlowStorageDevice ElectricFlowStorageDeviceType
+ BATTERY CAPACITORBANK HARMONICFILTER INDUCTORBANK UPS USERDEFINED NOTDEFINED
+ElectricGenerator ElectricGeneratorType
+ CHP ENGINEGENERATOR STANDALONE USERDEFINED NOTDEFINED
+ElectricMotor ElectricMotorType
+ DC INDUCTION POLYPHASE RELUCTANCESYNCHRONOUS SYNCHRONOUS USERDEFINED NOTDEFINED
+ElectricTimeControl ElectricTimeControlType
+ TIMECLOCK TIMEDELAY RELAY USERDEFINED NOTDEFINED
+ElementAssembly ElementAssemblyType
+ ACCESSORY_ASSEMBLY ARCH BEAM_GRID BRACED_FRAME GIRDER REINFORCEMENT_UNIT RIGID_FRAME SLAB_FIELD TRUSS
+ USERDEFINED NOTDEFINED
+Engine EngineType
+ EXTERNALCOMBUSTION INTERNALCOMBUSTION USERDEFINED NOTDEFINED
+EvaporativeCooler EvaporativeCoolerType
+ DIRECTEVAPORATIVERANDOMMEDIAAIRCOOLER DIRECTEVAPORATIVERIGIDMEDIAAIRCOOLER DIRECTEVAPORATIVESLINGERSPACKAGEDAIRCOOLER
+ DIRECTEVAPORATIVEPACKAGEDROTARYAIRCOOLER DIRECTEVAPORATIVEAIRWASHER INDIRECTEVAPORATIVEPACKAGEAIRCOOLER
+ INDIRECTEVAPORATIVEWETCOIL INDIRECTEVAPORATIVECOOLINGTOWERORCOILCOOLER INDIRECTDIRECTCOMBINATION USERDEFINED NOTDEFINED
+Evaporator EvaporatorType
+ DIRECTEXPANSION DIRECTEXPANSIONSHELLANDTUBE DIRECTEXPANSIONTUBEINTUBE DIRECTEXPANSIONBRAZEDPLATE FLOODEDSHELLANDTUBE
+ SHELLANDCOIL USERDEFINED NOTDEFINED
+Event EventType
+ STARTEVENT ENDEVENT INTERMEDIATEEVENT USERDEFINED NOTDEFINED
+ExternalSpatialElement
+ EXTERNAL EXTERNAL_EARTH EXTERNAL_WATER EXTERNAL_FIRE USERDEFINED NOTDEFINED
+Fan FanType
+ CENTRIFUGALFORWARDCURVED CENTRIFUGALRADIAL CENTRIFUGALBACKWARDINCLINEDCURVED CENTRIFUGALAIRFOIL TUBEAXIAL VANEAXIAL
+ PROPELLORAXIAL USERDEFINED NOTDEFINED
+Fastener FastenerType
+ GLUE MORTAR WELD USERDEFINED NOTDEFINED
+Filter FilterType
+ AIRPARTICLEFILTER COMPRESSEDAIRFILTER ODORFILTER OILFILTER STRAINER WATERFILTER USERDEFINED NOTDEFINED
+FireSuppressionTerminal FireSuppressionTerminalType
+ BREECHINGINLET FIREHYDRANT HOSEREEL SPRINKLER SPRINKLERDEFLECTOR USERDEFINED NOTDEFINED
+FlowInstrument FlowInstrumentType
+ PRESSUREGAUGE THERMOMETER AMMETER FREQUENCYMETER POWERFACTORMETER PHASEANGLEMETER VOLTMETER_PEAK VOLTMETER_RMS
+ USERDEFINED NOTDEFINED
+FlowMeter FlowMeterType
+ ENERGYMETER GASMETER OILMETER WATERMETER USERDEFINED NOTDEFINED
+Footing FootingType
+ CAISSON_FOUNDATION FOOTING_BEAM PAD_FOOTING PILE_CAP STRIP_FOOTING USERDEFINED NOTDEFINED
+Furniture FurnitureType
+ CHAIR TABLE DESK BED FILECABINET SHELF SOFA USERDEFINED NOTDEFINED
+GeographicElement GeographicElementType
+ TERRAIN USERDEFINED NOTDEFINED
+HeatExchanger HeatExchangerType
+ PLATE SHELLANDTUBE USERDEFINED NOTDEFINED
+Humidifier HumidifierType
+ STEAMINJECTION ADIABATICAIRWASHER ADIABATICPAN ADIABATICWETTEDELEMENT ADIABATICATOMIZING ADIABATICULTRASONIC
+ ADIABATICRIGIDMEDIA ADIABATICCOMPRESSEDAIRNOZZLE ASSISTEDELECTRIC ASSISTEDNATURALGAS ASSISTEDPROPANE ASSISTEDBUTANE
+ ASSISTEDSTEAM USERDEFINED NOTDEFINED
+Interceptor InterceptorType
+ CYCLONIC GREASE OIL PETROL USERDEFINED NOTDEFINED
+Inventory
+ ASSETINVENTORY SPACEINVENTORY FURNITUREINVENTORY USERDEFINED NOTDEFINED
+JunctionBox JunctionBoxType
+ DATA POWER USERDEFINED NOTDEFINED
+LaborResource LaborResourceType
+ ADMINISTRATION CARPENTRY CLEANING CONCRETE DRYWALL ELECTRIC FINISHING FLOORING GENERAL HVAC LANDSCAPING MASONRY
+ PAINTING PAVING PLUMBING ROOFING SITEGRADING STEELWORK SURVEYING USERDEFINED NOTDEFINED
+Lamp LampType
+ COMPACTFLUORESCENT FLUORESCENT HALOGEN HIGHPRESSUREMERCURY HIGHPRESSURESODIUM LED METALHALIDE OLED TUNGSTENFILAMENT
+ USERDEFINED NOTDEFINED
+LightFixture LightFixtureType
+ POINTSOURCE DIRECTIONSOURCE SECURITYLIGHTING USERDEFINED NOTDEFINED
+StructuralLoadGroup
+ LOAD_GROUP LOAD_CASE LOAD_COMBINATION USERDEFINED NOTDEFINED
+MechanicalFastener MechanicalFastenerType
+ ANCHORBOLT BOLT DOWEL NAIL NAILPLATE RIVET SCREW SHEARCONNECTOR STAPLE STUDSHEARCONNECTOR USERDEFINED NOTDEFINED
+MedicalDevice MedicalDeviceType
+ AIRSTATION FEEDAIRUNIT OXYGENGENERATOR OXYGENPLANT VACUUMSTATION USERDEFINED NOTDEFINED
+Member MemberType
+ BRACE CHORD COLLAR MEMBER MULLION PLATE POST PURLIN RAFTER STRINGER STRUT STUD USERDEFINED NOTDEFINED
+MotorConnection MotorConnectionType
+ BELTDRIVE COUPLING DIRECTDRIVE USERDEFINED NOTDEFINED
+Occupant
+ ASSIGNEE ASSIGNOR LESSEE LESSOR LETTINGAGENT OWNER TENANT USERDEFINED NOTDEFINED
+OpeningElement
+ OPENING RECESS USERDEFINED NOTDEFINED
+Outlet OutletType
+ AUDIOVISUALOUTLET COMMUNICATIONSOUTLET POWEROUTLET DATAOUTLET TELEPHONEOUTLET USERDEFINED NOTDEFINED
+PerformanceHistory
+ USERDEFINED NOTDEFINED
+Permit
+ ACCESS BUILDING WORK USERDEFINED NOTDEFINED
+Pile PileType
+ BORED DRIVEN JETGROUTING COHESION FRICTION SUPPORT USERDEFINED NOTDEFINED
+PipeFitting PipeFittingType
+ BEND CONNECTOR ENTRY EXIT JUNCTION OBSTRUCTION TRANSITION USERDEFINED NOTDEFINED
+PipeSegment PipeSegmentType
+ CULVERT FLEXIBLESEGMENT RIGIDSEGMENT GUTTER SPOOL USERDEFINED NOTDEFINED
+Plate PlateType
+ CURTAIN_PANEL SHEET USERDEFINED NOTDEFINED
+Procedure ProcedureType
+ ADVICE_CAUTION ADVICE_NOTE ADVICE_WARNING CALIBRATION DIAGNOSTIC SHUTDOWN STARTUP USERDEFINED NOTDEFINED
+ProjectOrder
+ CHANGEORDER MAINTENANCEWORKORDER MOVEORDER PURCHASEORDER WORKORDER USERDEFINED NOTDEFINED
+ProjectionElement
+ USERDEFINED NOTDEFINED
+ProtectiveDeviceTrippingUnit ProtectiveDeviceTrippingUnitType
+ ELECTRONIC ELECTROMAGNETIC RESIDUALCURRENT THERMAL USERDEFINED NOTDEFINED
+ProtectiveDevice ProtectiveDeviceType
+ CIRCUITBREAKER EARTHLEAKAGECIRCUITBREAKER EARTHINGSWITCH FUSEDISCONNECTOR RESIDUALCURRENTCIRCUITBREAKER
+ RESIDUALCURRENTSWITCH VARISTOR USERDEFINED NOTDEFINED
+Pump PumpType
+ CIRCULATOR ENDSUCTION SPLITCASE SUBMERSIBLEPUMP SUMPPUMP VERTICALINLINE VERTICALTURBINE USERDEFINED NOTDEFINED
+Railing RailingType
+ HANDRAIL GUARDRAIL BALUSTRADE USERDEFINED NOTDEFINED
+RampFlight RampFlightType
+ STRAIGHT SPIRAL USERDEFINED NOTDEFINED
+Ramp RampType
+ STRAIGHT_RUN_RAMP TWO_STRAIGHT_RUN_RAMP QUARTER_TURN_RAMP TWO_QUARTER_TURN_RAMP HALF_TURN_RAMP SPIRAL_RAMP
+ USERDEFINED NOTDEFINED
+ReinforcingBar ReinforcingBarType
+ ANCHORING EDGE LIGATURE MAIN PUNCHING RING SHEAR STUD USERDEFINED NOTDEFINED
+ReinforcingMesh ReinforcingMeshType
+ USERDEFINED NOTDEFINED
+Roof RoofType
+ FLAT_ROOF SHED_ROOF GABLE_ROOF HIP_ROOF HIPPED_GABLE_ROOF GAMBREL_ROOF MANSARD_ROOF BARREL_ROOF RAINBOW_ROOF
+ BUTTERFLY_ROOF PAVILION_ROOF DOME_ROOF FREEFORM USERDEFINED NOTDEFINED
+SanitaryTerminal SanitaryTerminalType
+ BATH BIDET CISTERN SHOWER SINK SANITARYFOUNTAIN TOILETPAN URINAL WASHHANDBASIN WCSEAT USERDEFINED NOTDEFINED
+Sensor SensorType
+ COSENSOR CO2SENSOR CONDUCTANCESENSOR CONTACTSENSOR FIRESENSOR FLOWSENSOR FROSTSENSOR GASSENSOR HEATSENSOR
+ HUMIDITYSENSOR IDENTIFIERSENSOR IONCONCENTRATIONSENSOR LEVELSENSOR LIGHTSENSOR MOISTURESENSOR MOVEMENTSENSOR
+ PHSENSOR PRESSURESENSOR RADIATIONSENSOR RADIOACTIVITYSENSOR SMOKESENSOR SOUNDSENSOR TEMPERATURESENSOR WINDSENSOR
+ USERDEFINED NOTDEFINED
+ShadingDevice ShadingDeviceType
+ JALOUSIE SHUTTER AWNING USERDEFINED NOTDEFINED
+Slab SlabType
+ FLOOR ROOF LANDING BASESLAB USERDEFINED NOTDEFINED
+SolarDevice SolarDeviceType
+ SOLARCOLLECTOR SOLARPANEL USERDEFINED NOTDEFINED
+SpaceHeater SpaceHeaterType
+ CONVECTOR RADIATOR USERDEFINED NOTDEFINED
+Space SpaceType
+ SPACE PARKING GFA INTERNAL EXTERNAL USERDEFINED NOTDEFINED
+SpatialZone SpatialZoneType
+ CONSTRUCTION FIRESAFETY LIGHTING OCCUPANCY SECURITY THERMAL TRANSPORT VENTILATION USERDEFINED NOTDEFINED
+StackTerminal StackTerminalType
+ BIRDCAGE COWL RAINWATERHOPPER USERDEFINED NOTDEFINED
+StairFlight StairFlightType
+ STRAIGHT WINDER SPIRAL CURVED FREEFORM USERDEFINED NOTDEFINED
+Stair StairType
+ STRAIGHT_RUN_STAIR TWO_STRAIGHT_RUN_STAIR QUARTER_WINDING_STAIR QUARTER_TURN_STAIR HALF_WINDING_STAIR HALF_TURN_STAIR
+ TWO_QUARTER_WINDING_STAIR TWO_QUARTER_TURN_STAIR THREE_QUARTER_WINDING_STAIR THREE_QUARTER_TURN_STAIR SPIRAL_STAIR
+ DOUBLE_RETURN_STAIR CURVED_RUN_STAIR TWO_CURVED_RUN_STAIR USERDEFINED NOTDEFINED
+StructuralCurveAction StructuralCurveReaction
+ CONST LINEAR POLYGONAL EQUIDISTANT SINUS PARABOLA DISCRETE USERDEFINED NOTDEFINED
+StructuralCurveMember
+ RIGID_JOINED_MEMBER PIN_JOINED_MEMBER CABLE TENSION_MEMBER COMPRESSION_MEMBER USERDEFINED NOTDEFINED
+StructuralSurfaceAction StructuralSurfaceReaction
+ CONST BILINEAR DISCRETE ISOCONTOUR USERDEFINED NOTDEFINED
+StructuralSurfaceMember
+ BENDING_ELEMENT MEMBRANE_ELEMENT SHELL USERDEFINED NOTDEFINED
+SubContractResource SubContractResourceType
+ PURCHASE WORK USERDEFINED NOTDEFINED
+SurfaceFeature
+ MARK TAG TREATMENT USERDEFINED NOTDEFINED
+SwitchingDevice SwitchingDeviceType
+ CONTACTOR DIMMERSWITCH EMERGENCYSTOP KEYPAD MOMENTARYSWITCH SELECTORSWITCH STARTER SWITCHDISCONNECTOR TOGGLESWITCH
+ USERDEFINED NOTDEFINED
+SystemFurnitureElement SystemFurnitureElementType
+ PANEL WORKSURFACE USERDEFINED NOTDEFINED
+Tank TankType
+ BASIN BREAKPRESSURE EXPANSION FEEDANDEXPANSION PRESSUREVESSEL STORAGE VESSEL USERDEFINED NOTDEFINED
+Task TaskType
+ ATTENDANCE CONSTRUCTION DEMOLITION DISMANTLE DISPOSAL INSTALLATION LOGISTIC MAINTENANCE MOVE OPERATION REMOVAL
+ RENOVATION USERDEFINED NOTDEFINED
+TendonAnchor TendonAnchorType
+ COUPLER FIXED_END TENSIONING_END USERDEFINED NOTDEFINED
+Tendon TendonType
+ BAR COATED STRAND WIRE USERDEFINED NOTDEFINED
+Transformer TransformerType
+ CURRENT FREQUENCY INVERTER RECTIFIER VOLTAGE USERDEFINED NOTDEFINED
+TransportElement TransportElementType
+ ELEVATOR ESCALATOR MOVINGWALKWAY CRANEWAY LIFTINGGEAR USERDEFINED NOTDEFINED
+TubeBundle TubeBundleType
+ FINNED USERDEFINED NOTDEFINED
+UnitaryControlElement UnitaryControlElementType
+ ALARMPANEL CONTROLPANEL GASDETECTIONPANEL INDICATORPANEL MIMICPANEL HUMIDISTAT THERMOSTAT WEATHERSTATION
+ USERDEFINED NOTDEFINED
+UnitaryEquipment UnitaryEquipmentType
+ AIRHANDLER AIRCONDITIONINGUNIT DEHUMIDIFIER SPLITSYSTEM ROOFTOPUNIT USERDEFINED NOTDEFINED
+Valve ValveType
+ AIRRELEASE ANTIVACUUM CHANGEOVER CHECK COMMISSIONING DIVERTING DRAWOFFCOCK DOUBLECHECK DOUBLEREGULATING FAUCET
+ FLUSHING GASCOCK GASTAP ISOLATING MIXING PRESSUREREDUCING PRESSURERELIEF REGULATING SAFETYCUTOFF STEAMTRAP STOPCOCK
+ USERDEFINED NOTDEFINED
+VibrationIsolator VibrationIsolatorType
+ COMPRESSION SPRING USERDEFINED NOTDEFINED
+VoidingFeature
+ CUTOUT NOTCH HOLE MITER CHAMFER EDGE USERDEFINED NOTDEFINED
+Wall WallType
+ MOVABLE PARAPET PARTITIONING PLUMBINGWALL SHEAR SOLIDWALL STANDARD POLYGONAL ELEMENTEDWALL USERDEFINED NOTDEFINED
+WasteTerminal WasteTerminalType
+ FLOORTRAP FLOORWASTE GULLYSUMP GULLYTRAP ROOFDRAIN WASTEDISPOSALUNIT WASTETRAP USERDEFINED NOTDEFINED
+Window WindowType
+ WINDOW SKYLIGHT LIGHTDOME USERDEFINED NOTDEFINED
+WorkCalendar
+ FIRSTSHIFT SECONDSHIFT THIRDSHIFT USERDEFINED NOTDEFINED
+WorkPlan
+ ACTUAL BASELINE PLANNED USERDEFINED NOTDEFINED
+WorkSchedule
+ ACTUAL BASELINE PLANNED USERDEFINED NOTDEFINED
+"""
+
+_PREDEFINED_VALUES: dict[str, set[str]] = {}
+_enum_entities: list[str] = []
+for _row in _PREDEFINED_ENUMS.splitlines():
+    if not _row:
+        continue
+    if _row.startswith(" "):
+        for _entity in _enum_entities:
+            _PREDEFINED_VALUES[_entity].update(_row.split())
+    else:
+        _enum_entities = ["Ifc" + name for name in _row.split()]
+        for _entity in _enum_entities:
+            _PREDEFINED_VALUES[_entity] = set()
+_PREDEFINED_TYPES = {name: frozenset(values) for name, values in _PREDEFINED_VALUES.items()}
+
+
+def is_entity(name: str) -> bool:
+    """Whether *name* is an exact entity identity in IFC4 ADD2 TC1."""
+    return name in _PARENTS
+
+
+def is_subtype(actual: str, expected: str) -> bool:
+    """Whether known *actual* is *expected* or transitively inherits from it."""
+    if not is_entity(actual) or not is_entity(expected):
+        return False
+    current: str | None = actual
+    while current is not None:
+        if current == expected:
+            return True
+        current = _PARENTS[current]
+    return False
+
+
+def attribute_datatype(ifc_class: str, attribute: str) -> str | None:
+    """XSD IRI for a supported explicit scalar, inherited with exact case.
+
+    None means absent OR unsupported, not a statement that the IFC attribute
+    does not exist. No unit conversion, value restrictions or SELECT resolution
+    is attempted. Date/time/duration lexical strings remain xsd:string.
+    """
+    current: str | None = ifc_class
+    while current is not None and current in _PARENTS:
+        key = (current, attribute)
+        if key in _ATTRIBUTE_TYPES:
+            return _ATTRIBUTE_TYPES[key]
+        current = _PARENTS[current]
+    return None
+
+
+def predefined_types(ifc_class: str) -> frozenset[str]:
+    """Declared (possibly inherited) PredefinedType enum, or the empty set.
+
+    Only this attribute is considered, not similarly named enums or type-object
+    assignments. WHERE constraints and instance values are not evaluated.
+    """
+    current: str | None = ifc_class
+    while current is not None and current in _PARENTS:
+        if current in _PREDEFINED_TYPES:
+            return _PREDEFINED_TYPES[current]
+        current = _PARENTS[current]
+    return frozenset()

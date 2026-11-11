@@ -2,9 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, RootModel, model_validator
 
 from app.schemas.rules import RuleDraft
+from app.schemas.translation import (
+    TranslationProfileCreateRequest,
+    TranslationProfileSummary,
+    TranslationStoredProfile,
+)
 
 
 class LexiconHealthResponse(BaseModel):
@@ -168,6 +173,7 @@ class LexiconStoredProfile(BaseModel):
 
 
 class LexiconProfileCreateRequest(LexiconProfileDeriveRequest):
+    kind: Literal["rule_execution"] = "rule_execution"
     name: str | None = None
     description: str | None = None
     keywords: list[str] = Field(default_factory=list)
@@ -187,6 +193,10 @@ class LexiconProfileCreateRequest(LexiconProfileDeriveRequest):
         return self
 
 
+class LexiconProfileCreatePayload(RootModel[LexiconProfileCreateRequest | TranslationProfileCreateRequest]):
+    pass
+
+
 class LexiconProfileUpdateRequest(BaseModel):
     name: str | None = None
     description: str | None = None
@@ -199,7 +209,7 @@ class LexiconProfileUpdateRequest(BaseModel):
 
 
 class LexiconProfileResponse(BaseModel):
-    profile_record: LexiconStoredProfile
+    profile_record: LexiconStoredProfile | TranslationStoredProfile
 
 
 class LexiconProfileSummaryItem(BaseModel):
@@ -219,7 +229,7 @@ class LexiconProfileSummaryItem(BaseModel):
 
 class LexiconProfileListResponse(BaseModel):
     count: int
-    profiles: list[LexiconProfileSummaryItem] = Field(default_factory=list)
+    profiles: list[LexiconProfileSummaryItem | TranslationProfileSummary] = Field(default_factory=list)
 
 
 class LexiconProfileDeleteResponse(BaseModel):
