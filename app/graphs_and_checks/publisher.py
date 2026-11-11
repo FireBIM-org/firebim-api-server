@@ -26,6 +26,10 @@ def default_check_run_uri(run_id: str) -> str:
 
 
 def publish_building_graph_ttl(ttl_text: str, graph_uri: str) -> None:
+    if graph_uri.startswith(default_building_graph_uri("neo_")) or graph_uri.startswith(
+        "https://firebim.org/graphs/derived/neo_"
+    ):
+        raise ValueError("The neo_ graph namespace is reserved for immutable ingestion results")
     _publish_graph_ttl(ttl_text=ttl_text, dataset=BUILDING_GRAPH_DATASET, graph_uri=graph_uri)
 
 

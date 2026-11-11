@@ -2,6 +2,7 @@ import os
 from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -32,6 +33,12 @@ from app.schemas.lexicon import (
     LexiconPropertyRequirement,
     LexiconStoredProfile,
 )
+
+
+@pytest.fixture(autouse=True)
+def authenticated_router_clients(monkeypatch, authenticated_client_factory):
+    monkeypatch.setattr(f"{__name__}.TestClient", authenticated_client_factory)
+
 
 FBO_ONTOLOGY_TTL = """
 @prefix owl: <http://www.w3.org/2002/07/owl#> .

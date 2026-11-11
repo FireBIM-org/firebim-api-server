@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import OrderedDict
+from contextvars import ContextVar
 from copy import deepcopy
 from dataclasses import dataclass, field
 from hashlib import sha256
@@ -37,6 +39,18 @@ def make_rule_cache_key(rule_ttl: str) -> str:
     return make_content_hash(rule_ttl or "")
 
 
+class BoundedCache(OrderedDict):
+    def __init__(self, max_entries: int):
+        super().__init__()
+        self.max_entries = max_entries
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
+        self.move_to_end(key)
+        while len(self) > self.max_entries:
+            self.popitem(last=False)
+
+
 @dataclass
 class CheckExecutionCache:
     """
@@ -53,14 +67,14 @@ class CheckExecutionCache:
     - intentionally simple for Phase A1
     """
 
-    parsed_graphs: dict[str, Graph] = field(default_factory=dict)
-    targets_by_class: dict[str, list[str]] = field(default_factory=dict)
-    compiled_rules: dict[str, Any] = field(default_factory=dict)
-    property_values_by_target: dict[str, list[Any]] = field(default_factory=dict)
-    graph_schemas: dict[str, Any] = field(default_factory=dict)
-    graph_indexes: dict[str, Any] = field(default_factory=dict)
-    transition_results: dict[str, Any] = field(default_factory=dict)
-    property_values_by_batch: dict[str, dict[str, list[Any]]] = field(default_factory=dict)
+    parsed_graphs: dict[str, Graph] = field(default_factory=lambda: BoundedCache(2))
+    targets_by_class: dict[str, list[str]] = field(default_factory=lambda: BoundedCache(128))
+    compiled_rules: dict[str, Any] = field(default_factory=lambda: BoundedCache(8))
+    property_values_by_target: dict[str, list[Any]] = field(default_factory=lambda: BoundedCache(256))
+    graph_schemas: dict[str, Any] = field(default_factory=lambda: BoundedCache(2))
+    graph_indexes: dict[str, Any] = field(default_factory=lambda: BoundedCache(2))
+    transition_results: dict[str, Any] = field(default_factory=lambda: BoundedCache(128))
+    property_values_by_batch: dict[str, dict[str, list[Any]]] = field(default_factory=lambda: BoundedCache(8))
 
     def get_or_parse_graph(
         self,
@@ -187,7 +201,8 @@ class CheckExecutionCache:
 
 
 _DEFAULT_CACHE = CheckExecutionCache()
+request_execution_cache: ContextVar[CheckExecutionCache | None] = ContextVar("check_execution_cache", default=None)
 
 
 def get_default_execution_cache() -> CheckExecutionCache:
-    return _DEFAULT_CACHE
+    return request_execution_cache.get() or _DEFAULT_CACHE

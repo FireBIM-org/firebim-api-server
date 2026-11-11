@@ -3,14 +3,22 @@ from __future__ import annotations
 import json
 import logging
 from time import monotonic
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ValidationError
 
+from app.api.graph_access import graph_resolver
 from app.auth.jwt import get_current_active_user
 from app.core.observability import is_request_profiling_enabled, log_event, record_metric
 from app.lexicon.service import LexiconService
+from app.lexicon.translation_mapping_extraction import extract_module_mappings
+from app.lexicon.translation_publication import (
+    TranslationPublicationValidationError,
+    publish_translation_revision,
+)
+from app.lexicon.translation_validation import validate_translation_draft
 from app.models.models import User
 from app.schemas.lexicon import (
     LexiconCatalogCompareRequest,
@@ -43,7 +51,7 @@ from app.schemas.lexicon import (
     LexiconMappingValidationRequest,
     LexiconMappingValidationResponse,
     LexiconNextNeededResponse,
-    LexiconProfileCreateRequest,
+    LexiconProfileCreatePayload,
     LexiconProfileDeleteResponse,
     LexiconProfileDeriveRequest,
     LexiconProfileDeriveResponse,
@@ -63,6 +71,15 @@ from app.schemas.lexicon import (
     LexiconRuleTermValidationRequest,
     LexiconRuleTermValidationResponse,
 )
+from app.schemas.translation import (
+    TranslationGenerationRequest,
+    TranslationMappingExtractionReport,
+    TranslationProfileCreateRequest,
+    TranslationProfileUpdateRequest,
+    TranslationValidationReport,
+)
+from app.schemas.translation_revision import TranslationPublishedRevision, TranslationRevisionListResponse
+from app.storage.graph_resolver import GraphResolver
 from app.storage.graph_store import GraphStoreError, GraphStoreNotFoundError
 from app.storage.lexicon_handshake_repository import (
     LexiconHandshakeNotFoundError,
@@ -79,6 +96,13 @@ from app.storage.lexicon_profile_repository import (
     LexiconProfileRepository,
     LexiconProfileRepositoryError,
 )
+from app.storage.ontology_repository import OntologyRepository
+from app.storage.translation_profile_repository import (
+    TranslationProfileConflictError,
+    TranslationProfileNotFoundError,
+    TranslationProfileRepository,
+    TranslationProfileRepositoryError,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/lexicon", tags=["lexicon"])
@@ -87,6 +111,13 @@ service = LexiconService()
 mapping_repo = LexiconMappingRepository()
 handshake_repo = LexiconHandshakeRepository()
 profile_repo = LexiconProfileRepository()
+translation_profile_repo = TranslationProfileRepository()
+translation_ontology_repo = OntologyRepository()
+
+
+def _evidence_service(resolver: GraphResolver, graph_id: str) -> LexiconService:
+    resolver.buildings = service.building_repo
+    return service.for_graph(resolver.resolve(graph_id))
 
 
 async def _parse_request_model[ModelT: BaseModel](
@@ -404,9 +435,14 @@ def list_related_properties(
 
 
 @router.post("/graphs/evidence-summary", response_model=LexiconGraphEvidenceSummaryResponse)
-def summarize_graph_evidence(payload: LexiconGraphEvidenceSummaryRequest) -> LexiconGraphEvidenceSummaryResponse:
+def summarize_graph_evidence(
+    payload: LexiconGraphEvidenceSummaryRequest, resolver: GraphResolver = Depends(graph_resolver)
+) -> LexiconGraphEvidenceSummaryResponse:
+    evidence_service = _evidence_service(resolver, payload.graph_id)
     try:
-        return service.summarize_graph_evidence(payload)
+        return evidence_service.summarize_graph_evidence(payload)
+    except HTTPException:
+        raise
     except (GraphStoreError, GraphStoreNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:
@@ -439,7 +475,9 @@ def validate_mapping(payload: LexiconMappingValidationRequest) -> LexiconMapping
 def evaluate_mapping(
     payload: LexiconMappingEvaluateRequest,
     current_user: User = Depends(get_current_active_user),
+    resolver: GraphResolver = Depends(graph_resolver),
 ) -> LexiconMappingEvaluateResponse:
+    evidence_service = _evidence_service(resolver, payload.graph_id)
     try:
         mapping_payload = (
             LexiconMappingValidationRequest.model_validate(mapping_repo.get_mapping(payload.mapping_id, current_user))
@@ -448,7 +486,9 @@ def evaluate_mapping(
         )
         if mapping_payload is None:
             raise ValueError("mapping payload is required")
-        return service.evaluate_mapping(payload=payload, mapping=mapping_payload)
+        return evidence_service.evaluate_mapping(payload=payload, mapping=mapping_payload)
+    except HTTPException:
+        raise
     except (GraphStoreError, GraphStoreNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except LexiconMappingNotFoundError as exc:
@@ -705,9 +745,12 @@ def check_handshake_conformity(
 
 
 @router.post("/profiles/derive", response_model=LexiconProfileDeriveResponse)
-def derive_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconProfileDeriveResponse:
+def derive_execution_profile(
+    payload: LexiconProfileDeriveRequest, resolver: GraphResolver = Depends(graph_resolver)
+) -> LexiconProfileDeriveResponse:
+    profile_service = _evidence_service(resolver, payload.graph_id) if payload.graph_id else service
     try:
-        ontology, profile, rule_profiles, rule_ids = service.derive_profile(
+        ontology, profile, rule_profiles, rule_ids = profile_service.derive_profile(
             ontology_family=payload.ontology_family,
             country=payload.country,
             version=payload.version,
@@ -718,7 +761,7 @@ def derive_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconPro
             rule=payload.rule,
             rules=payload.rules,
         )
-        selected_ontologies = service.resolve_selected_ontologies(
+        selected_ontologies = profile_service.resolve_selected_ontologies(
             ontology_family=payload.ontology_family,
             country=payload.country,
             version=payload.version,
@@ -727,7 +770,7 @@ def derive_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconPro
         )
         graph_coverage = None
         if payload.graph_id:
-            graph_coverage = service.compute_profile_graph_coverage(
+            graph_coverage = profile_service.compute_profile_graph_coverage(
                 profile_id="derived",
                 graph_id=payload.graph_id,
                 selected_ontologies=selected_ontologies["selected_ontologies"],
@@ -746,6 +789,8 @@ def derive_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconPro
             profile=profile,
             graph_coverage=graph_coverage,
         )
+    except HTTPException:
+        raise
     except (GraphStoreError, GraphStoreNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:
@@ -790,11 +835,15 @@ async def create_profile(
     current_user: User = Depends(get_current_active_user),
 ) -> LexiconProfileResponse:
     try:
-        payload = await _parse_request_model(
+        parsed = await _parse_request_model(
             request,
-            LexiconProfileCreateRequest,
+            LexiconProfileCreatePayload,
             metric_prefix="lexicon.profile_create",
         )
+        payload = parsed.root
+        if isinstance(payload, TranslationProfileCreateRequest):
+            profile_record = translation_profile_repo.create_profile(payload=payload, user=current_user)
+            return LexiconProfileResponse(profile_record=profile_record)
         logic_started_at = monotonic()
         if payload.profile is not None:
             selection_started_at = monotonic()
@@ -886,7 +935,9 @@ async def create_profile(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except LexiconProfileRepositoryError as exc:
+    except TranslationProfileConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except (LexiconProfileRepositoryError, TranslationProfileRepositoryError) as exc:
         logger.exception("Failed to create lexicon profile", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
@@ -897,9 +948,24 @@ def list_profiles(
     ontology_family: str | None = Query(default=None),
     country: str | None = Query(default=None),
     rule_id: str | None = Query(default=None),
+    kind: Literal["rule_execution", "ifc_translation"] = Query(default="rule_execution"),
+    include_archived: bool = Query(default=False),
     current_user: User = Depends(get_current_active_user),
 ) -> LexiconProfileListResponse:
     try:
+        if kind == "ifc_translation":
+            if ontology_family or country or rule_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Legacy ontology and rule filters are not supported for translation drafts",
+                )
+            drafts = translation_profile_repo.list_profiles(current_user, include_archived=include_archived)
+            if search:
+                needle = search.strip().lower()
+                drafts = [
+                    item for item in drafts if needle in item.name.lower() or needle in (item.description or "").lower()
+                ]
+            return LexiconProfileListResponse(count=len(drafts), profiles=drafts)
         profiles = profile_repo.list_profiles(current_user)
         if search:
             needle = search.strip().lower()
@@ -918,7 +984,7 @@ def list_profiles(
         if rule_id:
             profiles = [item for item in profiles if rule_id in item.rule_ids]
         return LexiconProfileListResponse(count=len(profiles), profiles=profiles)
-    except LexiconProfileRepositoryError as exc:
+    except (LexiconProfileRepositoryError, TranslationProfileRepositoryError) as exc:
         logger.exception("Failed to list lexicon profiles", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
@@ -926,11 +992,14 @@ def list_profiles(
 @router.get("/profiles/{profile_id}", response_model=LexiconProfileResponse)
 def get_profile(profile_id: str, current_user: User = Depends(get_current_active_user)) -> LexiconProfileResponse:
     try:
-        profile_record = profile_repo.get_profile(profile_id, current_user)
+        if profile_id.startswith(translation_profile_repo.ID_PREFIX):
+            profile_record = translation_profile_repo.get_profile(profile_id, current_user)
+        else:
+            profile_record = profile_repo.get_profile(profile_id, current_user)
         return LexiconProfileResponse(profile_record=profile_record)
-    except LexiconProfileNotFoundError as exc:
+    except (LexiconProfileNotFoundError, TranslationProfileNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except LexiconProfileRepositoryError as exc:
+    except (LexiconProfileRepositoryError, TranslationProfileRepositoryError) as exc:
         logger.exception("Failed to fetch lexicon profile", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
@@ -942,6 +1011,14 @@ async def update_profile(
     current_user: User = Depends(get_current_active_user),
 ) -> LexiconProfileResponse:
     try:
+        if profile_id.startswith(translation_profile_repo.ID_PREFIX):
+            translation_payload = await _parse_request_model(
+                request, TranslationProfileUpdateRequest, metric_prefix="lexicon.translation_profile_update"
+            )
+            profile_record = translation_profile_repo.update_profile(
+                profile_id=profile_id, user=current_user, payload=translation_payload
+            )
+            return LexiconProfileResponse(profile_record=profile_record)
         payload = await _parse_request_model(
             request,
             LexiconProfileUpdateRequest,
@@ -989,20 +1066,33 @@ async def update_profile(
                 duration_ms=logic_duration_ms,
             )
         return LexiconProfileResponse(profile_record=profile_record)
-    except LexiconProfileNotFoundError as exc:
+    except (LexiconProfileNotFoundError, TranslationProfileNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except LexiconProfileRepositoryError as exc:
+    except TranslationProfileConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except (LexiconProfileRepositoryError, TranslationProfileRepositoryError) as exc:
         logger.exception("Failed to update lexicon profile", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
-@router.delete("/profiles/{profile_id}", response_model=LexiconProfileDeleteResponse)
+@router.delete("/profiles/{profile_id}", response_model=LexiconProfileDeleteResponse | LexiconProfileResponse)
 async def delete_profile(
     profile_id: str,
     request: Request,
+    expected_generation: int | None = Query(default=None, ge=1),
     current_user: User = Depends(get_current_active_user),
-) -> LexiconProfileDeleteResponse:
+) -> LexiconProfileDeleteResponse | LexiconProfileResponse:
     try:
+        if profile_id.startswith(translation_profile_repo.ID_PREFIX):
+            if expected_generation is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail="expected_generation is required to archive a translation profile",
+                )
+            archived = translation_profile_repo.archive_profile(
+                profile_id, current_user, expected_generation=expected_generation
+            )
+            return LexiconProfileResponse(profile_record=archived)
         delete_started_at = monotonic()
         profile_repo.delete_profile(profile_id, current_user)
         delete_duration_ms = round((monotonic() - delete_started_at) * 1000, 3)
@@ -1011,10 +1101,115 @@ async def delete_profile(
         if is_request_profiling_enabled():
             log_event(logger, "lexicon.profile_delete.completed", profile_id=profile_id, duration_ms=delete_duration_ms)
         return LexiconProfileDeleteResponse(deleted=True, profile_id=profile_id)
-    except LexiconProfileNotFoundError as exc:
+    except (LexiconProfileNotFoundError, TranslationProfileNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    except LexiconProfileRepositoryError as exc:
+    except TranslationProfileConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except (LexiconProfileRepositoryError, TranslationProfileRepositoryError) as exc:
         logger.exception("Failed to delete lexicon profile", exc_info=exc)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post("/profiles/{profile_id}/validate", response_model=TranslationValidationReport)
+def validate_translation_profile(
+    profile_id: str,
+    payload: TranslationGenerationRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> TranslationValidationReport:
+    try:
+        draft = translation_profile_repo.get_profile(profile_id, current_user)
+        translation_profile_repo.require_draft_generation(draft, payload.expected_generation)
+        report = validate_translation_draft(draft, translation_ontology_repo)
+        current = translation_profile_repo.get_profile(profile_id, current_user)
+        translation_profile_repo.require_draft_generation(current, payload.expected_generation)
+        return report
+    except TranslationProfileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TranslationProfileConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except TranslationProfileRepositoryError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post("/profiles/{profile_id}/extract-mappings", response_model=TranslationMappingExtractionReport)
+def extract_translation_profile_mappings(
+    profile_id: str,
+    payload: TranslationGenerationRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> TranslationMappingExtractionReport:
+    try:
+        draft = translation_profile_repo.get_profile(profile_id, current_user)
+        translation_profile_repo.require_draft_generation(draft, payload.expected_generation)
+        report = extract_module_mappings(draft, translation_ontology_repo)
+        current = translation_profile_repo.get_profile(profile_id, current_user)
+        translation_profile_repo.require_draft_generation(current, payload.expected_generation)
+        return report
+    except TranslationProfileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TranslationProfileConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except TranslationProfileRepositoryError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.get("/profiles/{profile_id}/revisions", response_model=TranslationRevisionListResponse)
+def list_translation_revisions(
+    profile_id: str,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_active_user),
+) -> TranslationRevisionListResponse:
+    try:
+        revisions = translation_profile_repo.list_revisions(profile_id, current_user)
+        return TranslationRevisionListResponse(count=len(revisions), revisions=revisions[offset : offset + limit])
+    except TranslationProfileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TranslationProfileRepositoryError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.get("/profiles/{profile_id}/revisions/{revision_id}", response_model=TranslationPublishedRevision)
+def get_translation_revision(
+    profile_id: str,
+    revision_id: str,
+    current_user: User = Depends(get_current_active_user),
+) -> TranslationPublishedRevision:
+    try:
+        return translation_profile_repo.get_revision(profile_id, revision_id, current_user)
+    except TranslationProfileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TranslationProfileRepositoryError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@router.post("/profiles/{profile_id}/publish", response_model=TranslationPublishedRevision)
+def publish_translation_profile(
+    profile_id: str,
+    payload: TranslationGenerationRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> TranslationPublishedRevision:
+    try:
+        return publish_translation_revision(
+            profile_id,
+            payload.expected_generation,
+            current_user,
+            translation_profile_repo,
+            translation_ontology_repo,
+        )
+    except TranslationPublicationValidationError as exc:
+        unavailable = any(item.code == "ontology_storage_unavailable" for item in exc.diagnostics)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY if unavailable else status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "translation_validation_unavailable" if unavailable else "translation_validation_failed",
+                "diagnostics": [item.model_dump() for item in exc.diagnostics],
+            },
+        ) from exc
+    except TranslationProfileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TranslationProfileConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except TranslationProfileRepositoryError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
 
@@ -1057,15 +1252,19 @@ def profile_graph_coverage(
     profile_id: str,
     payload: LexiconProfileGraphCoverageRequest,
     current_user: User = Depends(get_current_active_user),
+    resolver: GraphResolver = Depends(graph_resolver),
 ) -> LexiconProfileGraphCoverageResponse:
+    evidence_service = _evidence_service(resolver, payload.graph_id)
     try:
         profile_record = profile_repo.get_profile(profile_id, current_user)
-        return service.compute_profile_graph_coverage(
+        return evidence_service.compute_profile_graph_coverage(
             profile_id=profile_id,
             graph_id=payload.graph_id,
             selected_ontologies=profile_record.selected_ontologies,
             expected_profile=profile_record.profile,
         )
+    except HTTPException:
+        raise
     except (GraphStoreError, GraphStoreNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except LexiconProfileNotFoundError as exc:
