@@ -125,3 +125,16 @@ def mock_celery():
         mock_task.id = "test-task-id"
         mock.send_task.return_value = mock_task
         yield mock
+
+
+@pytest.fixture
+def authenticated_client_factory(session, test_user):
+    """Standalone router tests use the same real DB/auth seam as application tests."""
+    from app.auth.jwt import get_current_active_user
+
+    def create(app, **kwargs):
+        app.dependency_overrides[get_db] = lambda: session
+        app.dependency_overrides.setdefault(get_current_active_user, lambda: test_user)
+        return TestClient(app, **kwargs)
+
+    return create

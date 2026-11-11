@@ -5,8 +5,8 @@ import os
 from time import monotonic
 
 from alembic.config import Config
-from sqlalchemy import event
-from sqlmodel import Session, SQLModel, create_engine
+from sqlalchemy import event, inspect
+from sqlmodel import Session, create_engine
 
 from alembic import command
 from app.core.config import settings
@@ -106,11 +106,27 @@ def get_auth_db():
 
 # Function to initialize the database
 def init_db():
-    """Initialize the database by creating all tables"""
-    # Import models here to avoid circular imports
+    """Bootstrap an empty database; existing deployments must migrate before startup."""
+    from app.models import models
 
-    # Create all tables
-    SQLModel.metadata.create_all(bind=engine)
+    with engine.begin() as connection:
+        inspector = inspect(connection)
+        existing = set(inspector.get_table_names())
+        if not existing:
+            models.SQLModel.metadata.create_all(bind=connection)
+            return
+        missing = []
+        for table in models.SQLModel.metadata.sorted_tables:
+            if table.name not in existing:
+                missing.append(table.name)
+                continue
+            columns = {column["name"] for column in inspector.get_columns(table.name)}
+            missing.extend(f"{table.name}.{name}" for name in sorted(set(table.c.keys()) - columns))
+        if missing:
+            raise RuntimeError(
+                f"Database schema is incomplete (missing: {', '.join(missing)}). "
+                "Run `alembic upgrade head` before starting the API. No schema changes were made."
+            )
 
 
 def run_migrations():

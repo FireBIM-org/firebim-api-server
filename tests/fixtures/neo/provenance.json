@@ -1,0 +1,30 @@
+{
+  "fixture_version": "neo-semantic/1",
+  "source": "semantic.ifc",
+  "source_sha256": "01d034650d187fae63d531ff416a610be04d50b3dbc51ccf9fa0e1c36a968a58",
+  "captured_artifact": "semantic_ifcowl.ttl",
+  "captured_sha256": "71486974b02fc271fa0f3173f567a872bc34d7d38d52384d990c2b0230cbdc53",
+  "format": "turtle",
+  "triples": 381,
+  "converter": {
+    "release": "v0.7.4",
+    "commit": "853f8ad16916a372dcde709f845ee0c7a6014ba8",
+    "platform": "linux-x86_64",
+    "binary_sha256": "f773019184ddd3ae6441e97f9bbf5085f4f460b349aac8df5bdc37e4742a4879",
+    "upstream": "https://github.com/ISBE-TUe/IFC2LBD-Neo/releases/tag/v0.7.4"
+  },
+  "reproduction": {
+    "command": "python -m scripts.probe_neo_ifcowl --binary <pinned-binary> --output-dir <new-directory>",
+    "base_uri": "https://example.org/neo-fixture/",
+    "modules": [
+      "neo-bot-producer", "neo-beo-producer", "neo-bsdd-producer", "neo-ifcowl-producer",
+      "neo-turtle-serializer", "neo-file-export"
+    ],
+    "options": [
+      "neo-ifcowl-producer.mode=full", "neo-bsdd-producer.opm_level=l2",
+      "neo-bsdd-producer.compact=false", "neo-bsdd-producer.dedup_properties=false",
+      "neo-turtle-serializer.layout=separate", "neo-turtle-serializer.grouping=sorted"
+    ],
+    "comparison": "Equivalent RDF assertions, not Turtle byte order; fresh sorted output is RDF-isomorphic to the captured absolute-IRI serialization."
+  }
+}
