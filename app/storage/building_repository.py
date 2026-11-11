@@ -39,6 +39,10 @@ class BuildingRepository:
 
     def publish_graph(self, graph_id: str, ttl: str) -> tuple[str, bool]:
         graph_uri = default_building_graph_uri(graph_id)
+        if graph_uri.startswith(default_building_graph_uri("neo_")) or str(graph_id).strip().startswith(
+            default_building_graph_uri("neo_")
+        ):
+            raise ValueError("The neo_ graph namespace is reserved for immutable ingestion results")
         overwritten = self.exists(graph_uri)
         self._validate_ttl(ttl)
         self.client.put_graph_ttl(

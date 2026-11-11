@@ -20,7 +20,7 @@ from app.api.rules import router as rules_router
 from app.auth.router import router as auth_router
 from app.core.config import settings
 from app.core.observability import log_event, reset_request_context, set_request_context, snapshot_metrics
-from app.core.s3 import BUCKET_NAME, s3_client
+from app.core.s3 import BUCKET_NAME, configure_browser_upload_cors, s3_client
 from app.models.database import init_db
 from app.storage.demo_content_bootstrap import bootstrap_default_demo_content
 from app.storage.ontology_bootstrap import bootstrap_default_ontologies
@@ -34,8 +34,7 @@ ontologies_repo = OntologyRepository()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    logger.info("Database tables created successfully")
-    # run_migrations()
+    logger.info("Database schema ready")
 
     try:
         s3_client.head_bucket(Bucket=BUCKET_NAME)
@@ -50,6 +49,12 @@ async def lifespan(app: FastAPI):
                 ) from exc
         else:
             raise
+
+    configure_browser_upload_cors(
+        s3_client,
+        BUCKET_NAME,
+        [str(origin).rstrip("/") for origin in settings.S3_BROWSER_CORS_ORIGINS],
+    )
 
     if settings.ENVIRONMENT == "local":
         seeded_ontologies = bootstrap_default_ontologies(ontologies_repo)

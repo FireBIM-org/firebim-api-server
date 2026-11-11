@@ -7,7 +7,7 @@ from contextlib import suppress
 from time import perf_counter
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from rdflib import Graph
 from rdflib.namespace import RDF, SH
 
@@ -16,6 +16,7 @@ try:
 except Exception:  # pragma: no cover
     BlindShaclRuleRunner = None
 
+from app.api.graph_access import evaluation_slot, graph_resolver
 from app.checks.assertions import apply_assertions, open_questions
 from app.checks.compiler import RuleCompiler
 from app.checks.derived import default_derived_graph_uri
@@ -50,6 +51,8 @@ from app.schemas.checks import (
     CompatibilityMatch,
     CompatibilityWarning,
 )
+from app.storage.building_repository import BUILDING_GRAPH_BASE_URI
+from app.storage.graph_resolver import GraphResolver, LegacyGraphNotFound, ResolvedGraph
 from app.storage.graph_store import GraphStoreNotFoundError
 from app.storage.ontology_repository import OntologyRepository
 
@@ -269,6 +272,7 @@ def _build_compatibility_response(
     graph_id: str,
     rule_ttl: str,
     graph_ttl: str | None = None,
+    graph_uri: str | None = None,
     class_counter: Counter[str] | None = None,
     property_counter: Counter[str] | None = None,
 ) -> CheckCompatibilityResponse:
@@ -280,7 +284,7 @@ def _build_compatibility_response(
 
         schema_payload = extract_graph_schema_payload(
             graph_id=graph_id,
-            graph_uri=default_building_graph_uri(graph_id),
+            graph_uri=graph_uri or default_building_graph_uri(graph_id),
             graph_ttl=graph_ttl,
         )
         payload_data = schema_payload["payload"]
@@ -395,6 +399,7 @@ def _build_run_options(payload: CheckRunRequest, *, diagnostics: bool) -> RunOpt
 def _execute_check_run(
     payload: CheckRunRequest,
     *,
+    resolver: GraphResolver,
     forced_solver: str | None = None,
     diagnostics: bool,
 ) -> tuple[RunOptions, str | None, str, dict[str, float], str, str, CheckCompatibilityResponse, RuleRunResult]:
@@ -414,29 +419,29 @@ def _execute_check_run(
         ) from exc
     request_timings["fetch_rule"] = round((perf_counter() - started) * 1000.0, 3)
 
-    building_graph_uri = default_building_graph_uri(payload.graph_id)
     started = perf_counter()
     try:
-        graph_ttl = fetch_building_graph_ttl(building_graph_uri)
-    except GraphStoreNotFoundError as exc:
+        resolved = resolver.resolve(payload.graph_id)
+    except LegacyGraphNotFound as exc:
         raise CheckInputNotFoundError(
-            "graph_not_found", f"Building graph '{payload.graph_id}' is not published"
+            "graph_not_found",
+            f"Building graph '{payload.graph_id}' is not published",
         ) from exc
+    building_graph_uri = resolved.graph_uri
+    graph_ttl, merged_schemas = _check_dataset(resolved, payload.options, rule_ttl)
     if payload.options.use_derived_from:
         graph_ttl = merge_derived_graphs(
             graph_ttl=graph_ttl, graph_id=payload.graph_id, rule_ids=payload.options.use_derived_from
         )
     if payload.options.overrides:
         graph_ttl, _ = apply_assertions(graph_ttl, payload.options.overrides)
-    graph_ttl, merged_schemas = merge_schema_graphs(
-        graph_ttl=graph_ttl, rule_ttl=rule_ttl, schema=payload.options.schema
-    )
     request_timings["fetch_graph"] = round((perf_counter() - started) * 1000.0, 3)
 
     started = perf_counter()
     compatibility = _build_compatibility_response(
         rule_id=payload.rule_id,
         graph_id=payload.graph_id,
+        graph_uri=building_graph_uri,
         rule_ttl=rule_ttl,
         graph_ttl=graph_ttl,
     )
@@ -472,6 +477,8 @@ def _execute_check_run(
         and getattr(result, "derived_graph_uri", None)
     ):
         started = perf_counter()
+        if result.derived_graph_uri.startswith(BUILDING_GRAPH_BASE_URI):
+            resolver.require_mutable(result.derived_graph_uri)
         publish_building_graph_ttl(ttl_text=result.derived_graph_ttl, graph_uri=result.derived_graph_uri)
         result.engine["derived_persisted"] = True
         request_timings["persist_derived"] = round((perf_counter() - started) * 1000.0, 3)
@@ -507,6 +514,18 @@ def _to_derived_values(result: RuleRunResult) -> list[CheckDerivedValue]:
 _ontology_repo = OntologyRepository()
 _ONTOLOGY_SUMMARY_CACHE: dict[str, Any] = {"at": 0.0, "summaries": []}
 _ONTOLOGY_SUMMARY_TTL_SECONDS = 60.0
+
+
+def _check_dataset(resolved: ResolvedGraph, options, rule_ttl: str) -> tuple[str, list[str]]:
+    if resolved.publication:
+        if getattr(options, "persist_derived", False) or options.use_derived_from:
+            raise HTTPException(409, "Persisted overlays are not supported for immutable ingestion graphs")
+        if options.schema not in (None, "auto"):
+            raise HTTPException(409, "Immutable ingestion graphs always use their retained ontology context")
+        return resolved.qualified_ttl(), [
+            f"{pin['family']}/{pin['country']}/{pin['version']}" for pin, _ in resolved.ontologies
+        ]
+    return merge_schema_graphs(graph_ttl=resolved.qualified_ttl(), rule_ttl=rule_ttl, schema=options.schema)
 
 
 def _published_ontology_summaries() -> list[dict[str, Any]]:
@@ -775,8 +794,8 @@ def _error_run_response(
     )
 
 
-@router.post("/run", response_model=CheckSimpleRunResponse)
-def run_check(payload: CheckRunRequest):
+@router.post("/run", response_model=CheckSimpleRunResponse, dependencies=[Depends(evaluation_slot)])
+def run_check(payload: CheckRunRequest, resolver: GraphResolver = Depends(graph_resolver)):
     try:
         (
             options,
@@ -787,7 +806,7 @@ def run_check(payload: CheckRunRequest):
             building_graph_uri,
             compatibility,
             result,
-        ) = _execute_check_run(payload, diagnostics=False)
+        ) = _execute_check_run(payload, diagnostics=False, resolver=resolver)
         return _build_simple_response(
             payload=payload,
             options=options,
@@ -799,6 +818,8 @@ def run_check(payload: CheckRunRequest):
             compatibility=compatibility,
             result=result,
         )
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
@@ -818,8 +839,8 @@ def run_check(payload: CheckRunRequest):
         )
 
 
-@router.post("/run-vertical", response_model=CheckSimpleRunResponse)
-def run_check_vertical(payload: CheckRunRequest):
+@router.post("/run-vertical", response_model=CheckSimpleRunResponse, dependencies=[Depends(evaluation_slot)])
+def run_check_vertical(payload: CheckRunRequest, resolver: GraphResolver = Depends(graph_resolver)):
     try:
         (
             options,
@@ -830,7 +851,7 @@ def run_check_vertical(payload: CheckRunRequest):
             building_graph_uri,
             compatibility,
             result,
-        ) = _execute_check_run(payload, forced_solver="vertical", diagnostics=False)
+        ) = _execute_check_run(payload, forced_solver="vertical", diagnostics=False, resolver=resolver)
         return _build_simple_response(
             payload=payload,
             options=options,
@@ -842,6 +863,8 @@ def run_check_vertical(payload: CheckRunRequest):
             compatibility=compatibility,
             result=result,
         )
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
@@ -856,8 +879,8 @@ def run_check_vertical(payload: CheckRunRequest):
         )
 
 
-@router.post("/run-horisontal", response_model=CheckSimpleRunResponse)
-def run_check_horisontal(payload: CheckRunRequest):
+@router.post("/run-horisontal", response_model=CheckSimpleRunResponse, dependencies=[Depends(evaluation_slot)])
+def run_check_horisontal(payload: CheckRunRequest, resolver: GraphResolver = Depends(graph_resolver)):
     try:
         (
             options,
@@ -868,7 +891,7 @@ def run_check_horisontal(payload: CheckRunRequest):
             building_graph_uri,
             compatibility,
             result,
-        ) = _execute_check_run(payload, forced_solver="horizontal", diagnostics=False)
+        ) = _execute_check_run(payload, forced_solver="horizontal", diagnostics=False, resolver=resolver)
         return _build_simple_response(
             payload=payload,
             options=options,
@@ -880,6 +903,8 @@ def run_check_horisontal(payload: CheckRunRequest):
             compatibility=compatibility,
             result=result,
         )
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
@@ -894,8 +919,8 @@ def run_check_horisontal(payload: CheckRunRequest):
         )
 
 
-@router.post("/run-diagnostic", response_model=CheckDiagnosticResponse)
-def run_check_diagnostic(payload: CheckRunRequest):
+@router.post("/run-diagnostic", response_model=CheckDiagnosticResponse, dependencies=[Depends(evaluation_slot)])
+def run_check_diagnostic(payload: CheckRunRequest, resolver: GraphResolver = Depends(graph_resolver)):
     try:
         (
             options,
@@ -906,7 +931,7 @@ def run_check_diagnostic(payload: CheckRunRequest):
             building_graph_uri,
             compatibility,
             result,
-        ) = _execute_check_run(payload, diagnostics=True)
+        ) = _execute_check_run(payload, diagnostics=True, resolver=resolver)
         return _build_diagnostic_response(
             payload=payload,
             options=options,
@@ -918,6 +943,8 @@ def run_check_diagnostic(payload: CheckRunRequest):
             compatibility=compatibility,
             result=result,
         )
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
@@ -937,8 +964,8 @@ def run_check_diagnostic(payload: CheckRunRequest):
         )
 
 
-@router.post("/run-blind", response_model=BlindCheckRunResponse)
-def run_blind_check(payload: BlindCheckRunRequest):
+@router.post("/run-blind", response_model=BlindCheckRunResponse, dependencies=[Depends(evaluation_slot)])
+def run_blind_check(payload: BlindCheckRunRequest, resolver: GraphResolver = Depends(graph_resolver)):
     if BlindShaclRuleRunner is None:
         raise HTTPException(
             status_code=501,
@@ -946,15 +973,15 @@ def run_blind_check(payload: BlindCheckRunRequest):
         )
     try:
         rule_graph_uri, rule_ttl = fetch_rule_ttl(payload.rule_id)
-        building_graph_uri = default_building_graph_uri(payload.graph_id)
-        graph_ttl = fetch_building_graph_ttl(building_graph_uri)
+        resolved = resolver.resolve(payload.graph_id)
+        building_graph_uri = resolved.graph_uri
+        graph_ttl, _ = _check_dataset(resolved, payload.options, rule_ttl)
         if payload.options.use_derived_from:
             graph_ttl = merge_derived_graphs(
                 graph_ttl=graph_ttl, graph_id=payload.graph_id, rule_ids=payload.options.use_derived_from
             )
         if payload.options.overrides:
             graph_ttl, _ = apply_assertions(graph_ttl, payload.options.overrides)
-        graph_ttl, _ = merge_schema_graphs(graph_ttl=graph_ttl, rule_ttl=rule_ttl, schema=payload.options.schema)
 
         runner = BlindShaclRuleRunner()
         result = runner.run_rule(
@@ -999,6 +1026,8 @@ def run_blind_check(payload: BlindCheckRunRequest):
             },
         )
 
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -1019,19 +1048,25 @@ def run_blind_check(payload: BlindCheckRunRequest):
         )
 
 
-@router.post("/compatibility", response_model=CheckCompatibilityResponse)
-def check_compatibility(payload: CheckCompatibilityRequest):
+@router.post("/compatibility", response_model=CheckCompatibilityResponse, dependencies=[Depends(evaluation_slot)])
+def check_compatibility(payload: CheckCompatibilityRequest, resolver: GraphResolver = Depends(graph_resolver)):
     try:
         _, rule_ttl = fetch_rule_ttl(payload.rule_id)
-        building_graph_uri = default_building_graph_uri(payload.graph_id)
-        graph_ttl = fetch_building_graph_ttl(building_graph_uri)
+        resolved = resolver.resolve(payload.graph_id)
+        if resolved.publication:
+            graph_ttl = resolved.qualified_ttl()
+        else:
+            graph_ttl, _ = merge_schema_graphs(graph_ttl=resolved.qualified_ttl(), rule_ttl=rule_ttl, schema="auto")
         return _build_compatibility_response(
             rule_id=payload.rule_id,
             graph_id=payload.graph_id,
+            graph_uri=resolved.graph_uri,
             rule_ttl=rule_ttl,
             graph_ttl=graph_ttl,
         )
 
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

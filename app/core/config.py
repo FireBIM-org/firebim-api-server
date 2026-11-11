@@ -89,6 +89,8 @@ class Settings(BaseSettings):
 
     # S3
     S3_ENDPOINT_URL: str
+    S3_PUBLIC_ENDPOINT_URL: HttpUrl | None = None
+    S3_BROWSER_CORS_ORIGINS: Annotated[list[HttpUrl] | str, BeforeValidator(parse_cors)] = []
     S3_BUCKET_NAME: str
     S3_ACCESS_KEY_ID: str
     S3_SECRET_ACCESS_KEY: SecretStr = Field()
@@ -98,6 +100,13 @@ class Settings(BaseSettings):
     # Worker
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str
+
+    # Opt-in only after resource qualification and deployment/storage/licensing clearance.
+    NEO_INGESTION_ENABLED: bool = False
+    NEO_INGESTION_MAX_INPUT_BYTES: int = Field(default=0, ge=0)
+    NEO_UPLOAD_TTL_SECONDS: int = Field(default=900, ge=60, le=3600)
+    NEO_CONVERTER_PATH: str = "/opt/ifc2lbd-neo/ifc2lbd-neo"
+    NEO_ATTEMPT_ROOT: str = ".cache/neo-attempts"
 
     # SMTP_TLS: bool = True
     # SMTP_SSL: bool = False

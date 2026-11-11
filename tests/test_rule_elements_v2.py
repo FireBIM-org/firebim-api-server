@@ -424,12 +424,12 @@ def test_in_memory_rule_engine_supports_derive():
 
 # ----------------------------------------------------------------------------------------------- API surface
 @pytest.fixture
-def api_client(monkeypatch):
+def api_client(monkeypatch, authenticated_client_factory):
     from fastapi import FastAPI
-    from fastapi.testclient import TestClient
 
     from app.api import checks as checks_api
     from app.api import rules as rules_api
+    from app.storage.building_repository import BuildingRepository
 
     rule_ttls = {"t-fg": _ttl(lt_rule()), "t-pair": _ttl(pair_rule())}
     published: dict[str, str] = {}
@@ -449,12 +449,20 @@ def api_client(monkeypatch):
     monkeypatch.setattr(checks_api, "fetch_rule_ttl", fetch_rule)
     monkeypatch.setattr(checks_api, "fetch_building_graph_ttl", fetch_building)
     monkeypatch.setattr(
+        BuildingRepository,
+        "fetch_graph",
+        lambda self, graph_id: (
+            checks_api.default_building_graph_uri(graph_id),
+            checks_api.fetch_building_graph_ttl(checks_api.default_building_graph_uri(graph_id)),
+        ),
+    )
+    monkeypatch.setattr(
         checks_api, "publish_building_graph_ttl", lambda ttl_text, graph_uri: published.__setitem__(graph_uri, ttl_text)
     )
     app = FastAPI()
     app.include_router(rules_api.router)
     app.include_router(checks_api.router)
-    client = TestClient(app)
+    client = authenticated_client_factory(app)
     client.published = published  # type: ignore[attr-defined]
     return client
 
@@ -1158,7 +1166,7 @@ def test_open_questions_name_the_missing_fact_and_where_to_write_it():
     assert by_target["c4"]["write_property"] == f"{LT}Sprinklered"
 
 
-def test_overrides_and_graph_answers_endpoint(api_client, monkeypatch):
+def test_overrides_and_graph_answers_endpoint(api_client, monkeypatch, authenticated_client_factory):
     from app.api import graphs as graphs_api
 
     # c3 has no FireCompartmentHeight / HabsCalculatedAltitude -> the Fg derive asks for them
@@ -1198,11 +1206,10 @@ def test_overrides_and_graph_answers_endpoint(api_client, monkeypatch):
 
     monkeypatch.setattr(graphs_api, "repo", FakeRepo())
     from fastapi import FastAPI
-    from fastapi.testclient import TestClient
 
     app = FastAPI()
     app.include_router(graphs_api.router)
-    client = TestClient(app)
+    client = authenticated_client_factory(app)
     res = client.post("/graphs/lt/answers", json={"assertions": overrides[:1]})
     assert res.status_code == 200, res.text
     assert res.json()["graph_id"] == "lt--answered" and res.json()["created"] is True

@@ -91,6 +91,7 @@ from app.schemas.lexicon import (
 )
 from app.schemas.rules import RuleDraft
 from app.storage.building_repository import BuildingRepository
+from app.storage.graph_resolver import ResolvedGraph
 from app.storage.graph_store import GraphStoreNotFoundError
 from app.storage.ontology_repository import OntologyRepository
 
@@ -131,11 +132,24 @@ class LexiconService:
         self,
         ontology_repo: OntologyRepository | None = None,
         building_repo: BuildingRepository | None = None,
+        resolved_graph: ResolvedGraph | None = None,
     ) -> None:
         self.ontology_repo = ontology_repo or OntologyRepository()
         self.building_repo = building_repo or BuildingRepository()
+        self.resolved_graph = resolved_graph
         self._ontology_cache: OrderedDict[tuple[str, str, str], LexiconOntologyCacheEntry] = OrderedDict()
         self._cache_lock = RLock()
+
+    def for_graph(self, resolved_graph: ResolvedGraph) -> LexiconService:
+        scoped = LexiconService(
+            ontology_repo=self.ontology_repo,
+            building_repo=self.building_repo,
+            resolved_graph=resolved_graph,
+        )
+        if not resolved_graph.publication:
+            scoped._ontology_cache = self._ontology_cache
+            scoped._cache_lock = self._cache_lock
+        return scoped
 
     def health(self) -> bool:
         return self.ontology_repo.health()
@@ -776,10 +790,11 @@ class LexiconService:
         self,
         payload: LexiconGraphEvidenceSummaryRequest,
     ) -> LexiconGraphEvidenceSummaryResponse:
-        graph_uri, ttl = self.building_repo.fetch_graph(payload.graph_id)
+        graph_uri, ttl = self._graph_evidence(payload.graph_id)
         data_graph = Graph()
         data_graph.parse(data=ttl, format="turtle")
-        runtime = self._build_query_runtime(payload.selected_ontologies)
+        selections = self._evidence_selections(payload.selected_ontologies)
+        runtime = self._build_query_runtime(selections)
         return runtime.summarize_graph_evidence(
             graph_id=payload.graph_id,
             graph_uri=graph_uri,
@@ -801,11 +816,11 @@ class LexiconService:
         from app.checks.derived import resolve_path_values
         from app.checks.rdfs_light import materialize, schema_subset
 
-        graph_uri, ttl = self.building_repo.fetch_graph(graph_id)
+        graph_uri, ttl = self._graph_evidence(graph_id)
         data_graph = Graph()
         data_graph.parse(data=ttl, format="turtle")
         merged_schemas: list[str] = []
-        for selection in selected_ontologies:
+        for selection in self._evidence_selections(selected_ontologies):
             bundle = self._resolve_ontology_bundle(
                 ontology_family=selection.ontology_family,
                 country=selection.country,
@@ -1061,10 +1076,10 @@ class LexiconService:
         payload: LexiconMappingEvaluateRequest,
         mapping: LexiconMappingValidationRequest,
     ) -> LexiconMappingEvaluateResponse:
-        graph_uri, ttl = self.building_repo.fetch_graph(payload.graph_id)
+        graph_uri, ttl = self._graph_evidence(payload.graph_id)
         data_graph = Graph()
         data_graph.parse(data=ttl, format="turtle")
-        runtime = self._build_query_runtime(self._selected_ontologies_for_mapping(mapping))
+        runtime = self._build_query_runtime(self._evidence_selections(self._selected_ontologies_for_mapping(mapping)))
         subject_types, subject_predicates = runtime.build_subject_indexes(data_graph)
 
         clause_evaluation: LexiconMappingEvaluationClauseResult | None = None
@@ -1178,11 +1193,18 @@ class LexiconService:
         resolved: list[LexiconSelectedOntology] = []
         seen: set[tuple[str, str, str]] = set()
         for selection in requested:
-            metadata = self.ontology_repo.fetch_version_metadata(
-                selection.ontology_family,
-                selection.country,
-                selection.version,
-            )
+            if self.resolved_graph and self.resolved_graph.publication:
+                metadata = self.resolve_ontology(
+                    ontology_family=selection.ontology_family,
+                    country=selection.country,
+                    version=selection.version,
+                )
+            else:
+                metadata = self.ontology_repo.fetch_version_metadata(
+                    selection.ontology_family,
+                    selection.country,
+                    selection.version,
+                )
             key = (selection.ontology_family, selection.country, metadata.version)
             if key in seen:
                 continue
@@ -1810,6 +1832,22 @@ class LexiconService:
         country: str,
         version: str,
     ) -> LexiconOntologyContext:
+        if self.resolved_graph and self.resolved_graph.publication:
+            for pin, ttl in self.resolved_graph.ontologies:
+                if pin["family"] == ontology_family and pin["country"] == country:
+                    if version not in ("latest", pin["version"]):
+                        raise ValueError("Requested ontology does not match the retained graph revision")
+                    return LexiconOntologyContext(
+                        ontology_family=ontology_family,
+                        country=country,
+                        version=pin["version"],
+                        canonical_family_uri=self.ontology_repo.canonical_family_uri(ontology_family),
+                        canonical_country_uri=self.ontology_repo.canonical_country_uri(ontology_family, country),
+                        ontology_uri=pin.get("ontology_iri"),
+                        version_iri=pin.get("version_iri"),
+                        ontology_ttl=ttl,
+                    )
+            raise ValueError("Requested ontology is not in the graph's retained context")
         started_at = monotonic()
         fetched = self.ontology_repo.fetch_version(ontology_family, country, version)
         duration_ms = round((monotonic() - started_at) * 1000, 3)
@@ -2262,6 +2300,30 @@ class LexiconService:
                 )
             )
         return summaries
+
+    def _graph_evidence(self, graph_id: str) -> tuple[str, str]:
+        if self.resolved_graph:
+            if graph_id not in (self.resolved_graph.graph_id, self.resolved_graph.graph_uri):
+                raise ValueError("Evidence graph differs from the authorized graph")
+            return self.resolved_graph.graph_uri, self.resolved_graph.evidence_ttl()
+        return self.building_repo.fetch_graph(graph_id)
+
+    def _evidence_selections(self, selections: list[LexiconSelectedOntology]) -> list[LexiconSelectedOntology]:
+        if not self.resolved_graph or not self.resolved_graph.publication:
+            return selections
+        retained = [
+            LexiconSelectedOntology(ontology_family=pin["family"], country=pin["country"], version=pin["version"])
+            for pin, _ in self.resolved_graph.ontologies
+        ]
+        for selection in selections:
+            if not any(
+                selection.ontology_family == pin.ontology_family
+                and selection.country == pin.country
+                and selection.version in ("latest", pin.version)
+                for pin in retained
+            ):
+                raise ValueError("Evidence selection differs from the graph's retained ontology context")
+        return retained
 
     def _build_query_runtime(
         self,

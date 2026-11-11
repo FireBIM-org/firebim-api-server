@@ -23,6 +23,10 @@ class S3JsonStoreNotFoundError(S3JsonStoreError):
     pass
 
 
+class S3JsonStoreConflictError(S3JsonStoreError):
+    pass
+
+
 class UserScopedS3JsonStore:
     def __init__(
         self,
@@ -124,6 +128,68 @@ class UserScopedS3JsonStore:
                 ContentType=content_type,
             )
         except (BotoCoreError, ClientError) as exc:
+            raise S3JsonStoreError(f"{write_error_message}: {exc}") from exc
+
+    def read_model_with_etag(
+        self,
+        root_prefix: str,
+        user: User | SimpleNamespace,
+        document_id: str,
+        *,
+        model_type: type[ModelT],
+        not_found_message: str,
+        fetch_error_message: str,
+        payload_error_message: str,
+    ) -> tuple[ModelT, str]:
+        key = self.document_key(root_prefix, user, document_id)
+        try:
+            response = self.client.get_object(Bucket=self.bucket_name, Key=key)
+        except ClientError as exc:
+            code = str(exc.response.get("Error", {}).get("Code", ""))
+            if code in {"404", "NoSuchKey", "NotFound"}:
+                raise S3JsonStoreNotFoundError(not_found_message) from exc
+            raise S3JsonStoreError(f"{fetch_error_message}: {exc}") from exc
+        except BotoCoreError as exc:
+            raise S3JsonStoreError(f"{fetch_error_message}: {exc}") from exc
+
+        try:
+            payload = response["Body"].read()
+        except (BotoCoreError, OSError) as exc:
+            raise S3JsonStoreError(f"{fetch_error_message}: {exc}") from exc
+        etag = response.get("ETag")
+        if not etag:
+            raise S3JsonStoreError(f"{fetch_error_message}: object store did not return an ETag")
+        try:
+            return model_type.model_validate_json(payload), etag
+        except ValueError as exc:
+            raise S3JsonStoreError(f"{payload_error_message}: {exc}") from exc
+
+    def write_model_conditionally(
+        self,
+        root_prefix: str,
+        user: User | SimpleNamespace,
+        document_id: str,
+        payload: BaseModel,
+        *,
+        expected_etag: str | None,
+        write_error_message: str,
+    ) -> None:
+        """Create only when absent, or replace exactly the object read with expected_etag."""
+        condition = {"IfNoneMatch": "*"} if expected_etag is None else {"IfMatch": expected_etag}
+        try:
+            self.client.put_object(
+                Bucket=self.bucket_name,
+                Key=self.document_key(root_prefix, user, document_id),
+                Body=payload.model_dump_json(indent=2).encode("utf-8"),
+                ContentType="application/json",
+                **condition,
+            )
+        except ClientError as exc:
+            code = str(exc.response.get("Error", {}).get("Code", ""))
+            if code in {"412", "409", "PreconditionFailed", "ConditionalRequestConflict"}:
+                raise S3JsonStoreConflictError("The document changed; reload before saving") from exc
+            raise S3JsonStoreError(f"{write_error_message}: {exc}") from exc
+        except BotoCoreError as exc:
             raise S3JsonStoreError(f"{write_error_message}: {exc}") from exc
 
     def write_model(

@@ -7,6 +7,8 @@ services:
       - "8000:8000"
     environment:
       - S3_ENDPOINT_URL=${S3_ENDPOINT_URL-http://minio:9000}
+      - S3_PUBLIC_ENDPOINT_URL=${S3_PUBLIC_ENDPOINT_URL-http://localhost:9000}
+      - S3_BROWSER_CORS_ORIGINS=${S3_BROWSER_CORS_ORIGINS-http://localhost:3000}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
       - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY-minioadmin}
@@ -21,8 +23,12 @@ services:
       - BACKEND_CORS_ORIGINS=${BACKEND_CORS_ORIGINS-https://firebim.org,https://www.firebim.org,https://app.firebim.org,https://www.app.firebim.org,http://localhost:3000}
       - CHECKS_SOLVER=${CHECKS_SOLVER-standard}
       - SEED_DEMO_CONTENT=${SEED_DEMO_CONTENT-true}
-      - AUTHENTIK_ISSUER_URL=http://localhost:9080/application/o/firebim/
+      - GRAPH_SERVICE_URL=http://graph-service:7878
+      - GRAPH_SERVICE_TOKEN=${GRAPH_SERVICE_TOKEN-}
+      - AUTHENTIK_ISSUER_URL=http://100.95.221.15:9080/application/o/firebim/
       - AUTHENTIK_INTERNAL_URL=http://authentik-server:9000/application/o/firebim/
+      - NEO_INGESTION_ENABLED=true
+      - NEO_INGESTION_MAX_INPUT_BYTES=10000000
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,7 +46,7 @@ services:
       context: .
       dockerfile: docker/worker/Dockerfile
     environment:
-      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL-http://minio:9000}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
       - S3_REGION=${S3_REGION}
@@ -53,6 +59,8 @@ services:
       - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://firebim:firebim@rabbitmq:5672/firebim}
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
       - CHECKS_SOLVER=${CHECKS_SOLVER-standard}
+      - GRAPH_SERVICE_URL=http://graph-service:7878
+      - GRAPH_SERVICE_TOKEN=${GRAPH_SERVICE_TOKEN-}
     command: celery -A app.workers.celery_worker worker --loglevel=info --concurrency=1
     depends_on:
       postgres:
@@ -62,8 +70,82 @@ services:
       minio:
         condition: service_started
 
+  upload-cleanup-beat:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    environment:
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL-http://minio:9000}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY-minioadmin}
+      - S3_REGION=${S3_REGION}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://firebim:firebim@rabbitmq:5672/firebim}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
+    command: celery -A app.workers.celery_app beat --loglevel=info --schedule=/tmp/upload-cleanup-schedule
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  neo-ingestion-worker:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+      target: neo-runtime
+    environment: &neo-environment
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL-http://minio:9000}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY-minioadmin}
+      S3_REGION: ${S3_REGION}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT-5432}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL-amqp://firebim:firebim@rabbitmq:5672/firebim}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND-rpc://}
+    command: celery -A app.workers.celery_app worker -Q neo_ingestion --loglevel=info --concurrency=1 --prefetch-multiplier=1
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    mem_limit: 805306368
+    memswap_limit: 805306368
+    tmpfs:
+      - /tmp:size=16777216,uid=1001,gid=1001,mode=0700,noexec,nosuid,nodev
+      - /app/ingestion-attempts:size=268435456,uid=1001,gid=1001,mode=0700,noexec,nosuid,nodev
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  neo-ingestion-dispatcher:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    environment: *neo-environment
+    command: python -m app.workers.ingestion_dispatcher
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
   rabbitmq:
-    image: rabbitmq:4-management-alpine
+    image: rabbitmq:3.13-management-alpine
     environment:
       RABBITMQ_DEFAULT_USER: firebim
       RABBITMQ_DEFAULT_PASS: firebim
@@ -79,6 +161,58 @@ services:
       timeout: 5s
       retries: 5
 
+  graph-service:
+    profiles: ["translation-graphs"]
+    build:
+      context: .
+      dockerfile: docker/graph-service/Dockerfile
+    environment:
+      - GRAPH_SERVICE_TOKEN=${GRAPH_SERVICE_TOKEN-}
+      - GRAPH_SERVICE_DATA_DIR=/data
+      - GRAPH_SERVICE_CGROUP_METRICS=1
+    volumes:
+      - graph_indexes:/data
+    mem_limit: 6000000000
+    memswap_limit: 6000000000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7878/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  graph-worker:
+    profiles: ["translation-graphs"]
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    environment:
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL-http://minio:9000}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_ACCESS_KEY_ID=${S3_ACCESS_KEY_ID}
+      - S3_SECRET_ACCESS_KEY=${S3_SECRET_ACCESS_KEY-minioadmin}
+      - S3_REGION=${S3_REGION}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL-amqp://firebim:firebim@rabbitmq:5672/firebim}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND-rpc://}
+      - GRAPH_SERVICE_URL=http://graph-service:7878
+      - GRAPH_SERVICE_TOKEN=${GRAPH_SERVICE_TOKEN-}
+    command: celery -A app.workers.celery_app worker -Q graphs --loglevel=info --concurrency=1
+    mem_limit: 2000000000
+    memswap_limit: 2000000000
+    depends_on:
+      graph-service:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
   postgres:
     image: postgres:17-alpine
     environment:
@@ -86,8 +220,8 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_PORT=5432
       - POSTGRES_DB=${POSTGRES_DB}
-    ports:
-      - "5432:5432"
+#    ports:
+#      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/initdb:/docker-entrypoint-initdb.d:ro
@@ -102,14 +236,14 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
+    image: rustfs/rustfs:latest
+    command: /data
     ports:
       - "9000:9000"
       - "9001:9001"
     environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
+      - RUSTFS_ACCESS_KEY=${S3_ACCESS_KEY_ID-minioadmin}
+      - RUSTFS_SECRET_KEY=${S3_SECRET_ACCESS_KEY-minioadmin}
     volumes:
       - minio_data:/data
 
@@ -142,8 +276,8 @@ services:
       AUTHENTIK_EMAIL__TIMEOUT: 10
       FIREBIM_CLIENT_ID: firebim
       FIREBIM_CLIENT_SECRET: local-dev-client-secret
-      FIREBIM_REDIRECT_URI: "http://localhost:3000/api/auth/callback/authentik"
-      FIREBIM_LAUNCH_URL: "http://localhost:3000"
+      FIREBIM_REDIRECT_URI: "http://100.95.221.15:3000/api/auth/callback/authentik"
+      FIREBIM_LAUNCH_URL: "http://100.95.221.15:3000"
     volumes:
       - authentik_media:/media
       - authentik_templates:/templates
@@ -175,8 +309,8 @@ services:
       AUTHENTIK_EMAIL__TIMEOUT: 10
       FIREBIM_CLIENT_ID: firebim
       FIREBIM_CLIENT_SECRET: local-dev-client-secret
-      FIREBIM_REDIRECT_URI: "http://localhost:3000/api/auth/callback/authentik"
-      FIREBIM_LAUNCH_URL: "http://localhost:3000"
+      FIREBIM_REDIRECT_URI: "http://100.95.221.15:3000/api/auth/callback/authentik"
+      FIREBIM_LAUNCH_URL: "http://100.95.221.15:3000"
     volumes:
       - authentik_media:/media
       - authentik_templates:/templates
@@ -201,6 +335,7 @@ services:
       - postgres
 
 volumes:
+  graph_indexes:
   postgres_data:
   minio_data:
   pgadmin_data:

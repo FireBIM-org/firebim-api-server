@@ -19,12 +19,15 @@ from collections import defaultdict
 
 from rdflib import OWL, RDF, RDFS, Graph, URIRef
 
+from app.ingestion.policy import LIMITS
+
 SCHEMA_PREDICATES = (RDFS.subClassOf, RDFS.subPropertyOf, OWL.equivalentClass, OWL.equivalentProperty, OWL.inverseOf)
 
 
 def _closure(edges: dict[URIRef, set[URIRef]]) -> dict[URIRef, set[URIRef]]:
     """Transitive closure of a parent relation (node -> all ancestors, excluding itself unless cyclic)."""
     result: dict[URIRef, set[URIRef]] = {}
+    total = 0
     for start in edges:
         seen: set[URIRef] = set()
         stack = list(edges[start])
@@ -33,6 +36,9 @@ def _closure(edges: dict[URIRef, set[URIRef]]) -> dict[URIRef, set[URIRef]]:
             if cur in seen:
                 continue
             seen.add(cur)
+            total += 1
+            if total > LIMITS.triples:
+                raise ValueError("Ontology closure exceeds the evaluator budget")
             stack.extend(edges.get(cur, ()))
         result[start] = seen
     return result
@@ -73,18 +79,24 @@ def materialize(graph: Graph) -> int:
     if not class_up and not prop_up and not inverses:
         return 0
     added = 0
-    new_triples = []
+    new_triples = set()
+
+    def infer(triple):
+        new_triples.add(triple)
+        if len(new_triples) + len(graph) > LIMITS.triples:
+            raise ValueError("Inferred graph exceeds the evaluator triple budget")
+
     for s, o in graph.subject_objects(RDF.type):
         for parent in class_up.get(o, ()):
             if parent != o:
-                new_triples.append((s, RDF.type, parent))
+                infer((s, RDF.type, parent))
     for prop in list(prop_up) + list(inverses):
         for s, o in graph.subject_objects(prop):
             for parent in prop_up.get(prop, ()):
                 if parent != prop:
-                    new_triples.append((s, parent, o))
+                    infer((s, parent, o))
             for inv in inverses.get(prop, ()):
-                new_triples.append((o, inv, s))
+                infer((o, inv, s))
     for triple in new_triples:
         if triple not in graph:
             graph.add(triple)

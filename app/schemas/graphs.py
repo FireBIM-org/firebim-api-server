@@ -50,6 +50,14 @@ class GraphAnswersResponse(BaseModel):
 
 class GraphListItem(BaseModel):
     graph_uri: str
+    graph_id: str | None = None
+    backend: str | None = None
+    status: str | None = None
+    immutable: bool = False
+    model_id: str | None = None
+    profile_id: str | None = None
+    revision_id: str | None = None
+    revision_digest: str | None = None
     triple_count: int | None = None
     label: str | None = Field(default=None, description="What the graph calls itself (`<graph_uri> rdfs:label`)")
     description: str | None = Field(
@@ -77,6 +85,16 @@ class GraphFetchResponse(BaseModel):
     success: bool = True
     graph_id: str
     graph_uri: str
+    backend: str | None = None
+    immutable: bool = False
+    profile_id: str | None = None
+    revision_id: str | None = None
+    revision_digest: str | None = None
+    total_triples: int | None = None
+    total_nodes: int | None = None
+    total_edges: int | None = None
+    preview_triples: int | None = None
+    truncated: bool = False
     ttl: str | None = None
     nodes: list[dict] = Field(default_factory=list)
     edges: list[dict] = Field(default_factory=list)

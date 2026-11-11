@@ -1,6 +1,5 @@
 import os
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 # Minimal settings needed before importing the API modules.
 os.environ.setdefault("POSTGRES_HOST", "localhost")
@@ -17,12 +16,10 @@ os.environ.setdefault("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
 
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 from app.api import checks as checks_api
 from app.api import graphs as graphs_api
 from app.api import rules as rules_api
-from app.models.database import get_db
 
 
 class DummyRepo:
@@ -207,19 +204,11 @@ class DummyBlindRunner:
 
 
 @pytest.fixture()
-def client(monkeypatch):
+def client(monkeypatch, authenticated_client_factory):
     app = FastAPI()
     app.include_router(graphs_api.router)
     app.include_router(rules_api.router)
     app.include_router(checks_api.router)
-
-    # Mock database to avoid real Postgres connection
-    mock_db = MagicMock()
-    # Mock for list_graphs
-    mock_db.exec.return_value.all.return_value = []
-    # Mock for single model lookups (IfcModel)
-    mock_db.exec.return_value.first.return_value = None
-    app.dependency_overrides[get_db] = lambda: mock_db
 
     # Graphs API
     monkeypatch.setattr(graphs_api, "repo", DummyRepo())
@@ -399,7 +388,17 @@ ex:room1 rdf:type fbo:Room ;
         checks_api, "default_building_graph_uri", lambda graph_id: f"https://firebim.org/graphs/buildings/{graph_id}"
     )
 
-    return TestClient(app)
+    from app.storage.building_repository import BuildingRepository
+
+    monkeypatch.setattr(
+        BuildingRepository,
+        "fetch_graph",
+        lambda self, graph_id: (
+            checks_api.default_building_graph_uri(graph_id),
+            checks_api.fetch_building_graph_ttl(checks_api.default_building_graph_uri(graph_id)),
+        ),
+    )
+    return authenticated_client_factory(app)
 
 
 @pytest.fixture()
