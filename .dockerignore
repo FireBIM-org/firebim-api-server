@@ -6,6 +6,9 @@
 **/*.pyo
 .pytest_cache
 .ruff_cache
+.cache/
+.test-results/
+ingestion-attempts/
 secrets/
 tests/
 docs/
