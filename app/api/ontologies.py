@@ -8,7 +8,12 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.auth.jwt import get_current_active_user
 from app.core.config import settings
-from app.ontologies.registry_sync import OntologyRegistryError, sync_from_registry
+from app.ontologies.registry_sync import (
+    OntologyRegistryError,
+    OntologySourceNotAllowedError,
+    ensure_source_allowed,
+    sync_from_registry,
+)
 from app.ontologies.service import (
     build_dictionary_conversion,
     build_version_summary_from_metadata,
@@ -140,6 +145,10 @@ def start_ontology_sync_job(
 ) -> OntologySyncJobResponse:
     """Queue an ontology sync so large releases do not hold an HTTP request open."""
     request = payload or OntologySyncRequest()
+    try:
+        ensure_source_allowed(request)
+    except OntologySourceNotAllowedError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     record: dict | None = None
     try:
         record = sync_job_store.create(owner_id=str(current_user.id), request=request)
@@ -187,7 +196,10 @@ def get_ontology_sync_job(
 
 def _run_sync(request: OntologySyncRequest) -> OntologySyncResponse:
     try:
+        ensure_source_allowed(request)
         return sync_from_registry(repo, request)
+    except OntologySourceNotAllowedError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except OntologyRegistryError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     except GraphStoreError as exc:
