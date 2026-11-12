@@ -165,6 +165,9 @@ class Settings(BaseSettings):
     # Optional comma-separated allowlist of hosts a user-supplied ontology sync source_url may point at.
     # Empty = any public host (private, loopback, link-local and other internal addresses are always refused).
     ONTOLOGY_SYNC_ALLOWED_HOSTS: str = ""
+    # Largest response accepted from a user-supplied sync source (index or TTL file); ONTOLOGY_SYNC_TIMEOUT_SECONDS is
+    # the deadline for each whole fetch from such a source, redirects included.
+    ONTOLOGY_SYNC_MAX_FETCH_BYTES: int = Field(default=52_428_800, ge=1)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

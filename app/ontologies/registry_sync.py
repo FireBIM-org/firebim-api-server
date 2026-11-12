@@ -77,6 +77,7 @@ def _guarded_fetcher(url: str) -> bytes:
     return fetch_public_url(
         url,
         timeout=settings.ONTOLOGY_SYNC_TIMEOUT_SECONDS,
+        max_bytes=settings.ONTOLOGY_SYNC_MAX_FETCH_BYTES,
         allowed_hosts=settings.ontology_sync_allowed_hosts,
         headers=_USER_AGENT,
     )

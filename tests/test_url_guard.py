@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api import ontologies as ontologies_api
-from app.core.url_guard import UnsafeUrlError, check_url, fetch_public_url, resolve_and_check
+from app.core.url_guard import FetchLimitError, UnsafeUrlError, check_url, fetch_public_url, resolve_and_check
 from app.ontologies import registry_sync
 from app.schemas.ontologies import OntologySyncRequest
 
@@ -102,6 +102,88 @@ def test_redirect_loops_stop():
             resolver=public_resolver,
             transport=httpx.MockTransport(handler),
         )
+
+
+def test_declared_content_length_over_the_cap_is_refused_before_reading():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"x" * 200)
+
+    with pytest.raises(FetchLimitError):
+        fetch_public_url(
+            "https://registry.example.org/big.ttl",
+            timeout=5,
+            max_bytes=100,
+            resolver=public_resolver,
+            transport=httpx.MockTransport(handler),
+        )
+
+
+def test_streamed_body_is_abandoned_once_it_passes_the_cap():
+    sent: list[int] = []
+
+    def chunks():
+        for index in range(100):
+            sent.append(index)
+            yield b"x" * 40
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=chunks())  # chunked, no Content-Length
+
+    with pytest.raises(FetchLimitError):
+        fetch_public_url(
+            "https://registry.example.org/endless.ttl",
+            timeout=5,
+            max_bytes=100,
+            resolver=public_resolver,
+            transport=httpx.MockTransport(handler),
+        )
+    assert len(sent) < 100
+
+    small = fetch_public_url(
+        "https://registry.example.org/small.ttl",
+        timeout=5,
+        max_bytes=100,
+        resolver=public_resolver,
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, content=iter([b"ab", b"cd"]))),
+    )
+    assert small == b"abcd"
+
+
+def test_timeout_is_a_deadline_for_the_whole_fetch():
+    ticks = iter(range(1000))
+
+    def clock() -> float:
+        return float(next(ticks))  # every look at the clock is one second later
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=iter([b"x"] * 50))  # a slow drip of small chunks
+
+    with pytest.raises(FetchLimitError):
+        fetch_public_url(
+            "https://registry.example.org/drip.ttl",
+            timeout=5,
+            resolver=public_resolver,
+            transport=httpx.MockTransport(handler),
+            clock=clock,
+        )
+
+
+def test_guarded_fetcher_passes_the_size_cap(monkeypatch):
+    from app.core.config import settings
+
+    seen: dict = {}
+    monkeypatch.setattr(registry_sync, "fetch_public_url", lambda url, **kwargs: seen.update(kwargs) or b"{}")
+    registry_sync._guarded_fetcher("https://registry.example.org/index.json")
+    assert seen["max_bytes"] == settings.ONTOLOGY_SYNC_MAX_FETCH_BYTES == 52_428_800
+    assert seen["timeout"] == settings.ONTOLOGY_SYNC_TIMEOUT_SECONDS
+
+
+def test_oversized_registry_index_is_a_registry_error():
+    def too_big(url: str) -> bytes:
+        raise FetchLimitError("response is larger than 100 bytes")
+
+    with pytest.raises(registry_sync.OntologyRegistryError):
+        registry_sync.fetch_registry("https://registry.example.org/index.json", fetcher=too_big)
 
 
 def test_user_supplied_registry_uses_the_guarded_fetcher(monkeypatch):
