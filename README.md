@@ -232,14 +232,17 @@ before ever running `alembic upgrade` there.
 `GET /users/me` returns `is_admin`. A user is an admin when the verified access token's `groups` claim contains
 `ADMIN_GROUP` (`firebim-admins`). Authentik's default `profile` scope mapping emits `groups` (the names of the user's
 groups), and because the provider sets `include_claims_in_id_token: true` those claims are in the JWT access token
-too. To make someone an admin, add them to the `firebim-admins` group in Authentik (the local blueprint creates it);
-it takes effect with their next access token (tokens live 60 minutes). If a token has no `groups` claim at all, the
-API asks the OIDC userinfo endpoint (found through discovery at `AUTHENTIK_INTERNAL_URL`, else the issuer) with the
-same token and caches the answer per token for up to 5 minutes.
+too. To make someone an admin, add them to the `firebim-admins` group in Authentik (this repo's local blueprint
+creates it for compose; the firebim-deploy blueprint, `apps/authentik/blueprints/firebim.yaml`, creates it for the
+deployed environments). It takes effect with their next access token: up to 60 minutes with the local blueprint, up
+to 5 minutes in the deployed environments, or at once after signing out and back in. If a token has no `groups`
+claim at all, the API asks the OIDC userinfo endpoint (found through discovery at `AUTHENTIK_INTERNAL_URL`, else the
+issuer) with the same token and caches the answer per token for up to 5 minutes.
 
 `ADMIN_EMAILS` is a bootstrap fallback only: Authentik reports `email_verified: false` for everyone and the
-self-enrollment flow does not verify addresses, so anyone can register with any email. The fallback is therefore
-ignored while more than one local user has the address, but prefer the group, and keep the list empty when you can.
+self-enrollment flow does not verify addresses, so anyone can register with any email. The fallback therefore only
+applies when the caller's own local user is the only one with the address (it is ignored while more than one local
+user has it), but prefer the group, and keep the list empty when you can.
 
 `AdminUser.is_admin` is the status this API process last determined for that user (when they called `/users/me` or
 an admin route), and `null` until then. `last_seen_at` comes from `user_activity`, written at most once per 5 minutes

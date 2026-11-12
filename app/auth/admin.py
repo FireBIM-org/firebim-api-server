@@ -12,8 +12,8 @@ cached for 30 seconds and counts as "not in the group".
 
 Authentik reports ``email_verified: false`` for every user and self-enrollment does not verify addresses, so anyone
 can sign up with any address. The ADMIN_EMAILS fallback is therefore only honoured while exactly one local user has
-that email; a second account with the same address disables the fallback for both (and logs a warning). Prefer the
-group.
+that email and that user is the caller; a second account with the same address disables the fallback for both (and
+logs a warning). Prefer the group.
 """
 
 from __future__ import annotations
@@ -166,28 +166,29 @@ def _group_names(groups: Any) -> list[str]:
     return []
 
 
-def _count_users_with_email(email: str) -> int:
+def _user_ids_with_email(email: str) -> list[str]:
+    """Ids of the local users whose email is ``email`` (case-insensitive); two at most, enough to spot a duplicate."""
     with Session(database.engine) as session:
-        return int(
-            session.execute(select(func.count()).select_from(User).where(func.lower(User.email) == email)).scalar() or 0
-        )
+        return list(session.execute(select(User.id).where(func.lower(User.email) == email).limit(2)).scalars())
 
 
-async def _is_admin_email(email: Any) -> bool:
+async def _is_admin_email(user: User, email: Any) -> bool:
     if not isinstance(email, str) or not email.strip():
         return False
     email = email.strip().lower()
     if email not in settings.admin_emails:
         return False
     try:
-        matches = await run_in_threadpool(_count_users_with_email, email)
+        matches = await run_in_threadpool(_user_ids_with_email, email)
     except Exception:
         logger.warning("Could not check ADMIN_EMAILS uniqueness; not granting admin by email", exc_info=True)
         return False
-    if matches != 1:
-        logger.warning("%d local users share an ADMIN_EMAILS address; the email fallback is ignored for them", matches)
+    if len(matches) > 1:
+        logger.warning("Several local users share an ADMIN_EMAILS address; the email fallback is ignored for them")
         return False
-    return True
+    # The address must be the caller's own local email: an email from the userinfo fallback is never synced to the
+    # caller's row by get_current_user, so a single match could be someone else.
+    return matches == [user.id]
 
 
 def remember_admin_status(user_id: str, is_admin: bool) -> None:
@@ -214,7 +215,7 @@ async def resolve_is_admin(user: User, claims: dict[str, Any], token: str | None
             groups = info.get("groups")
             email = email or info.get("email")
     in_group = bool(settings.ADMIN_GROUP) and settings.ADMIN_GROUP in _group_names(groups)
-    is_admin = in_group or await _is_admin_email(email)
+    is_admin = in_group or await _is_admin_email(user, email)
     if is_admin or groups is not None:
         remember_admin_status(user.id, is_admin)
     return is_admin

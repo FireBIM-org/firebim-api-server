@@ -134,6 +134,23 @@ def test_admin_emails_ignored_when_address_is_shared(client, session, monkeypatc
     assert client.get("/admin/overview").status_code == 403
 
 
+def test_admin_emails_requires_the_address_to_be_the_callers_own(client, session, monkeypatch):
+    # No groups/email in the token, so userinfo is asked; it reports an address the caller's row was never synced to.
+    monkeypatch.setattr(settings, "ADMIN_EMAILS", "boss@example.org")
+    session.add(User(authentik_sub="boss", username="boss", email="boss@example.org"))
+    session.commit()
+    _Userinfo({"sub": "test-sub", "groups": [], "email": "boss@example.org"}).install(monkeypatch)
+    _use_claims({"sub": "test-sub", "exp": int(time.time()) + 600})
+    assert client.get("/admin/overview", headers={"Authorization": "Bearer t"}).status_code == 403
+
+
+def test_admin_emails_via_userinfo_email_matching_the_caller(client, monkeypatch):
+    monkeypatch.setattr(settings, "ADMIN_EMAILS", "test@example.org")
+    _Userinfo({"sub": "test-sub", "groups": [], "email": "Test@Example.org"}).install(monkeypatch)
+    _use_claims({"sub": "test-sub", "exp": int(time.time()) + 600})
+    assert client.get("/admin/overview", headers={"Authorization": "Bearer t"}).status_code == 200
+
+
 def test_email_not_in_admin_emails_is_not_admin(client, monkeypatch):
     monkeypatch.setattr(settings, "ADMIN_EMAILS", "boss@example.org")
     _use_claims({"sub": "test-sub", "groups": [], "email": "test@example.org"})
