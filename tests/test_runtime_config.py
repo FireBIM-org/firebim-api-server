@@ -155,3 +155,12 @@ def test_stores_keep_injected_clients():
     fake = object()
     assert GraphStoreClient(s3_client=fake).client is fake
     assert UserScopedS3JsonStore(s3_client=fake).client is fake
+
+
+def test_settings_model_dump_works():
+    from app.core.config import Settings
+
+    dumped = Settings().model_dump()
+
+    assert "SQLALCHEMY_DATABASE_URI" in dumped
+    assert "emails_enabled" not in dumped

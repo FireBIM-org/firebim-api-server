@@ -51,7 +51,8 @@ curl http://localhost:8000/health
 
 `GET /livez` (process is serving, no dependency checks) and `GET /readyz` (database and S3 reachable) are meant
 for Kubernetes liveness and readiness probes. `GET /health` additionally checks Celery and Authentik and is meant
-for humans and blackbox monitoring, not for probes.
+for humans and blackbox monitoring, not for probes. The checks run concurrently and each gives up after 2.5 s, so
+all three endpoints answer within about 2.5 s even when a dependency hangs.
 
 5. Access the services:
 - Backend API: http://localhost:8000
