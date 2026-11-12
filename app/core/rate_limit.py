@@ -1,10 +1,14 @@
 """In-memory request rate limiting as a pure ASGI middleware.
 
 Identity:
-- requests carrying a bearer token are keyed on ``sha256(token)``. The token is *not* verified here, and the
-  unverified ``sub`` claim is never used, so a forged token can only ever throttle itself.
-- requests without a token are keyed on the client IP. ``X-Forwarded-For`` is honoured only when the direct
-  peer is a trusted proxy; the right-most address that is not itself a trusted proxy wins.
+- requests carrying a bearer token that the ``token_verifier`` accepts (signature, issuer and expiry checked against
+  the identity provider's keys) are keyed on the token's ``sub``, so refreshing an access token does not reset the
+  budget. Verified tokens are remembered by ``sha256(token)`` for a short while so the signature is not re-checked
+  on every request.
+- every other request (no token, or a token that does not verify) is keyed on the client IP and counts against
+  RATE_LIMIT_ANON: an invented ``Authorization`` header cannot buy a bigger or a fresh budget, even on routes that
+  never look at the token. ``X-Forwarded-For`` is honoured only when the direct peer is a trusted proxy; the
+  right-most address that is not itself a trusted proxy wins.
 
 The webapp proxies every browser request from its pod IPs, so IP limits apply to tokenless requests only.
 
@@ -19,11 +23,12 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import logging
 import math
 import re
 import time
 from collections import OrderedDict
-from collections.abc import Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 
 from starlette.datastructures import MutableHeaders
@@ -32,8 +37,13 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core import metrics
 
+logger = logging.getLogger(__name__)
+
 _PERIOD_SECONDS = {"second": 1, "minute": 60, "hour": 3600, "day": 86400}
 _RATE_LIMIT_RE = re.compile(r"^\s*(\d+)\s*/\s*(\d*)\s*(second|minute|hour|day)s?\s*$", re.IGNORECASE)
+
+# Verifies a bearer token and returns its subject, or None when the token is not valid.
+TokenVerifier = Callable[[str], Awaitable[str | None]]
 
 # Floating point slack when comparing arrival times, so exactly N requests fit into a burst of N.
 _EPSILON = 1e-9
@@ -130,13 +140,48 @@ class GcraRateLimiter:
             del self._tats[store_key]
 
 
+class VerifiedTokenCache:
+    """Bounded ``sha256(token) -> sub`` memo of tokens that passed verification, each kept for ``ttl_seconds``.
+
+    Only successful verifications are stored, so random tokens cannot grow it beyond ``max_entries`` either."""
+
+    def __init__(
+        self, *, ttl_seconds: float = 60.0, max_entries: int = 10_000, clock: Callable[[], float] = time.monotonic
+    ) -> None:
+        self._entries: OrderedDict[str, tuple[str, float]] = OrderedDict()
+        self._ttl = ttl_seconds
+        self._max_entries = max_entries
+        self._clock = clock
+
+    def __len__(self) -> int:
+        return len(self._entries)
+
+    def get(self, token_hash: str) -> str | None:
+        entry = self._entries.get(token_hash)
+        if entry is None:
+            return None
+        subject, expires_at = entry
+        if expires_at <= self._clock():
+            del self._entries[token_hash]
+            return None
+        return subject
+
+    def put(self, token_hash: str, subject: str) -> None:
+        self._entries[token_hash] = (subject, self._clock() + self._ttl)
+        self._entries.move_to_end(token_hash)
+        while len(self._entries) > self._max_entries:
+            self._entries.popitem(last=False)
+
+
 # Routes that are costly in CPU, memory, storage or outbound traffic. They count against RATE_LIMIT_EXPENSIVE
 # in addition to RATE_LIMIT_DEFAULT. Classified by method + full path (regex, optional trailing slash).
+# POST /checks/run-diagnostic is deliberately not listed: the webapp's rulebook runner calls it once per rule, in
+# sequence (dozens per run), so it only counts against RATE_LIMIT_DEFAULT.
 EXPENSIVE_ROUTES: tuple[tuple[str, str], ...] = (
     ("POST", r"/ifc-models"),
     ("POST", r"/ifc-models/[^/]+/data-payload"),
     ("POST", r"/ids-files"),
-    ("POST", r"/checks/run(-[a-z-]+)?"),
+    ("POST", r"/checks/run(-vertical|-horisontal|-blind)?"),
     ("POST", r"/graphs/publish"),
     ("POST", r"/rules/publish"),
     ("POST", r"/ontologies/publish"),
@@ -230,7 +275,9 @@ class RateLimitMiddleware:
         anon: str | RateLimit,
         trusted_proxy_cidrs: Iterable[str] = (),
         enabled: bool = True,
+        token_verifier: TokenVerifier | None = None,
         limiter: GcraRateLimiter | None = None,
+        verified_tokens: VerifiedTokenCache | None = None,
     ) -> None:
         self.app = app
         self.enabled = enabled
@@ -238,7 +285,26 @@ class RateLimitMiddleware:
         self.expensive = expensive if isinstance(expensive, RateLimit) else parse_rate_limit(expensive)
         self.anon = anon if isinstance(anon, RateLimit) else parse_rate_limit(anon)
         self.trusted_networks = parse_trusted_networks(trusted_proxy_cidrs)
+        # Without a verifier no token is trusted and every request is limited per client IP.
+        self.token_verifier = token_verifier
         self.limiter = limiter if limiter is not None else GcraRateLimiter()
+        self.verified_tokens = verified_tokens if verified_tokens is not None else VerifiedTokenCache()
+
+    async def _verified_subject(self, token: str) -> str | None:
+        if self.token_verifier is None:
+            return None
+        token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        subject = self.verified_tokens.get(token_hash)
+        if subject is not None:
+            return subject
+        try:
+            subject = await self.token_verifier(token)
+        except Exception:
+            logger.warning("Bearer token verification failed in the rate limiter; limiting by client IP", exc_info=True)
+            return None
+        if subject:
+            self.verified_tokens.put(token_hash, subject)
+        return subject or None
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if (
@@ -253,8 +319,9 @@ class RateLimitMiddleware:
         method = scope.get("method", "GET")
         path = scope.get("path", "")
         token = _bearer_token(scope)
-        if token:
-            identity = "token:" + hashlib.sha256(token.encode("utf-8")).hexdigest()
+        subject = await self._verified_subject(token) if token else None
+        if subject:
+            identity = f"sub:{subject}"
             checks = [("default", identity, self.default)]
             if is_expensive_route(method, path):
                 checks.append(("expensive", identity, self.expensive))
@@ -306,6 +373,8 @@ __all__ = [
     "RateLimit",
     "RateLimitDecision",
     "RateLimitMiddleware",
+    "TokenVerifier",
+    "VerifiedTokenCache",
     "is_expensive_route",
     "parse_rate_limit",
     "resolve_client_ip",

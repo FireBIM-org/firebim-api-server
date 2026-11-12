@@ -1,4 +1,4 @@
-import hashlib
+import uuid
 
 import pytest
 from fastapi import FastAPI
@@ -9,6 +9,7 @@ from app.core.rate_limit import (
     GcraRateLimiter,
     RateLimit,
     RateLimitMiddleware,
+    VerifiedTokenCache,
     is_expensive_route,
     parse_rate_limit,
     resolve_client_ip,
@@ -112,7 +113,9 @@ def test_gcra_memory_is_bounded_and_idle_buckets_are_swept():
         ("POST", "/ifc-models/abc/data-payload", True),
         ("POST", "/checks/run", True),
         ("POST", "/checks/run-blind", True),
-        ("POST", "/checks/run-diagnostic", True),
+        ("POST", "/checks/run-vertical", True),
+        # The webapp's rulebook runner calls run-diagnostic once per rule in sequence: default budget only.
+        ("POST", "/checks/run-diagnostic", False),
         ("POST", "/checks/compatibility", False),
         ("POST", "/graphs/publish", True),
         ("POST", "/graphs/lt/answers", False),
@@ -153,6 +156,19 @@ def test_resolve_client_ip(peer, xff, expected):
     assert resolve_client_ip(peer, xff, TRUSTED) == expected
 
 
+# Tokens the fake identity provider accepts: two tokens of the same user (e.g. before and after a refresh).
+VALID_TOKENS = {"token-alice": "alice", "token-alice-refreshed": "alice", "token-bob": "bob"}
+
+
+class FakeVerifier:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    async def __call__(self, token: str) -> str | None:
+        self.calls.append(token)
+        return VALID_TOKENS.get(token)
+
+
 def _app(**overrides) -> FastAPI:
     app = FastAPI()
 
@@ -173,6 +189,7 @@ def _app(**overrides) -> FastAPI:
         "expensive": "1/minute",
         "anon": "2/minute",
         "trusted_proxy_cidrs": ["10.42.0.0/16"],
+        "token_verifier": FakeVerifier(),
     }
     kwargs.update(overrides)
     app.add_middleware(RateLimitMiddleware, **kwargs)
@@ -209,27 +226,75 @@ def test_disabled_middleware_passes_everything():
     assert all(client.get("/items").status_code == 200 for _ in range(5))
 
 
-def test_token_requests_are_keyed_on_token_hash_not_ip():
+def test_verified_tokens_are_keyed_on_the_subject_not_the_token_or_ip():
     limiter = GcraRateLimiter()
     client = TestClient(_app(limiter=limiter))
     alice = {"Authorization": "Bearer token-alice"}
-    mallory = {"Authorization": "Bearer forged-token"}
+    refreshed = {"Authorization": "Bearer token-alice-refreshed"}
 
-    # Mallory exhausts her own bucket ...
-    assert [client.get("/items", headers=mallory).status_code for _ in range(4)] == [200, 200, 200, 429]
-    # ... which does not touch Alice's (same IP) or the anonymous bucket.
-    assert client.get("/items", headers=alice).status_code == 200
+    # A refreshed token belongs to the same user, so it does not get a fresh budget ...
+    assert [client.get("/items", headers=alice).status_code for _ in range(2)] == [200, 200]
+    assert [client.get("/items", headers=refreshed).status_code for _ in range(2)] == [200, 429]
+    # ... and Alice's budget is not shared with Bob (same IP) or with anonymous requests.
+    assert client.get("/items", headers={"Authorization": "Bearer token-bob"}).status_code == 200
     assert client.get("/items").status_code == 200
 
-    expected_key = "token:" + hashlib.sha256(b"token-alice").hexdigest()
     keys = {key for _, key in limiter._tats}
-    assert expected_key in keys
-    assert not any("token-alice" in key for key in keys)
+    assert {"sub:alice", "sub:bob"} <= keys
+    assert not any("token-" in key for key in keys)
+
+
+def test_unverifiable_tokens_count_against_the_client_ip():
+    """Invented tokens neither get the authenticated budget nor a fresh bucket per token, even on public routes."""
+    limiter = GcraRateLimiter()
+    client = TestClient(_app(limiter=limiter))
+
+    statuses = [client.get("/items", headers={"Authorization": f"Bearer {uuid.uuid4()}"}).status_code for _ in range(4)]
+
+    assert statuses == [200, 200, 429, 429]  # RATE_LIMIT_ANON is 2/minute here
+    assert {bucket for bucket, _ in limiter._tats} == {"anon"}
+    assert len(limiter) == 1
+
+
+def test_without_a_verifier_every_request_is_limited_per_ip():
+    client = TestClient(_app(token_verifier=None))
+    headers = {"Authorization": "Bearer token-alice"}
+    assert [client.get("/items", headers=headers).status_code for _ in range(3)] == [200, 200, 429]
+
+
+def test_verified_tokens_are_cached_briefly():
+    clock = FakeClock()
+    verifier = FakeVerifier()
+    cache = VerifiedTokenCache(ttl_seconds=60, max_entries=1, clock=clock)
+    client = TestClient(_app(token_verifier=verifier, verified_tokens=cache, default="100/minute"))
+    alice = {"Authorization": "Bearer token-alice"}
+
+    for _ in range(3):
+        assert client.get("/items", headers=alice).status_code == 200
+    assert verifier.calls == ["token-alice"]
+
+    clock.now += 61
+    assert client.get("/items", headers=alice).status_code == 200
+    assert verifier.calls == ["token-alice", "token-alice"]
+
+    # Failed verifications are not cached and the cache is bounded.
+    client.get("/items", headers={"Authorization": "Bearer nope"})
+    client.get("/items", headers={"Authorization": "Bearer token-bob"})
+    assert len(cache) == 1
+
+
+def test_a_failing_verifier_falls_back_to_the_client_ip():
+    async def broken(token: str) -> str | None:
+        raise RuntimeError("JWKS down")
+
+    client = TestClient(_app(token_verifier=broken))
+    headers = {"Authorization": "Bearer token-alice"}
+    assert [client.get("/items", headers=headers).status_code for _ in range(3)] == [200, 200, 429]
 
 
 def test_expensive_routes_count_against_both_limits():
     client = TestClient(_app())
-    headers = {"Authorization": "Bearer t"}
+    headers = {"Authorization": "Bearer token-alice"}
     assert client.post("/graphs/publish", headers=headers).status_code == 200
     limited = client.post("/graphs/publish", headers=headers)
     assert limited.status_code == 429
@@ -252,6 +317,7 @@ def test_forwarded_for_only_counts_behind_trusted_proxy():
 
 
 def test_main_app_installs_middleware_stack_in_order():
+    from app.auth.token_identity import verify_token_subject
     from app.core.body_limit import BodySizeLimitMiddleware
     from app.core.security_headers import SecurityHeadersMiddleware
     from app.main import app
@@ -262,3 +328,4 @@ def test_main_app_installs_middleware_stack_in_order():
     rate_limit = next(m for m in app.user_middleware if m.cls is RateLimitMiddleware)
     assert rate_limit.kwargs["default"] == "300/minute"
     assert rate_limit.kwargs["trusted_proxy_cidrs"] == ["10.42.0.0/16", "10.43.0.0/16", "127.0.0.1/32"]
+    assert rate_limit.kwargs["token_verifier"] is verify_token_subject

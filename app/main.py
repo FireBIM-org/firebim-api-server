@@ -21,6 +21,7 @@ from app.api.rulebuilder import router as rulebuilder_router
 from app.api.rules import public_router as rules_public_router
 from app.api.rules import router as rules_router
 from app.auth.router import router as auth_router
+from app.auth.token_identity import verify_token_subject
 from app.core.body_limit import BodySizeLimitMiddleware
 from app.core.config import settings
 from app.core.errors import install_error_handlers
@@ -131,6 +132,7 @@ app.add_middleware(
     expensive=settings.RATE_LIMIT_EXPENSIVE,
     anon=settings.RATE_LIMIT_ANON,
     trusted_proxy_cidrs=settings.trusted_proxy_cidrs,
+    token_verifier=verify_token_subject,
 )
 app.add_middleware(
     CORSMiddleware,
