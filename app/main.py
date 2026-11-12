@@ -7,6 +7,7 @@ from botocore.exceptions import ClientError
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.admin import router as admin_router
 from app.api.build_info import router as build_info_router
 from app.api.checks import public_router as checks_public_router
 from app.api.checks import router as checks_router
@@ -100,6 +101,7 @@ app.include_router(rules_router)
 app.include_router(checks_public_router)
 app.include_router(checks_router)
 app.include_router(health_router)
+app.include_router(admin_router)
 
 origins = settings.all_cors_origins
 

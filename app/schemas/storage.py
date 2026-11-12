@@ -19,8 +19,8 @@ class StorageSummary(BaseModel):
     # used_bytes / limit_bytes; 0.0 when the hard limit is disabled
     usage_ratio: float
     warn_ratio: float
-    last_reconciled_at: datetime | None = None
-    by_prefix: list[StoragePrefixUsage] = []
+    last_reconciled_at: datetime | None
+    by_prefix: list[StoragePrefixUsage]
 
 
 class StorageUserUsage(BaseModel):

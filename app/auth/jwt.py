@@ -2,11 +2,12 @@ import logging
 from time import monotonic
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
 from sqlmodel import Session, select
 
+from app.auth.activity import record_user_activity
 from app.core.config import settings
 from app.core.observability import is_request_profiling_enabled, log_event, record_metric, start_db_checkout_wait
 from app.models.database import get_auth_db
@@ -31,6 +32,7 @@ def get_jwks_client() -> PyJWKClient:
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_auth_db),
 ) -> User:
@@ -67,6 +69,9 @@ async def get_current_user(
         record_metric("auth.jwt_decode_ms", jwt_duration_ms)
         if is_request_profiling_enabled():
             log_event(logger, "auth.jwt.decoded", duration_ms=jwt_duration_ms)
+
+    # The verified claims (e.g. ``groups``) for app.auth.admin; the return type stays a plain User.
+    request.state.token_claims = payload
 
     # Find or auto-provision user based on Authentik subject
     lookup_started_at = monotonic()
@@ -128,6 +133,7 @@ async def get_current_user(
     record_metric("auth.total_ms", total_auth_ms)
     if is_request_profiling_enabled():
         log_event(logger, "auth.completed", duration_ms=total_auth_ms, user_id=user.id)
+    await record_user_activity(user.id)
     return user
 
 

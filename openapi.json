@@ -6055,10 +6055,946 @@
           }
         }
       }
+    },
+    "/admin/users": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Users",
+        "operationId": "list_users_admin_users_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive match on username or email",
+              "title": "Search"
+            },
+            "description": "Case-insensitive match on username or email"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "created_at",
+                "last_seen_at",
+                "storage_bytes",
+                "username"
+              ],
+              "type": "string",
+              "default": "created_at",
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "desc",
+                "asc"
+              ],
+              "type": "string",
+              "default": "desc",
+              "title": "Order"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/users/{user_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get User",
+        "operationId": "get_user_admin_users__user_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update User",
+        "description": "Activate or deactivate a user. A deactivated user gets 400 \"Inactive user\" on every authenticated route.",
+        "operationId": "update_user_admin_users__user_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminUserUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/overview": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Overview",
+        "operationId": "overview_admin_overview_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOverview"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/admin/storage": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Storage",
+        "operationId": "storage_admin_storage_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "top",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Number of top_users",
+              "default": 10,
+              "title": "Top"
+            },
+            "description": "Number of top_users"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminStorage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/storage/reconcile": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Reconcile",
+        "description": "Recompute the storage counters from a bucket listing now (rate limited as an expensive route).",
+        "operationId": "reconcile_admin_storage_reconcile_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageSummary"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another reconcile is running"
+          },
+          "502": {
+            "description": "Reconcile failed"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/admin/system": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "System",
+        "operationId": "system_admin_system_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSystem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdminContentCounts": {
+        "properties": {
+          "ifc_models": {
+            "type": "integer",
+            "title": "Ifc Models"
+          },
+          "ids_files": {
+            "type": "integer",
+            "title": "Ids Files"
+          },
+          "models_pending": {
+            "type": "integer",
+            "title": "Models Pending"
+          },
+          "models_processing": {
+            "type": "integer",
+            "title": "Models Processing"
+          },
+          "models_processed": {
+            "type": "integer",
+            "title": "Models Processed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ifc_models",
+          "ids_files",
+          "models_pending",
+          "models_processing",
+          "models_processed"
+        ],
+        "title": "AdminContentCounts"
+      },
+      "AdminIdsFileSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "created_at"
+        ],
+        "title": "AdminIdsFileSummary"
+      },
+      "AdminModelSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "processed": {
+            "type": "boolean",
+            "title": "Processed"
+          },
+          "processing_status": {
+            "type": "string",
+            "title": "Processing Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "processed",
+          "processing_status",
+          "created_at"
+        ],
+        "title": "AdminModelSummary"
+      },
+      "AdminOverview": {
+        "properties": {
+          "users": {
+            "$ref": "#/components/schemas/AdminUserCounts"
+          },
+          "content": {
+            "$ref": "#/components/schemas/AdminContentCounts"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/StorageSummary"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Generated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "users",
+          "content",
+          "storage",
+          "generated_at"
+        ],
+        "title": "AdminOverview"
+      },
+      "AdminStorage": {
+        "properties": {
+          "used_bytes": {
+            "type": "integer",
+            "title": "Used Bytes"
+          },
+          "object_count": {
+            "type": "integer",
+            "title": "Object Count"
+          },
+          "limit_bytes": {
+            "type": "integer",
+            "title": "Limit Bytes"
+          },
+          "user_quota_bytes": {
+            "type": "integer",
+            "title": "User Quota Bytes"
+          },
+          "usage_ratio": {
+            "type": "number",
+            "title": "Usage Ratio"
+          },
+          "warn_ratio": {
+            "type": "number",
+            "title": "Warn Ratio"
+          },
+          "last_reconciled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reconciled At"
+          },
+          "by_prefix": {
+            "items": {
+              "$ref": "#/components/schemas/StoragePrefixUsage"
+            },
+            "type": "array",
+            "title": "By Prefix"
+          },
+          "top_users": {
+            "items": {
+              "$ref": "#/components/schemas/AdminStorageUser"
+            },
+            "type": "array",
+            "title": "Top Users"
+          }
+        },
+        "type": "object",
+        "required": [
+          "used_bytes",
+          "object_count",
+          "limit_bytes",
+          "user_quota_bytes",
+          "usage_ratio",
+          "warn_ratio",
+          "last_reconciled_at",
+          "by_prefix",
+          "top_users"
+        ],
+        "title": "AdminStorage"
+      },
+      "AdminStorageUser": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          },
+          "objects": {
+            "type": "integer",
+            "title": "Objects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "username",
+          "email",
+          "bytes",
+          "objects"
+        ],
+        "title": "AdminStorageUser"
+      },
+      "AdminSystem": {
+        "properties": {
+          "build": {
+            "$ref": "#/components/schemas/BuildInfo"
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          },
+          "checks": {
+            "$ref": "#/components/schemas/AdminSystemChecks"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/AdminSystemLimits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "build",
+          "environment",
+          "checks",
+          "limits"
+        ],
+        "title": "AdminSystem"
+      },
+      "AdminSystemChecks": {
+        "properties": {
+          "database": {
+            "type": "string",
+            "title": "Database"
+          },
+          "s3": {
+            "type": "string",
+            "title": "S3"
+          },
+          "celery": {
+            "type": "string",
+            "title": "Celery"
+          },
+          "authentik": {
+            "type": "string",
+            "title": "Authentik"
+          }
+        },
+        "type": "object",
+        "required": [
+          "database",
+          "s3",
+          "celery",
+          "authentik"
+        ],
+        "title": "AdminSystemChecks"
+      },
+      "AdminSystemLimits": {
+        "properties": {
+          "storage_hard_limit_bytes": {
+            "type": "integer",
+            "title": "Storage Hard Limit Bytes"
+          },
+          "storage_user_quota_bytes": {
+            "type": "integer",
+            "title": "Storage User Quota Bytes"
+          },
+          "max_upload_bytes": {
+            "type": "integer",
+            "title": "Max Upload Bytes"
+          },
+          "max_json_body_bytes": {
+            "type": "integer",
+            "title": "Max Json Body Bytes"
+          },
+          "rate_limit_default": {
+            "type": "string",
+            "title": "Rate Limit Default"
+          },
+          "rate_limit_expensive": {
+            "type": "string",
+            "title": "Rate Limit Expensive"
+          },
+          "rate_limit_anon": {
+            "type": "string",
+            "title": "Rate Limit Anon"
+          },
+          "rate_limit_enabled": {
+            "type": "boolean",
+            "title": "Rate Limit Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "storage_hard_limit_bytes",
+          "storage_user_quota_bytes",
+          "max_upload_bytes",
+          "max_json_body_bytes",
+          "rate_limit_default",
+          "rate_limit_expensive",
+          "rate_limit_anon",
+          "rate_limit_enabled"
+        ],
+        "title": "AdminSystemLimits"
+      },
+      "AdminUser": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "is_admin": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Admin"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "ifc_models": {
+            "type": "integer",
+            "title": "Ifc Models"
+          },
+          "ids_files": {
+            "type": "integer",
+            "title": "Ids Files"
+          },
+          "storage_bytes": {
+            "type": "integer",
+            "title": "Storage Bytes"
+          },
+          "storage_objects": {
+            "type": "integer",
+            "title": "Storage Objects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "email",
+          "is_active",
+          "is_admin",
+          "created_at",
+          "last_seen_at",
+          "ifc_models",
+          "ids_files",
+          "storage_bytes",
+          "storage_objects"
+        ],
+        "title": "AdminUser"
+      },
+      "AdminUserCounts": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "active": {
+            "type": "integer",
+            "title": "Active"
+          },
+          "new_7d": {
+            "type": "integer",
+            "title": "New 7D"
+          },
+          "new_30d": {
+            "type": "integer",
+            "title": "New 30D"
+          },
+          "active_7d": {
+            "type": "integer",
+            "title": "Active 7D"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "active",
+          "new_7d",
+          "new_30d",
+          "active_7d"
+        ],
+        "title": "AdminUserCounts"
+      },
+      "AdminUserDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "is_admin": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Admin"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "ifc_models": {
+            "type": "integer",
+            "title": "Ifc Models"
+          },
+          "ids_files": {
+            "type": "integer",
+            "title": "Ids Files"
+          },
+          "storage_bytes": {
+            "type": "integer",
+            "title": "Storage Bytes"
+          },
+          "storage_objects": {
+            "type": "integer",
+            "title": "Storage Objects"
+          },
+          "recent_models": {
+            "items": {
+              "$ref": "#/components/schemas/AdminModelSummary"
+            },
+            "type": "array",
+            "title": "Recent Models"
+          },
+          "recent_ids_files": {
+            "items": {
+              "$ref": "#/components/schemas/AdminIdsFileSummary"
+            },
+            "type": "array",
+            "title": "Recent Ids Files"
+          },
+          "storage_by_prefix": {
+            "items": {
+              "$ref": "#/components/schemas/StoragePrefixUsage"
+            },
+            "type": "array",
+            "title": "Storage By Prefix"
+          },
+          "storage_by_prefix_complete": {
+            "type": "boolean",
+            "title": "Storage By Prefix Complete"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "email",
+          "is_active",
+          "is_admin",
+          "created_at",
+          "last_seen_at",
+          "ifc_models",
+          "ids_files",
+          "storage_bytes",
+          "storage_objects",
+          "recent_models",
+          "recent_ids_files",
+          "storage_by_prefix",
+          "storage_by_prefix_complete"
+        ],
+        "title": "AdminUserDetail"
+      },
+      "AdminUserList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUser"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "AdminUserList"
+      },
+      "AdminUserUpdate": {
+        "properties": {
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_active"
+        ],
+        "title": "AdminUserUpdate"
+      },
       "BlindCheckRunOptions": {
         "properties": {
           "include_targets": {
@@ -17842,6 +18778,89 @@
         ],
         "title": "RuleValidateResponse"
       },
+      "StoragePrefixUsage": {
+        "properties": {
+          "prefix": {
+            "type": "string",
+            "title": "Prefix"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          },
+          "objects": {
+            "type": "integer",
+            "title": "Objects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prefix",
+          "bytes",
+          "objects"
+        ],
+        "title": "StoragePrefixUsage"
+      },
+      "StorageSummary": {
+        "properties": {
+          "used_bytes": {
+            "type": "integer",
+            "title": "Used Bytes"
+          },
+          "object_count": {
+            "type": "integer",
+            "title": "Object Count"
+          },
+          "limit_bytes": {
+            "type": "integer",
+            "title": "Limit Bytes"
+          },
+          "user_quota_bytes": {
+            "type": "integer",
+            "title": "User Quota Bytes"
+          },
+          "usage_ratio": {
+            "type": "number",
+            "title": "Usage Ratio"
+          },
+          "warn_ratio": {
+            "type": "number",
+            "title": "Warn Ratio"
+          },
+          "last_reconciled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reconciled At"
+          },
+          "by_prefix": {
+            "items": {
+              "$ref": "#/components/schemas/StoragePrefixUsage"
+            },
+            "type": "array",
+            "title": "By Prefix"
+          }
+        },
+        "type": "object",
+        "required": [
+          "used_bytes",
+          "object_count",
+          "limit_bytes",
+          "user_quota_bytes",
+          "usage_ratio",
+          "warn_ratio",
+          "last_reconciled_at",
+          "by_prefix"
+        ],
+        "title": "StorageSummary",
+        "description": "Bucket usage as tracked by the storage accounting tables (see app/storage/quota.py)."
+      },
       "User": {
         "properties": {
           "username": {
@@ -17860,6 +18879,10 @@
           "is_active": {
             "type": "boolean",
             "title": "Is Active"
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin"
           }
         },
         "type": "object",
@@ -17867,7 +18890,8 @@
           "username",
           "email",
           "id",
-          "is_active"
+          "is_active",
+          "is_admin"
         ],
         "title": "User"
       },

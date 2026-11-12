@@ -296,6 +296,19 @@ entries:
       order: 50
 
   # ──────────────────────────────────────────────
+  # FireBIM admins — members get the API's /admin routes (ADMIN_GROUP).
+  # The default "profile" scope mapping puts the group names into the
+  # token's "groups" claim. Add users to it in the Authentik admin UI.
+  # ──────────────────────────────────────────────
+  - model: authentik_core.group
+    id: firebim-admins-group
+    state: present
+    identifiers:
+      name: firebim-admins
+    attrs:
+      is_superuser: false
+
+  # ──────────────────────────────────────────────
   # Application (visible on the Authentik dashboard)
   # ──────────────────────────────────────────────
   - model: authentik_core.application

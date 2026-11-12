@@ -171,7 +171,7 @@ samples the IFC models of the current user. `GET /livez`, `/readyz`, `/health` a
 | `CELERY_TASK_TIME_LIMIT` / `CELERY_TASK_SOFT_TIME_LIMIT` | `1680` / `1500` | Worker task time limits in seconds; keep the hard limit below RabbitMQ's `consumer_timeout` (default 30 min) |
 | `STORAGE_HARD_LIMIT_BYTES`, `STORAGE_USER_QUOTA_BYTES`, `STORAGE_WARN_RATIO` | `1 TB`, `0`, `0.8` | Bucket storage caps (see below) |
 | `STORAGE_RECONCILE_ON_STARTUP` | `true` | Reconcile the storage counters once at startup if they never were |
-| `ADMIN_GROUP`, `ADMIN_EMAILS` | `firebim-admins`, empty | Who counts as an admin |
+| `ADMIN_GROUP`, `ADMIN_EMAILS` | `firebim-admins`, empty | Who counts as an admin (see [Admin API](#admin-api)) |
 
 Rate-limited responses are 429 `{"detail": ..., "code": "RATE_LIMITED"}` with `Retry-After`,
 `X-RateLimit-Limit` and `X-RateLimit-Remaining`. The rate limiter checks a bearer token's signature, issuer and
@@ -213,6 +213,40 @@ The storage tables are created by `create_all` at startup. The Alembic revision 
 is chained on `1e9e75ea63ae`; another branch adding revisions on the same parent must be re-parented (or merged with
 a merge revision) so there is a single head. Deployed databases have no `alembic_version` table, so stamp a baseline
 before ever running `alembic upgrade` there.
+
+### Admin API
+
+`/admin` (tag `admin`) serves the webapp's admin dashboard; every route answers 403
+`{"detail": ..., "code": "FORBIDDEN"}` to non-admins:
+
+| Route | Returns |
+| --- | --- |
+| `GET /admin/overview` | User counts (total, active, new in 7/30 days, seen in 7 days), IFC/IDS counts by processing state, `StorageSummary` |
+| `GET /admin/users?search=&limit=50&offset=0&sort=created_at\|last_seen_at\|storage_bytes\|username&order=desc\|asc` | `{items: AdminUser[], total}`; `search` matches username or email (case-insensitive), `limit` ≤ 200 |
+| `GET /admin/users/{user_id}` | `AdminUserDetail`: the user, their 10 newest IFC models and IDS files, and a live per-prefix listing of their objects |
+| `PATCH /admin/users/{user_id}` `{"is_active": bool}` | `AdminUser`; deactivating yourself is 400 `CANNOT_DEACTIVATE_SELF` |
+| `GET /admin/storage?top=10` | `StorageSummary` plus `top_users` |
+| `POST /admin/storage/reconcile` | Reconciles synchronously and returns `StorageSummary` (409 `RECONCILE_IN_PROGRESS`, 502 `RECONCILE_FAILED`); rate limited as an expensive route |
+| `GET /admin/system` | Build info, environment, database/S3/Celery/Authentik checks and the configured limits |
+
+`GET /users/me` returns `is_admin`. A user is an admin when the verified access token's `groups` claim contains
+`ADMIN_GROUP` (`firebim-admins`). Authentik's default `profile` scope mapping emits `groups` (the names of the user's
+groups), and because the provider sets `include_claims_in_id_token: true` those claims are in the JWT access token
+too. To make someone an admin, add them to the `firebim-admins` group in Authentik (this repo's local blueprint
+creates it for compose; the firebim-deploy blueprint, `apps/authentik/blueprints/firebim.yaml`, creates it for the
+deployed environments). It takes effect with their next access token: up to 60 minutes with the local blueprint, up
+to 5 minutes in the deployed environments, or at once after signing out and back in. If a token has no `groups`
+claim at all, the API asks the OIDC userinfo endpoint (found through discovery at `AUTHENTIK_INTERNAL_URL`, else the
+issuer) with the same token and caches the answer per token for up to 5 minutes.
+
+`ADMIN_EMAILS` is a bootstrap fallback only: Authentik reports `email_verified: false` for everyone and the
+self-enrollment flow does not verify addresses, so anyone can register with any email. The fallback therefore only
+applies when the caller's own local user is the only one with the address (it is ignored while more than one local
+user has it), but prefer the group, and keep the list empty when you can.
+
+`AdminUser.is_admin` is the status this API process last determined for that user (when they called `/users/me` or
+an admin route), and `null` until then. `last_seen_at` comes from `user_activity`, written at most once per 5 minutes
+per user and process from the authentication dependency (failures are logged, never returned).
 
 ## Validating RuleBuilder ontology terms
 
