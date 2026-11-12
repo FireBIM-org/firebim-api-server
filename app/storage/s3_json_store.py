@@ -5,11 +5,11 @@ from types import SimpleNamespace
 from typing import TypeVar
 from urllib.parse import quote
 
-import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from pydantic import BaseModel
 
 from app.core.config import settings
+from app.core.s3 import create_s3_client
 from app.models.models import User
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
@@ -35,12 +35,11 @@ class UserScopedS3JsonStore:
         s3_client=None,
     ) -> None:
         self.bucket_name = bucket_name or settings.S3_BUCKET_NAME
-        self.client = s3_client or boto3.client(
-            "s3",
-            endpoint_url=endpoint_url or settings.S3_ENDPOINT_URL,
-            aws_access_key_id=access_key_id or settings.S3_ACCESS_KEY_ID,
-            aws_secret_access_key=(secret_access_key or settings.S3_SECRET_ACCESS_KEY.get_secret_value()),
-            region_name=region_name or settings.S3_REGION,
+        self.client = s3_client or create_s3_client(
+            endpoint_url=endpoint_url,
+            access_key_id=access_key_id,
+            secret_access_key=secret_access_key,
+            region_name=region_name,
         )
 
     @staticmethod

@@ -4,12 +4,12 @@ import logging
 from time import monotonic
 from urllib.parse import quote, unquote
 
-import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from rdflib import DCTERMS, RDFS, Graph, URIRef
 
 from app.core.config import settings
 from app.core.observability import is_request_profiling_enabled, log_event, record_metric
+from app.core.s3 import create_s3_client
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +39,11 @@ class GraphStoreClient:
         self.bucket_name = bucket_name or settings.S3_BUCKET_NAME
         self.prefix = self.ROOT_PREFIX
         self.timeout = timeout
-        self.client = s3_client or boto3.client(
-            "s3",
-            endpoint_url=endpoint_url or settings.S3_ENDPOINT_URL,
-            aws_access_key_id=access_key_id or settings.S3_ACCESS_KEY_ID,
-            aws_secret_access_key=(secret_access_key or settings.S3_SECRET_ACCESS_KEY.get_secret_value()),
-            region_name=region_name or settings.S3_REGION,
+        self.client = s3_client or create_s3_client(
+            endpoint_url=endpoint_url,
+            access_key_id=access_key_id,
+            secret_access_key=secret_access_key,
+            region_name=region_name,
         )
 
     def _dataset_prefix(self, dataset: str) -> str:
