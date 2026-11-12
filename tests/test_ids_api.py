@@ -1,5 +1,7 @@
 from io import BytesIO
 
+from botocore.response import StreamingBody
+
 
 def test_upload_ids(client, mock_s3):
     """Test uploading an IDS file."""
@@ -11,8 +13,12 @@ def test_upload_ids(client, mock_s3):
     assert response.status_code == 201
     assert "id" in response.json()
 
-    # Verify S3 upload was called
-    mock_s3.put_object.assert_called_once()
+    # Verify the upload was streamed to S3
+    mock_s3.put_object.assert_not_called()
+    mock_s3.upload_fileobj.assert_called_once()
+    _, bucket, key = mock_s3.upload_fileobj.call_args[0]
+    assert (bucket, key) == ("test-bucket", f"ids/{response.json()['id']}/test.ids")
+    assert mock_s3.upload_fileobj.call_args[1]["ExtraArgs"] == {"ContentType": "application/xml"}
 
 
 def test_upload_ids_invalid_extension(client):
@@ -96,15 +102,14 @@ def test_download_ids(client, session, test_user, mock_s3):
     session.add(ids_file)
     session.commit()
 
-    # Mock download_file to create a dummy file
-    def side_effect(Bucket, Key, Filename):
-        with open(Filename, "wb") as f:
-            f.write(b"<ids>downloaded</ids>")
-
-    mock_s3.download_file.side_effect = side_effect
+    content = b"<ids>downloaded</ids>"
+    mock_s3.get_object.return_value = {"Body": StreamingBody(BytesIO(content), len(content)), "ContentLength": 21}
 
     response = client.get(f"/ids-files/{ids_file.id}/download")
 
     assert response.status_code == 200
     assert response.content == b"<ids>downloaded</ids>"
-    mock_s3.download_file.assert_called_once()
+    assert response.headers["content-type"].startswith("application/xml")
+    assert response.headers["content-length"] == "21"
+    mock_s3.get_object.assert_called_once_with(Bucket="test-bucket", Key="ids/ids-download/test_download.ids")
+    mock_s3.download_file.assert_not_called()

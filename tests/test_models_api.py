@@ -1,5 +1,6 @@
 import io
 
+from botocore.response import StreamingBody
 from sqlmodel import Session
 
 from app.models.models import IfcModel, User
@@ -18,13 +19,41 @@ def test_upload_model(client, mock_s3, mock_celery):
     assert data["task_id"] == "test-task-id"
     assert data["status"] == "processing"
 
-    # Check S3 upload
-    mock_s3.put_object.assert_called_once()
+    # Check S3 upload: streamed from the spooled file, never read into memory
+    mock_s3.put_object.assert_not_called()
+    mock_s3.upload_fileobj.assert_called_once()
+    fileobj, bucket, key = mock_s3.upload_fileobj.call_args[0]
+    assert bucket == "test-bucket"
+    assert key == f"models/{data['id']}/test_model.ifc"
 
     # Check Celery task
-    mock_celery.send_task.assert_called_once_with(
-        "process_model", args=[data["id"], mock_s3.put_object.call_args[1]["Key"]]
-    )
+    mock_celery.send_task.assert_called_once_with("process_model", args=[data["id"], key])
+
+
+def test_upload_model_sanitizes_filename(client, mock_s3, session: Session):
+    file = (r"..\evil dir/../Bygning ÆØÅ #1.ifc", io.BytesIO(b"IFC"))
+
+    response = client.post("/ifc-models", files={"file": file})
+
+    assert response.status_code == 201
+    model_id = response.json()["id"]
+    key = mock_s3.upload_fileobj.call_args[0][2]
+    assert key == f"models/{model_id}/Bygning_A_1.ifc"
+    stored = session.get(IfcModel, model_id)
+    assert stored.filename == "Bygning ÆØÅ #1.ifc"
+
+
+def test_upload_model_too_large(client, mock_s3, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "MAX_UPLOAD_BYTES", 10)
+    file = ("big.ifc", io.BytesIO(b"x" * 11))
+
+    response = client.post("/ifc-models", files={"file": file})
+
+    assert response.status_code == 413
+    assert response.json()["code"] == "PAYLOAD_TOO_LARGE"
+    mock_s3.upload_fileobj.assert_not_called()
 
 
 def test_upload_model_invalid_extension(client):
@@ -113,29 +142,40 @@ def test_download_model(client, session: Session, test_user: User, mock_s3):
     session.add(model)
     session.commit()
 
-    # Mock download_file to do nothing
-    mock_s3.download_file.return_value = None
-
-    # We also need to mock os.remove if FileResponse is cleaned up, or just let it fail if it doesn't exist
-    # Actually FileResponse will try to open the file.
-    # In download_model endpoint:
-    # local_path = f"/tmp/{model.filename}"
-    # s3_client.download_file(Bucket=BUCKET_NAME, Key=model.s3_key, Filename=local_path)
-    # return FileResponse(path=local_path, filename=model.filename, media_type="application/octet-stream")
-
-    # To make this work, we should create the file in mock_s3.download_file
-    def side_effect(Bucket, Key, Filename):
-        with open(Filename, "wb") as f:
-            f.write(b"IFC CONTENT")
-
-    mock_s3.download_file.side_effect = side_effect
+    content = b"IFC CONTENT"
+    mock_s3.get_object.return_value = {
+        "Body": StreamingBody(io.BytesIO(content), len(content)),
+        "ContentLength": len(content),
+    }
 
     response = client.get(f"/ifc-models/{model.id}/download")
     assert response.status_code == 200
     assert response.content == b"IFC CONTENT"
-    assert response.headers["content-disposition"] == 'attachment; filename="download.ifc"'
+    assert response.headers["content-disposition"] == (
+        "attachment; filename=\"download.ifc\"; filename*=UTF-8''download.ifc"
+    )
 
-    mock_s3.download_file.assert_called_once()
+    # Streamed straight from S3: nothing is written to local disk
+    mock_s3.get_object.assert_called_once_with(Bucket="test-bucket", Key="models/download-id/download.ifc")
+    mock_s3.download_file.assert_not_called()
+
+
+def test_download_model_missing_object(client, session: Session, test_user: User, mock_s3):
+    from botocore.exceptions import ClientError
+
+    model = IfcModel(
+        id="missing-id",
+        filename="missing.ifc",
+        s3_key="models/missing-id/missing.ifc",
+        user_id=test_user.id,
+    )
+    session.add(model)
+    session.commit()
+    mock_s3.get_object.side_effect = ClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject")
+
+    response = client.get(f"/ifc-models/{model.id}/download")
+
+    assert response.status_code == 404
 
 
 def test_delete_model(client, session: Session, test_user: User, mock_s3):

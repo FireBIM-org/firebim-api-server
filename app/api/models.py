@@ -1,11 +1,17 @@
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 
 from app.auth.jwt import get_current_active_user
 from app.core.s3 import BUCKET_NAME, s3_client
+from app.core.uploads import (
+    display_filename,
+    ensure_upload_size,
+    s3_download_response,
+    safe_storage_filename,
+    upload_file_to_s3,
+)
 from app.models.database import get_db
 from app.models.models import IfcEntity, IfcModel, IfcProperty, IfcQuantity, User
 from app.schemas.models import IfcSqlDataUpload
@@ -21,21 +27,20 @@ async def upload_model(
     """
     Upload an IFC-STEP file, save to S3, and queue it for processing.
     """
-    if not file.filename.lower().endswith(".ifc"):
+    filename = display_filename(file.filename)
+    if not filename.lower().endswith(".ifc"):
         raise HTTPException(status_code=400, detail="File must be an IFC (STEP) file")
-
-    # Read the file content
-    content = await file.read()
+    ensure_upload_size(file)
 
     # Generate a unique ID for the model
     id = str(uuid.uuid4())
 
-    # Upload to S3
-    s3_key = f"models/{id}/{file.filename}"
-    s3_client.put_object(Bucket=BUCKET_NAME, Key=s3_key, Body=content)
+    # Stream the spooled upload to S3 (never the whole file in memory)
+    s3_key = f"models/{id}/{safe_storage_filename(filename)}"
+    await upload_file_to_s3(s3_client, bucket=BUCKET_NAME, key=s3_key, file=file)
 
     # Create DB entry
-    model = IfcModel(id=id, filename=file.filename, s3_key=s3_key, user_id=current_user.id, processing_status="pending")
+    model = IfcModel(id=id, filename=filename, s3_key=s3_key, user_id=current_user.id, processing_status="pending")
     db.add(model)
     db.commit()
     db.refresh(model)
@@ -109,11 +114,10 @@ async def download_model(id: str, db: Session = Depends(get_db), current_user: U
     if model.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to access this model")
 
-    # Download from S3
-    local_path = f"/tmp/{model.filename}"
-    s3_client.download_file(Bucket=BUCKET_NAME, Key=model.s3_key, Filename=local_path)
-
-    return FileResponse(path=local_path, filename=model.filename, media_type="application/octet-stream")
+    # Stream from S3
+    return await s3_download_response(
+        s3_client, bucket=BUCKET_NAME, key=model.s3_key, filename=model.filename, media_type="application/octet-stream"
+    )
 
 
 @router.post("/{id}/data-payload", status_code=201)
