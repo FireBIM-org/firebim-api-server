@@ -212,6 +212,22 @@ class Settings(BaseSettings):
     # Serve /docs, /redoc and /openapi.json.
     ENABLE_API_DOCS: bool = True
 
+    # Log output of the API and the worker: one JSON object per line (with trace_id/span_id) or plain text.
+    # Unset = json in staging/production, text otherwise.
+    LOG_FORMAT: Literal["json", "text"] | None = None
+
+    @field_validator("LOG_FORMAT", mode="before")
+    @classmethod
+    def _normalize_log_format(cls, value: Any) -> Any:
+        return value.strip().lower() if isinstance(value, str) else value
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def log_format(self) -> Literal["json", "text"]:
+        if self.LOG_FORMAT is not None:
+            return self.LOG_FORMAT
+        return "json" if self.ENVIRONMENT in ("staging", "production") else "text"
+
     # Admin access: members of this Authentik group (JWT `groups` claim), or the listed verified emails.
     ADMIN_GROUP: str = "firebim-admins"
     ADMIN_EMAILS: str = ""
