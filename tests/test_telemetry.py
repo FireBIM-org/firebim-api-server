@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import logging
@@ -15,6 +16,7 @@ from celery.signals import task_failure, task_postrun, task_prerun
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from opentelemetry import trace
+from opentelemetry.instrumentation.utils import is_instrumentation_enabled
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace import TracerProvider
@@ -26,7 +28,7 @@ from sqlmodel import Session
 from app.core import metrics, telemetry
 from app.core.config import settings
 from app.core.log_config import CORE_FIELDS, JsonLogFormatter, configure_logging
-from app.core.observability import LOG_FIELDS_ATTR, log_event
+from app.core.observability import LOG_FIELDS_ATTR, log_event, request_id_from_header
 from app.models.models import UserActivity
 from app.storage import quota
 
@@ -169,6 +171,66 @@ def test_request_produces_a_server_span_with_the_request_id(tracing, metric_read
     assert any(name.startswith("http.server") for name in _points(reader))
 
 
+def test_request_id_from_header_keeps_plain_ids_only():
+    uuid_id = "3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b"
+    assert request_id_from_header(uuid_id) == uuid_id
+    assert request_id_from_header("req-123.a:b_c") == "req-123.a:b_c"
+    assert request_id_from_header("x" * 128) == "x" * 128
+    for bad in (None, "", "x" * 129, "has space", "new\nline", '{"json":1}', "café"):
+        replaced = request_id_from_header(bad)
+        assert replaced != bad
+        assert len(replaced) == 36  # a fresh UUID
+
+
+def test_oversized_or_unsafe_request_ids_are_replaced(tracing):
+    from app.main import request_observability_middleware
+
+    tracer_provider, exporter = tracing
+    app = FastAPI()
+    app.middleware("http")(request_observability_middleware)
+
+    @app.get("/items")
+    def items():
+        return []
+
+    telemetry.instrument_fastapi_app(app, tracer_provider=tracer_provider)
+    with TestClient(app) as client:
+        oversized = client.get("/items", headers={"X-Request-ID": "a" * 4096}).headers["X-Request-ID"]
+        unsafe = client.get("/items", headers={"X-Request-ID": "id with <spaces>"}).headers["X-Request-ID"]
+
+    assert oversized != "a" * 4096 and len(oversized) == 36
+    assert unsafe != "id with <spaces>" and len(unsafe) == 36
+    recorded = [span.attributes[telemetry.REQUEST_ID_ATTRIBUTE] for span in exporter.get_finished_spans()]
+    assert recorded == [oversized, unsafe]
+
+
+def test_excluded_urls_run_with_instrumentation_suppressed(tracing):
+    """Database/S3 calls made while serving a probe must not become orphan root spans."""
+    tracer_provider, exporter = tracing
+    app = FastAPI()
+    seen: dict[str, bool] = {}
+
+    @app.get("/readyz")
+    async def readyz():
+        seen["readyz"] = is_instrumentation_enabled()
+        # The health checks hand their work to threads; the suppression must follow.
+        seen["readyz_thread"] = await asyncio.to_thread(is_instrumentation_enabled)
+        return {"status": "ok"}
+
+    @app.get("/items")
+    async def items():
+        seen["items"] = is_instrumentation_enabled()
+        return []
+
+    telemetry.instrument_fastapi_app(app, tracer_provider=tracer_provider)
+    with TestClient(app) as client:
+        assert client.get("/readyz?verbose=1").status_code == 200
+        assert client.get("/items").status_code == 200
+
+    assert seen == {"readyz": False, "readyz_thread": False, "items": True}
+    assert [span.name for span in exporter.get_finished_spans()] == ["GET /items"]
+
+
 def test_request_id_attribute_is_skipped_without_a_recording_span():
     telemetry.set_request_id_attribute("req-1")  # no active span: nothing happens, nothing raises
 
@@ -282,6 +344,20 @@ def test_gauge_cache_keeps_the_last_snapshot_when_the_database_fails():
     assert empty.get() is None
 
 
+def test_gauge_queries_run_with_instrumentation_suppressed(metric_reader):
+    provider, reader = metric_reader
+    seen = []
+
+    def loader():
+        seen.append(is_instrumentation_enabled())
+        return metrics.UsageSnapshot(used_bytes=1, object_count=1, limit_bytes=10)
+
+    metrics.register_usage_gauges(provider, loader=loader)
+    _points(reader)
+    assert seen == [False]
+    assert is_instrumentation_enabled()  # restored afterwards
+
+
 def test_gauges_report_nothing_while_the_database_is_unavailable(metric_reader):
     provider, reader = metric_reader
 
@@ -381,6 +457,19 @@ def test_log_format_defaults_to_json_in_deployed_environments():
 _ENABLED_SCRIPT = textwrap.dedent(
     """
     import json
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.pool import StaticPool
+    from sqlmodel import SQLModel
+    import app.models.database as database
+    import app.models.models  # noqa: F401  (registers the tables)
+
+    # An in-memory database for the probes and the usage gauges (instrumented by init_telemetry).
+    engine = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    SQLModel.metadata.create_all(engine)
+    database.engine = engine
+    import app.api.health as health
+    health.engine = engine
+
     from opentelemetry.sdk.metrics.export import InMemoryMetricReader
     from opentelemetry.sdk.trace.export import SimpleSpanProcessor
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -415,9 +504,23 @@ _ENABLED_SCRIPT = textwrap.dedent(
         queue_trace_id = format(span.get_span_context().trace_id, "032x")
     still_current = trace.get_current_span().is_recording()
 
+    server = [s for s in exporter.get_finished_spans() if s.kind.name == "SERVER"]
+
+    # Probes and gauge collections create no spans at all, although their database and S3 calls are instrumented.
+    from botocore.stub import Stubber
+    from app.core.s3 import BUCKET_NAME, s3_client
+    exporter.clear()
+    with Stubber(s3_client) as stub:
+        stub.add_response("head_bucket", {}, {"Bucket": BUCKET_NAME})
+        ready_status = client.get("/readyz").status_code
+    probe_spans = [s.name for s in exporter.get_finished_spans()]
     names = sorted({m.name for rm in reader.get_metrics_data().resource_metrics
                     for sm in rm.scope_metrics for m in sm.metrics})
-    server = [s for s in exporter.get_finished_spans() if s.kind.name == "SERVER"]
+    gauge_spans = [s.name for s in exporter.get_finished_spans()]
+    with trace.get_tracer("e2e").start_as_current_span("control"):
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    control_spans = [s.name for s in exporter.get_finished_spans() if s.name != "control"]
     print(json.dumps({
         "spans": [s.name for s in server],
         "request_id": server[0].attributes.get("firebim.request_id") if server else None,
@@ -431,6 +534,10 @@ _ENABLED_SCRIPT = textwrap.dedent(
         "metrics": names,
         "traceparent_matches": (published.get("traceparent") or "").split("-")[1:2] == [queue_trace_id],
         "context_leaked": still_current,
+        "ready_status": ready_status,
+        "probe_spans": probe_spans,
+        "gauge_spans": gauge_spans,
+        "control_spans": control_spans,
     }))
     """
 )
@@ -460,4 +567,9 @@ def test_enabled_telemetry_instruments_the_api_end_to_end():
     assert report["instrumented"] == [True, True, True, True]
     assert "http.server.request.duration" in report["metrics"]
     assert report["traceparent_matches"] is True
-    assert report["context_leaked"] is False  # stable semconv -> http_server_request_duration_seconds
+    assert report["context_leaked"] is False
+    assert "firebim.storage.used" in report["metrics"]
+    assert report["ready_status"] == 200
+    assert report["probe_spans"] == []  # no server span and no orphan connect/SELECT/S3.HeadBucket spans
+    assert report["gauge_spans"] == []  # the gauge queries run on the reader thread with instrumentation suppressed
+    assert report["control_spans"]  # ... while the same engine is traced in a request

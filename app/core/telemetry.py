@@ -4,7 +4,9 @@
 ``true``), so tests and local runs stay quiet. When enabled it installs a TracerProvider (batched OTLP/HTTP span export)
 and a MeterProvider (OTLP/HTTP metric export every 30 s) as the global providers, and instruments SQLAlchemy, botocore,
 httpx, requests and Celery (producer spans in the API, task spans in the worker; the trace context travels in the task
-headers). The standard ``OTEL_*`` variables (sampler, resource attributes, service name, exporter headers) apply.
+headers). Requests to the probe paths and the usage-gauge queries run with instrumentation suppressed, so they create
+no spans at all (not even orphan database/S3 spans). The standard ``OTEL_*`` variables (sampler, resource attributes,
+service name, exporter headers) apply.
 
 The worker must call it in each pool process (``worker_process_init``), never before the fork: exporter threads do
 not survive a fork. See app/workers/observability.py.
@@ -19,11 +21,14 @@ import threading
 from fastapi import FastAPI
 from opentelemetry import metrics as otel_metrics
 from opentelemetry import trace
+from opentelemetry.instrumentation.utils import suppress_instrumentation
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import MetricReader, PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, OTELResourceDetector, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SpanProcessor
+from opentelemetry.util.http import parse_excluded_urls
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.core.config import settings
 
@@ -33,7 +38,8 @@ API_SERVICE_NAME = "firebim-api"
 WORKER_SERVICE_NAME = "firebim-worker"
 
 METRIC_EXPORT_INTERVAL_MS = 30_000
-# Probe and scrape paths are never traced (regexes matched against the URL without its query string).
+# Probe and scrape paths are never traced, nor is anything they call (regexes matched against the URL without its query
+# string).
 EXCLUDED_URLS = ("/livez$", "/readyz$", "/health$", "/metrics$")
 # Span attribute carrying the request's X-Request-ID (set by the request middleware in app/main.py).
 REQUEST_ID_ATTRIBUTE = "firebim.request_id"
@@ -96,7 +102,6 @@ def _instrument_libraries(tracer_provider: TracerProvider, meter_provider: Meter
     from opentelemetry.instrumentation.botocore import BotocoreInstrumentor
     from opentelemetry.instrumentation.celery import CeleryInstrumentor
     from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-    from opentelemetry.instrumentation.logging import LoggingInstrumentor
     from opentelemetry.instrumentation.requests import RequestsInstrumentor
     from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
@@ -108,8 +113,7 @@ def _instrument_libraries(tracer_provider: TracerProvider, meter_provider: Meter
     HTTPXClientInstrumentor().instrument(**providers)
     RequestsInstrumentor().instrument(**providers)
     CeleryInstrumentor().instrument(**providers)
-    # Adds otelTraceID/otelSpanID to every LogRecord; the log format itself stays ours (app/core/log_config.py).
-    LoggingInstrumentor().instrument(tracer_provider=tracer_provider, set_logging_format=False)
+    # No logging instrumentation: the JSON formatter (app/core/log_config.py) reads the trace ids of the active span.
 
 
 def init_telemetry(service_name: str) -> bool:
@@ -147,23 +151,50 @@ def excluded_urls() -> str:
     return ",".join([*EXCLUDED_URLS, *(url.strip() for url in extra.split(",") if url.strip())])
 
 
+class SuppressExcludedUrlsMiddleware:
+    """Runs requests to the excluded URLs with instrumentation suppressed.
+
+    Excluding a URL only drops its server span; the database, S3 and HTTP calls made while serving it would still be
+    traced, each as a root span of its own trace. The URL is matched exactly like the OTel ASGI middleware does.
+    ``asyncio.to_thread`` copies the context, so the suppression also covers work handed to threads."""
+
+    def __init__(self, app: ASGIApp, excluded_urls: str) -> None:
+        self.app = app
+        self.excluded_urls = parse_excluded_urls(excluded_urls)
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        from opentelemetry.instrumentation.asgi import get_host_port_url_tuple
+
+        if scope["type"] in ("http", "websocket"):
+            _, _, url = get_host_port_url_tuple(scope)
+            if self.excluded_urls.url_disabled(url):
+                with suppress_instrumentation():
+                    await self.app(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
 def instrument_fastapi_app(
     app: FastAPI,
     *,
     tracer_provider: TracerProvider | None = None,
     meter_provider: MeterProvider | None = None,
 ) -> None:
-    """Server spans and HTTP server metrics for ``app``. Call before the app serves its first request (the middleware
-    stack is built then). Idempotent per app."""
+    """Server spans and HTTP server metrics for ``app``, and no spans at all for the excluded URLs. Call before the app
+    serves its first request (the middleware stack is built then). Idempotent per app."""
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
     if getattr(app, "_is_instrumented_by_opentelemetry", False):
         return
+    urls = excluded_urls()
+    # Added before the app's own middleware, so it wraps the routes; the middleware in front of it makes no traced
+    # calls on the probe paths (the rate limiter exempts them).
+    app.add_middleware(SuppressExcludedUrlsMiddleware, excluded_urls=urls)
     FastAPIInstrumentor.instrument_app(
         app,
         tracer_provider=tracer_provider,
         meter_provider=meter_provider,
-        excluded_urls=excluded_urls(),
+        excluded_urls=urls,
         # The per-message ASGI send/receive spans only add noise.
         exclude_spans=["receive", "send"],
     )
@@ -195,6 +226,7 @@ __all__ = [
     "API_SERVICE_NAME",
     "EXCLUDED_URLS",
     "REQUEST_ID_ATTRIBUTE",
+    "SuppressExcludedUrlsMiddleware",
     "WORKER_SERVICE_NAME",
     "build_providers",
     "build_resource",

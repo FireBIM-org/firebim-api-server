@@ -21,16 +21,11 @@ from app.core.observability import LOG_FIELDS_ATTR, get_request_id
 # Keys every JSON line has; extra fields never overwrite them.
 CORE_FIELDS = ("timestamp", "level", "logger", "message", "trace_id", "span_id", "service")
 
-# Attributes of a plain LogRecord, plus the ones added by Python, the OTel logging instrumentation, uvicorn and
-# log_event().
+# Attributes of a plain LogRecord, plus the ones added by Python, uvicorn and log_event().
 _RECORD_ATTRS = frozenset(vars(logging.LogRecord("", logging.INFO, "", 0, "", (), None))) | {
     "message",
     "asctime",
     "taskName",
-    "otelTraceID",
-    "otelSpanID",
-    "otelTraceSampled",
-    "otelServiceName",
     "color_message",  # uvicorn: the message again, with ANSI colours
     LOG_FIELDS_ATTR,
 }
@@ -39,12 +34,8 @@ _RECORD_ATTRS = frozenset(vars(logging.LogRecord("", logging.INFO, "", 0, "", ()
 _UVICORN_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access")
 
 
-def _trace_ids(record: logging.LogRecord) -> tuple[str | None, str | None]:
-    """Trace/span id of the record: set by the OTel logging instrumentation, else the span active while logging."""
-    trace_id = getattr(record, "otelTraceID", None)
-    span_id = getattr(record, "otelSpanID", None)
-    if trace_id and trace_id != "0" and span_id and span_id != "0":
-        return trace_id, span_id
+def _trace_ids() -> tuple[str | None, str | None]:
+    """Trace/span id of the span active while logging (formatting runs synchronously in the logging call)."""
     context = trace.get_current_span().get_span_context()
     if not context.is_valid:
         return None, None
@@ -59,7 +50,7 @@ class JsonLogFormatter(logging.Formatter):
         self.service = service
 
     def format(self, record: logging.LogRecord) -> str:
-        trace_id, span_id = _trace_ids(record)
+        trace_id, span_id = _trace_ids()
         payload: dict[str, Any] = {
             "timestamp": datetime.fromtimestamp(record.created, UTC).isoformat(timespec="milliseconds"),
             "level": record.levelname,

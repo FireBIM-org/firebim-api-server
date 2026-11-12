@@ -218,10 +218,12 @@ before ever running `alembic upgrade` there.
 
 The API (`firebim-api`) and the Celery worker (`firebim-worker`) export OpenTelemetry traces and metrics over
 OTLP/HTTP (`app/core/telemetry.py`). Telemetry is off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set, so tests and local
-runs export nothing. When it is on, FastAPI requests (except `/livez`, `/readyz`, `/health` and `/metrics`),
-SQLAlchemy, botocore (S3), httpx, requests and Celery are traced. A task's trace continues the request that queued it,
-and server spans carry the request's `X-Request-ID` as `firebim.request_id`. The worker starts telemetry in each pool
-process (`worker_process_init`).
+runs export nothing. When it is on, FastAPI requests, SQLAlchemy, botocore (S3), httpx, requests and Celery are
+traced. Requests to `/livez`, `/readyz`, `/health` and `/metrics` (and to `OTEL_PYTHON_FASTAPI_EXCLUDED_URLS`) create
+no spans at all, not even for the database and S3 calls they make, and neither do the usage-gauge queries. A task's
+trace continues the request that queued it, and server spans carry the request's `X-Request-ID` as
+`firebim.request_id`. An incoming `X-Request-ID` is kept only if it is 1-128 characters from `A-Z a-z 0-9 . _ : -`;
+otherwise the API generates a UUID. The worker starts telemetry in each pool process (`worker_process_init`).
 
 | Variable | Example / default | Effect |
 | --- | --- | --- |

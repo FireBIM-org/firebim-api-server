@@ -1,6 +1,5 @@
 import logging
 import time
-import uuid
 from contextlib import asynccontextmanager
 
 from botocore.exceptions import ClientError
@@ -27,7 +26,13 @@ from app.core.config import settings
 from app.core.errors import install_error_handlers
 from app.core.log_config import configure_logging
 from app.core.metrics import register_usage_gauges
-from app.core.observability import log_event, reset_request_context, set_request_context, snapshot_metrics
+from app.core.observability import (
+    log_event,
+    request_id_from_header,
+    reset_request_context,
+    set_request_context,
+    snapshot_metrics,
+)
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.s3 import BUCKET_NAME, s3_client
 from app.core.security_headers import SecurityHeadersMiddleware
@@ -159,7 +164,7 @@ app.add_middleware(
 
 @app.middleware("http")
 async def request_observability_middleware(request: Request, call_next):
-    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+    request_id = request_id_from_header(request.headers.get("x-request-id"))
     profiling_enabled = request.headers.get("x-firebim-profile") == "1" or request.url.path.startswith(
         "/lexicon/profiles"
     )

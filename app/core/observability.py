@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+import uuid
 from contextvars import ContextVar
 from time import monotonic
 from typing import Any
@@ -14,6 +16,17 @@ pending_db_checkout_var: ContextVar[tuple[str, float] | None] = ContextVar("pend
 
 # LogRecord attribute carrying log_event() fields; the JSON log formatter lifts them to top-level keys.
 LOG_FIELDS_ATTR = "firebim_fields"
+
+# An incoming X-Request-ID is kept only when it is short and plain (UUIDs and similar ids); it ends up in spans, log
+# lines and the response header, so anything else is replaced by a fresh UUID.
+_REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}")
+
+
+def request_id_from_header(value: str | None) -> str:
+    """The client's request id when it is safe to propagate, else a new UUID."""
+    if value and _REQUEST_ID_PATTERN.fullmatch(value):
+        return value
+    return str(uuid.uuid4())
 
 
 def set_request_context(*, request_id: str, endpoint: str, method: str, profiling_enabled: bool) -> dict[str, Any]:

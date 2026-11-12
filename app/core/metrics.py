@@ -9,7 +9,8 @@ raise; without a configured MeterProvider (tests, local) the instruments are the
 - Observable gauges registered by the API only (``register_usage_gauges``): ``firebim.storage.used``/``limit``/
   ``objects``, ``firebim.storage.prefix.used{prefix}`` and ``firebim.users{state=total|active_7d}``. Their callbacks
   read the accounting tables through a snapshot cached for ``USAGE_CACHE_SECONDS``, so every replica reports the
-  current database values and an export never queries the database more than once a minute.
+  current database values and an export never queries the database more than once a minute. The queries run with
+  instrumentation suppressed: the metric reader's thread has no request span, so each would be a trace of its own.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from time import monotonic
 from typing import Any
 
 from opentelemetry import metrics as otel_metrics
+from opentelemetry.instrumentation.utils import suppress_instrumentation
 from opentelemetry.metrics import CallbackOptions, Meter, MeterProvider, Observation
 
 logger = logging.getLogger(__name__)
@@ -146,7 +148,8 @@ class UsageSnapshotCache:
             if self._loaded_at is None or now - self._loaded_at >= self._ttl:
                 self._loaded_at = now
                 try:
-                    self._snapshot = self._loader()
+                    with suppress_instrumentation():
+                        self._snapshot = self._loader()
                 except Exception as exc:
                     # Keep reporting the last good values; try again after the TTL.
                     logger.warning("Could not read storage usage for metrics: %s", exc)

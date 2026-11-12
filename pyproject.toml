@@ -32,7 +32,6 @@ dependencies = [
     "opentelemetry-instrumentation-celery==0.66b1",
     "opentelemetry-instrumentation-httpx==0.66b1",
     "opentelemetry-instrumentation-requests==0.66b1",
-    "opentelemetry-instrumentation-logging==0.66b1",
 ]
 
 
