@@ -13,6 +13,7 @@ from app.core.s3 import BUCKET_NAME, s3_client
 from app.models.database import engine, get_db
 from app.models.models import IfcModel
 from app.storage.quota import account_write
+from app.workers import observability  # noqa: F401  (Celery signal handlers: telemetry, JSON logs, task metrics)
 from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)

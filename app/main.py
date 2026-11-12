@@ -25,10 +25,19 @@ from app.auth.token_identity import verify_token_subject
 from app.core.body_limit import BodySizeLimitMiddleware
 from app.core.config import settings
 from app.core.errors import install_error_handlers
+from app.core.log_config import configure_logging
+from app.core.metrics import register_usage_gauges
 from app.core.observability import log_event, reset_request_context, set_request_context, snapshot_metrics
 from app.core.rate_limit import RateLimitMiddleware
 from app.core.s3 import BUCKET_NAME, s3_client
 from app.core.security_headers import SecurityHeadersMiddleware
+from app.core.telemetry import (
+    API_SERVICE_NAME,
+    init_telemetry,
+    instrument_fastapi_app,
+    service_name_for,
+    set_request_id_attribute,
+)
 from app.models.database import init_db
 from app.storage.demo_content_bootstrap import bootstrap_default_demo_content
 from app.storage.ontology_bootstrap import bootstrap_default_ontologies
@@ -36,7 +45,7 @@ from app.storage.ontology_repository import OntologyRepository
 from app.storage.reconcile import start_startup_reconcile
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+configure_logging(service_name_for(API_SERVICE_NAME))
 ontologies_repo = OntologyRepository()
 
 
@@ -85,6 +94,11 @@ def api_docs_urls(enabled: bool) -> dict[str, str | None]:
 
 app = FastAPI(title="FireBIM API", lifespan=lifespan, **api_docs_urls(settings.ENABLE_API_DOCS))
 install_error_handlers(app)
+
+# No-op unless OTEL_EXPORTER_OTLP_ENDPOINT is set. Must run before the app serves (the middleware stack is built then).
+if init_telemetry(API_SERVICE_NAME):
+    instrument_fastapi_app(app)
+    register_usage_gauges()
 
 app.include_router(auth_router)
 app.include_router(build_info_router)
@@ -156,6 +170,7 @@ async def request_observability_middleware(request: Request, call_next):
         profiling_enabled=profiling_enabled,
     )
     request.state.request_id = request_id
+    set_request_id_attribute(request_id)
     request.state.request_started_at = time.monotonic()
     request.state.handler_completed_at = None
 

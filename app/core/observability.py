@@ -12,6 +12,9 @@ request_profiling_var: ContextVar[bool] = ContextVar("request_profiling", defaul
 request_metrics_var: ContextVar[dict[str, Any] | None] = ContextVar("request_metrics", default=None)
 pending_db_checkout_var: ContextVar[tuple[str, float] | None] = ContextVar("pending_db_checkout", default=None)
 
+# LogRecord attribute carrying log_event() fields; the JSON log formatter lifts them to top-level keys.
+LOG_FIELDS_ATTR = "firebim_fields"
+
 
 def set_request_context(*, request_id: str, endpoint: str, method: str, profiling_enabled: bool) -> dict[str, Any]:
     tokens = {
@@ -96,4 +99,4 @@ def log_event(logger, event: str, **fields: Any) -> None:
         "method": get_request_method(),
         **fields,
     }
-    logger.info(json.dumps(payload, ensure_ascii=True, default=str, sort_keys=True))
+    logger.info(json.dumps(payload, ensure_ascii=True, default=str, sort_keys=True), extra={LOG_FIELDS_ATTR: payload})
