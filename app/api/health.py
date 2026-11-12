@@ -87,7 +87,7 @@ async def _authentik_check() -> tuple[str, str, bool]:
 
 async def dependency_checks() -> list[tuple[str, str, bool]]:
     """``(name, status, ok)`` for the database, S3, Celery and Authentik, run concurrently and each bounded by
-    ``CHECK_TIMEOUT_SECONDS``."""
+    ``CHECK_TIMEOUT_SECONDS`` (/health, /admin/system)."""
     return list(await asyncio.gather(_db_check(), _s3_check(), _celery_check(), _authentik_check()))
 
 

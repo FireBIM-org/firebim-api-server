@@ -67,11 +67,13 @@ class _Totals:
         self.objects += 1
 
 
-def list_bucket_objects(client, bucket: str) -> Iterator[tuple[str, int]]:
-    """Yield ``(key, size)`` for every object in the bucket, following continuation tokens."""
+def list_bucket_objects(client, bucket: str, prefix: str = "") -> Iterator[tuple[str, int]]:
+    """Yield ``(key, size)`` for every object in the bucket (under ``prefix``), following continuation tokens."""
     token: str | None = None
     while True:
         kwargs = {"Bucket": bucket, "MaxKeys": 1000}
+        if prefix:
+            kwargs["Prefix"] = prefix
         if token:
             kwargs["ContinuationToken"] = token
         response = client.list_objects_v2(**kwargs)

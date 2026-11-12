@@ -189,6 +189,7 @@ EXPENSIVE_ROUTES: tuple[tuple[str, str], ...] = (
     ("POST", r"/ontologies/conversions/[^/]+"),
     ("POST", r"/ontologies/candidates/dictionaries/[^/]+/(convert|publish)"),
     ("POST", r"/rulebuilder/workspaces/[^/]+/export-rule-elements"),
+    ("POST", r"/admin/storage/reconcile"),
 )
 _EXPENSIVE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
     (method, re.compile(f"{pattern}/?")) for method, pattern in EXPENSIVE_ROUTES

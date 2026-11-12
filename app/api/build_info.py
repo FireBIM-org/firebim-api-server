@@ -15,11 +15,15 @@ class BuildInfo(BaseModel):
     environment: str
 
 
-@router.get("/build-info", response_model=BuildInfo)
-async def build_info() -> BuildInfo:
+def current_build_info() -> BuildInfo:
     return BuildInfo(
         git_branch=os.getenv("GIT_BRANCH", "Unknown"),
         git_commit=os.getenv("GIT_COMMIT", "Unknown"),
         build_time=os.getenv("BUILD_TIME", "Unknown"),
         environment=settings.ENVIRONMENT,
     )
+
+
+@router.get("/build-info", response_model=BuildInfo)
+async def build_info() -> BuildInfo:
+    return current_build_info()
