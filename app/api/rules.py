@@ -80,6 +80,7 @@ from app.schemas.rules import (
     RuleValidateResponse,
 )
 from app.storage.graph_store import GraphStoreNotFoundError
+from app.storage.quota import StorageWriteRefused
 
 logger = logging.getLogger(__name__)
 # Every endpoint requires an authenticated user, except the probe on `public_router` (included before `router`
@@ -621,6 +622,8 @@ def publish_rule(payload: RulePublishRequest):
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except StorageWriteRefused:
+        raise  # 507/503 from the storage cap, not a transient storage error
     except Exception as exc:
         count = len(payload.rule.elements)
         error_bits = _publish_error_payload(
@@ -805,6 +808,8 @@ def publish_rule_element(payload: RuleElementPublishRequest):
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except StorageWriteRefused:
+        raise  # 507/503 from the storage cap, not a transient storage error
     except Exception as exc:
         error_bits = _publish_error_payload(
             "storage_error", "Temporary backend storage issue while publishing rule element", exc

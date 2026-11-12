@@ -19,6 +19,7 @@ from app.schemas.ontologies import (
     OntologyVersionListResponse,
     OntologyVersionMetadata,
 )
+from app.storage import quota
 from app.storage.graph_store import GraphStoreClient, GraphStoreError, GraphStoreNotFoundError
 
 ONTOLOGIES_DATASET = "ontologies"
@@ -338,12 +339,13 @@ class OntologyRepository:
         key = self._manifest_key(ontology_family, country)
         payload = json.dumps(manifest, ensure_ascii=True, indent=2, sort_keys=True).encode("utf-8")
         try:
-            self.client.client.put_object(
-                Bucket=self.client.bucket_name,
-                Key=key,
-                Body=payload,
-                ContentType="application/json",
-            )
+            with quota.account_write(self.client.client, self.client.bucket_name, key, len(payload)):
+                self.client.client.put_object(
+                    Bucket=self.client.bucket_name,
+                    Key=key,
+                    Body=payload,
+                    ContentType="application/json",
+                )
         except (BotoCoreError, ClientError) as exc:
             raise GraphStoreError(f"Ontology manifest save failed: {exc}") from exc
 

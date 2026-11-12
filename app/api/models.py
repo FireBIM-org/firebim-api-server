@@ -15,6 +15,7 @@ from app.core.uploads import (
 from app.models.database import get_db
 from app.models.models import IfcEntity, IfcModel, IfcProperty, IfcQuantity, User
 from app.schemas.models import IfcSqlDataUpload
+from app.storage.quota import delete_object_accounted
 from app.workers.celery_app import celery_app
 
 router = APIRouter(prefix="/ifc-models", tags=["ifc-models"])
@@ -37,7 +38,7 @@ async def upload_model(
 
     # Stream the spooled upload to S3 (never the whole file in memory)
     s3_key = f"models/{id}/{safe_storage_filename(filename)}"
-    await upload_file_to_s3(s3_client, bucket=BUCKET_NAME, key=s3_key, file=file)
+    await upload_file_to_s3(s3_client, bucket=BUCKET_NAME, key=s3_key, file=file, user_id=current_user.id)
 
     # Create DB entry
     model = IfcModel(id=id, filename=filename, s3_key=s3_key, user_id=current_user.id, processing_status="pending")
@@ -216,10 +217,10 @@ async def delete_model(id: str, db: Session = Depends(get_db), current_user: Use
         if cr.result_key:
             s3_keys_to_delete.append(cr.result_key)
 
-    # 3. Synchronous S3 Cleanup (Best Effort)
+    # 3. Synchronous S3 Cleanup (Best Effort), releasing the deleted bytes from the storage accounting
     for key in s3_keys_to_delete:
         try:
-            s3_client.delete_object(Bucket=BUCKET_NAME, Key=key)
+            delete_object_accounted(s3_client, BUCKET_NAME, key, user_id=model.user_id)
         except Exception as e:
             # Best effort: log and continue
             print(f"Failed to delete S3 object {key}: {e}")

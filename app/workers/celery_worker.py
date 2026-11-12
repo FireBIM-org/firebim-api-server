@@ -6,12 +6,25 @@ import uuid
 import ifcopenshell
 import ifctester
 import ifctester.reporter
-from sqlmodel import select
+from sqlmodel import Session, select
 
 from app.core.s3 import BUCKET_NAME, s3_client
-from app.models.database import get_db
+from app.models.database import engine, get_db
 from app.models.models import IfcModel
+from app.storage.quota import account_write
 from app.workers.celery_app import celery_app
+
+
+def _put_json(key: str, payload, *, user_id: str | None = None) -> None:
+    """Write a JSON result object, reserved against the storage cap (raises when the cap is reached)."""
+    body = json.dumps(payload).encode("utf-8")
+    with account_write(s3_client, BUCKET_NAME, key, len(body), user_id=user_id):
+        s3_client.put_object(Bucket=BUCKET_NAME, Key=key, Body=body)
+
+
+def _model_owner(model_id) -> str | None:
+    with Session(engine) as db:
+        return db.exec(select(IfcModel.user_id).where(IfcModel.id == model_id)).first()
 
 
 @celery_app.task(name="process_model")
@@ -37,9 +50,9 @@ def process_model(model_id, s3_key):
             else:
                 stats[element_type] = 1
 
-        # Save processing results to S3
+        # Save processing results to S3 (attributed to the model's owner)
         result_key = f"results/{model_id}/stats.json"
-        s3_client.put_object(Bucket=BUCKET_NAME, Key=result_key, Body=json.dumps(stats))
+        _put_json(result_key, stats, user_id=_model_owner(model_id))
 
         # Clean up
         os.unlink(temp_path)
@@ -86,9 +99,9 @@ def check_model_with_ids(ids_id, model_id, ids_s3_key, model_s3_key):
 
         check_result = json.loads(reporter.to_string())
 
-        # Save check results to S3
+        # Save check results to S3 (no DB row records the owner of checks/*, so they count globally)
         result_key = f"checks/{check_id}/result.json"
-        s3_client.put_object(Bucket=BUCKET_NAME, Key=result_key, Body=json.dumps(check_result))
+        _put_json(result_key, check_result)
 
         # Clean up
         os.unlink(model_path)

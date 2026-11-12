@@ -53,6 +53,7 @@ from app.schemas.checks import (
 )
 from app.storage.graph_store import GraphStoreNotFoundError
 from app.storage.ontology_repository import OntologyRepository
+from app.storage.quota import StorageWriteRefused
 
 
 class CheckInputNotFoundError(Exception):
@@ -806,6 +807,8 @@ def run_check(payload: CheckRunRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
+    except StorageWriteRefused:
+        raise  # 507/503 from the storage cap, not a transient storage error
     except Exception as exc:
         selected_solver = None
         with suppress(Exception):
@@ -849,6 +852,8 @@ def run_check_vertical(payload: CheckRunRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
+    except StorageWriteRefused:
+        raise  # 507/503 from the storage cap, not a transient storage error
     except Exception as exc:
         return _error_run_response(
             payload=payload,
@@ -887,6 +892,8 @@ def run_check_horisontal(payload: CheckRunRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
+    except StorageWriteRefused:
+        raise  # 507/503 from the storage cap, not a transient storage error
     except Exception as exc:
         return _error_run_response(
             payload=payload,
@@ -925,6 +932,8 @@ def run_check_diagnostic(payload: CheckRunRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
+    except StorageWriteRefused:
+        raise  # 507/503 from the storage cap, not a transient storage error
     except Exception as exc:
         selected_solver = None
         with suppress(Exception):

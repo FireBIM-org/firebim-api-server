@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from app.core.config import settings
 from app.core.s3 import create_s3_client
 from app.models.models import User
+from app.storage import quota
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
@@ -43,8 +44,12 @@ class UserScopedS3JsonStore:
         )
 
     @staticmethod
-    def _user_prefix(user: User | SimpleNamespace) -> str:
-        return quote(str(user.id).strip(), safe="")
+    def _user_id(user: User | SimpleNamespace) -> str:
+        return str(user.id).strip()
+
+    @classmethod
+    def _user_prefix(cls, user: User | SimpleNamespace) -> str:
+        return quote(cls._user_id(user), safe="")
 
     @staticmethod
     def _normalize_document_id(document_id: str) -> str:
@@ -115,13 +120,15 @@ class UserScopedS3JsonStore:
         content_type: str = "application/json",
     ) -> None:
         key = self.document_key(root_prefix, user, document_id)
+        body = payload.encode("utf-8")
         try:
-            self.client.put_object(
-                Bucket=self.bucket_name,
-                Key=key,
-                Body=payload.encode("utf-8"),
-                ContentType=content_type,
-            )
+            with quota.account_write(self.client, self.bucket_name, key, len(body), user_id=self._user_id(user)):
+                self.client.put_object(
+                    Bucket=self.bucket_name,
+                    Key=key,
+                    Body=body,
+                    ContentType=content_type,
+                )
         except (BotoCoreError, ClientError) as exc:
             raise S3JsonStoreError(f"{write_error_message}: {exc}") from exc
 
@@ -198,7 +205,7 @@ class UserScopedS3JsonStore:
     ) -> None:
         key = self.document_key(root_prefix, user, document_id)
         try:
-            self.client.head_object(Bucket=self.bucket_name, Key=key)
+            head = self.client.head_object(Bucket=self.bucket_name, Key=key)
             self.client.delete_object(Bucket=self.bucket_name, Key=key)
         except ClientError as exc:
             code = str(exc.response.get("Error", {}).get("Code", ""))
@@ -207,3 +214,5 @@ class UserScopedS3JsonStore:
             raise S3JsonStoreError(f"{delete_error_message}: {exc}") from exc
         except BotoCoreError as exc:
             raise S3JsonStoreError(f"{delete_error_message}: {exc}") from exc
+        size = head.get("ContentLength") if isinstance(head, dict) else None
+        quota.record_delete(key, size if isinstance(size, int) else 0, user_id=self._user_id(user))

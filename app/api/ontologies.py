@@ -56,6 +56,7 @@ from app.storage.ontology_candidate_repository import (
     OntologyCandidateRepositoryError,
 )
 from app.storage.ontology_repository import ONTOLOGIES_DATASET, OntologyRepository
+from app.storage.quota import StorageWriteRefused
 from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -157,6 +158,8 @@ def start_ontology_sync_job(
             args=[record["job_id"], request.model_dump(mode="json")],
         )
         return OntologySyncJobResponse.model_validate(record)
+    except StorageWriteRefused:
+        raise  # 507/503 from the storage cap, not a transient storage error
     except GraphStoreError as exc:
         logger.exception("Could not create ontology sync job", exc_info=exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc

@@ -35,7 +35,9 @@ async def upload_ids(
 
     # Stream the spooled upload to S3 (never the whole file in memory)
     s3_key = f"ids/{id}/{safe_storage_filename(filename)}"
-    await upload_file_to_s3(s3_client, bucket=BUCKET_NAME, key=s3_key, file=file, content_type="application/xml")
+    await upload_file_to_s3(
+        s3_client, bucket=BUCKET_NAME, key=s3_key, file=file, user_id=current_user.id, content_type="application/xml"
+    )
 
     # Create DB entry
     ids_file = IdsFile(id=id, filename=filename, s3_key=s3_key, user_id=current_user.id)

@@ -17,6 +17,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core import metrics
 from app.core.config import settings
 from app.core.errors import payload_too_large
+from app.storage import quota
 
 logger = logging.getLogger(__name__)
 
@@ -79,17 +80,31 @@ def ensure_upload_size(file: UploadFile, *, max_bytes: int | None = None) -> int
 
 
 async def upload_file_to_s3(
-    s3_client, *, bucket: str, key: str, file: UploadFile, content_type: str = "application/octet-stream"
+    s3_client,
+    *,
+    bucket: str,
+    key: str,
+    file: UploadFile,
+    user_id: str | None,
+    content_type: str = "application/octet-stream",
 ) -> None:
-    """Stream an already spooled upload to S3 (multipart for large files) without loading it into memory."""
-    file.file.seek(0)
-    await run_in_threadpool(
-        s3_client.upload_fileobj,
-        file.file,
-        bucket,
-        key,
-        ExtraArgs={"ContentType": content_type},
-    )
+    """Stream an already spooled upload to a new S3 key (multipart for large files) without loading it into memory.
+
+    The upload's exact size is reserved against the storage cap first (507 STORAGE_LIMIT_EXCEEDED /
+    USER_QUOTA_EXCEEDED, 503 when accounting is down) and released again if the upload fails."""
+    reservation = await run_in_threadpool(quota.reserve_upload, key, upload_size(file), user_id=user_id)
+    try:
+        file.file.seek(0)
+        await run_in_threadpool(
+            s3_client.upload_fileobj,
+            file.file,
+            bucket,
+            key,
+            ExtraArgs={"ContentType": content_type},
+        )
+    except BaseException:
+        await run_in_threadpool(reservation.release)
+        raise
 
 
 async def s3_download_response(
