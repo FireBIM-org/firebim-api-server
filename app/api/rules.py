@@ -1,10 +1,11 @@
 import logging
 from collections import defaultdict
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
+from app.auth.jwt import get_current_active_user
 from app.graphs_and_checks.publisher import fetch_rule_ttl
 from app.rules.composer import (
     check_ruleset_completeness,
@@ -79,9 +80,13 @@ from app.schemas.rules import (
     RuleValidateResponse,
 )
 from app.storage.graph_store import GraphStoreNotFoundError
+from app.storage.quota import StorageWriteRefused
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/rules", tags=["rules"])
+# Every endpoint requires an authenticated user, except the probe on `public_router` (included before `router`
+# so `/rules/health` is not captured by `/rules/{rule_id}`).
+router = APIRouter(prefix="/rules", tags=["rules"], dependencies=[Depends(get_current_active_user)])
+public_router = APIRouter(prefix="/rules", tags=["rules"])
 
 
 class RuleTtlResponse(BaseModel):
@@ -490,7 +495,7 @@ def _assemble_rule(payload: RuleAssembleRequest) -> tuple[dict, dict, list[str]]
     return rule, completeness, errors
 
 
-@router.get("/health")
+@public_router.get("/health")
 def rules_health():
     test_rule_element = (
         RuleElementBuilder("health_check_rule_element")
@@ -617,6 +622,8 @@ def publish_rule(payload: RulePublishRequest):
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except StorageWriteRefused:
+        raise  # 507/503 from the storage cap, not a transient storage error
     except Exception as exc:
         count = len(payload.rule.elements)
         error_bits = _publish_error_payload(
@@ -801,6 +808,8 @@ def publish_rule_element(payload: RuleElementPublishRequest):
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except StorageWriteRefused:
+        raise  # 507/503 from the storage cap, not a transient storage error
     except Exception as exc:
         error_bits = _publish_error_payload(
             "storage_error", "Temporary backend storage issue while publishing rule element", exc

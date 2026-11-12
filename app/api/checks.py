@@ -7,7 +7,7 @@ from contextlib import suppress
 from time import perf_counter
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from rdflib import Graph
 from rdflib.namespace import RDF, SH
 
@@ -16,6 +16,7 @@ try:
 except Exception:  # pragma: no cover
     BlindShaclRuleRunner = None
 
+from app.auth.jwt import get_current_active_user
 from app.checks.assertions import apply_assertions, open_questions
 from app.checks.compiler import RuleCompiler
 from app.checks.derived import default_derived_graph_uri
@@ -52,6 +53,7 @@ from app.schemas.checks import (
 )
 from app.storage.graph_store import GraphStoreNotFoundError
 from app.storage.ontology_repository import OntologyRepository
+from app.storage.quota import StorageWriteRefused
 
 
 class CheckInputNotFoundError(Exception):
@@ -63,7 +65,9 @@ class CheckInputNotFoundError(Exception):
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/checks", tags=["checks"])
+# Every endpoint requires an authenticated user, except the probe on `public_router`.
+router = APIRouter(prefix="/checks", tags=["checks"], dependencies=[Depends(get_current_active_user)])
+public_router = APIRouter(prefix="/checks", tags=["checks"])
 
 
 def _error_payload(error_code: str, message: str, exc: Exception) -> dict:
@@ -350,7 +354,7 @@ def _build_compatibility_response(
     )
 
 
-@router.get("/health")
+@public_router.get("/health")
 def checks_health():
     selector = CheckSolverSelector(default_mode=settings.CHECKS_SOLVER)
     return {
@@ -803,6 +807,8 @@ def run_check(payload: CheckRunRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
+    except StorageWriteRefused:
+        raise  # 507/503 from the storage cap, not a transient storage error
     except Exception as exc:
         selected_solver = None
         with suppress(Exception):
@@ -846,6 +852,8 @@ def run_check_vertical(payload: CheckRunRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
+    except StorageWriteRefused:
+        raise  # 507/503 from the storage cap, not a transient storage error
     except Exception as exc:
         return _error_run_response(
             payload=payload,
@@ -884,6 +892,8 @@ def run_check_horisontal(payload: CheckRunRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
+    except StorageWriteRefused:
+        raise  # 507/503 from the storage cap, not a transient storage error
     except Exception as exc:
         return _error_run_response(
             payload=payload,
@@ -922,6 +932,8 @@ def run_check_diagnostic(payload: CheckRunRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except NotImplementedError as exc:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
+    except StorageWriteRefused:
+        raise  # 507/503 from the storage cap, not a transient storage error
     except Exception as exc:
         selected_solver = None
         with suppress(Exception):

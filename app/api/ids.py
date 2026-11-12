@@ -1,11 +1,17 @@
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 
 from app.auth.jwt import get_current_active_user
 from app.core.s3 import BUCKET_NAME, s3_client
+from app.core.uploads import (
+    display_filename,
+    ensure_upload_size,
+    s3_download_response,
+    safe_storage_filename,
+    upload_file_to_s3,
+)
 from app.models.database import get_db
 from app.models.models import IdsFile, User
 
@@ -19,21 +25,22 @@ async def upload_ids(
     """
     Upload an IDS file (XML-based) and save to S3.
     """
-    if not file.filename.lower().endswith(".ids"):
+    filename = display_filename(file.filename)
+    if not filename.lower().endswith(".ids"):
         raise HTTPException(status_code=400, detail="File must be an .ids (XML) file")
+    ensure_upload_size(file)
 
     # Generate a unique ID for the IDS file
     id = str(uuid.uuid4())
 
-    # Read the file content
-    content = await file.read()
-
-    # Upload to S3
-    s3_key = f"ids/{id}/{file.filename}"
-    s3_client.put_object(Bucket=BUCKET_NAME, Key=s3_key, Body=content)
+    # Stream the spooled upload to S3 (never the whole file in memory)
+    s3_key = f"ids/{id}/{safe_storage_filename(filename)}"
+    await upload_file_to_s3(
+        s3_client, bucket=BUCKET_NAME, key=s3_key, file=file, user_id=current_user.id, content_type="application/xml"
+    )
 
     # Create DB entry
-    ids_file = IdsFile(id=id, filename=file.filename, s3_key=s3_key, user_id=current_user.id)
+    ids_file = IdsFile(id=id, filename=filename, s3_key=s3_key, user_id=current_user.id)
     db.add(ids_file)
     db.commit()
     db.refresh(ids_file)
@@ -96,8 +103,7 @@ async def download_ids(id: str, db: Session = Depends(get_db), current_user: Use
     if ids_file.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to access this IDS file")
 
-    # Download from S3
-    local_path = f"/tmp/{ids_file.filename}"
-    s3_client.download_file(Bucket=BUCKET_NAME, Key=ids_file.s3_key, Filename=local_path)
-
-    return FileResponse(path=local_path, filename=ids_file.filename, media_type="application/xml")
+    # Stream from S3
+    return await s3_download_response(
+        s3_client, bucket=BUCKET_NAME, key=ids_file.s3_key, filename=ids_file.filename, media_type="application/xml"
+    )

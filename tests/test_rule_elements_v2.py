@@ -451,9 +451,12 @@ def api_client(monkeypatch):
     monkeypatch.setattr(
         checks_api, "publish_building_graph_ttl", lambda ttl_text, graph_uri: published.__setitem__(graph_uri, ttl_text)
     )
+    from app.auth.jwt import get_current_active_user
+
     app = FastAPI()
     app.include_router(rules_api.router)
     app.include_router(checks_api.router)
+    app.dependency_overrides[get_current_active_user] = lambda: object()
     client = TestClient(app)
     client.published = published  # type: ignore[attr-defined]
     return client
@@ -1200,8 +1203,11 @@ def test_overrides_and_graph_answers_endpoint(api_client, monkeypatch):
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
+    from app.auth.jwt import get_current_active_user
+
     app = FastAPI()
     app.include_router(graphs_api.router)
+    app.dependency_overrides[get_current_active_user] = lambda: object()
     client = TestClient(app)
     res = client.post("/graphs/lt/answers", json={"assertions": overrides[:1]})
     assert res.status_code == 200, res.text

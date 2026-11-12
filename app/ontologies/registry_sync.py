@@ -33,6 +33,7 @@ from typing import Any
 import httpx
 
 from app.core.config import settings
+from app.core.url_guard import UnsafeUrlError, check_url, fetch_public_url
 from app.schemas.ontologies import (
     OntologyPublishRequest,
     OntologyReleaseStatus,
@@ -55,19 +56,52 @@ class OntologyRegistryError(ValueError):
     """The registry could not be fetched or is not in the expected format."""
 
 
+class OntologySourceNotAllowedError(OntologyRegistryError):
+    """A user-supplied source_url (or a URL listed in its index) points somewhere the server must not fetch."""
+
+
+_USER_AGENT = {"User-Agent": "firebim-api-server/sync"}
+
+
 def _default_fetcher(url: str) -> bytes:
+    """Fetcher for the operator-configured registry (ONTOLOGY_REGISTRY_URL), which is trusted."""
     timeout = httpx.Timeout(settings.ONTOLOGY_SYNC_TIMEOUT_SECONDS)
-    with httpx.Client(
-        timeout=timeout, follow_redirects=True, headers={"User-Agent": "firebim-api-server/sync"}
-    ) as client:
+    with httpx.Client(timeout=timeout, follow_redirects=True, headers=_USER_AGENT) as client:
         response = client.get(url)
         response.raise_for_status()
         return response.content
 
 
+def _guarded_fetcher(url: str) -> bytes:
+    """Fetcher for user-supplied registries: public http(s) hosts only, every redirect hop re-checked."""
+    return fetch_public_url(
+        url,
+        timeout=settings.ONTOLOGY_SYNC_TIMEOUT_SECONDS,
+        max_bytes=settings.ONTOLOGY_SYNC_MAX_FETCH_BYTES,
+        allowed_hosts=settings.ontology_sync_allowed_hosts,
+        headers=_USER_AGENT,
+    )
+
+
+def is_configured_registry(source_url: str | None) -> bool:
+    return not source_url or source_url == settings.ONTOLOGY_REGISTRY_URL
+
+
+def ensure_source_allowed(request: OntologySyncRequest) -> None:
+    """Cheap up-front check of a user-supplied source_url (no DNS); the fetch re-checks with DNS on every hop."""
+    if is_configured_registry(request.source_url):
+        return
+    try:
+        check_url(request.source_url or "", allowed_hosts=settings.ontology_sync_allowed_hosts)
+    except UnsafeUrlError as exc:
+        raise OntologySourceNotAllowedError(f"source_url is not allowed: {exc}") from exc
+
+
 def fetch_registry(source_url: str, fetcher: Fetcher = _default_fetcher) -> dict[str, Any]:
     try:
         raw = fetcher(source_url)
+    except UnsafeUrlError as exc:
+        raise OntologySourceNotAllowedError(f"source_url is not allowed: {exc}") from exc
     except httpx.HTTPError as exc:
         raise OntologyRegistryError(f"Could not fetch registry {source_url}: {exc}") from exc
     try:
@@ -213,6 +247,8 @@ def build_sync_plan(
 def _apply_item(repo: OntologyRepository, item: OntologySyncItem, fetcher: Fetcher) -> OntologySyncItem:
     try:
         raw = fetcher(item.ttl_url)
+    except UnsafeUrlError as exc:
+        return item.model_copy(update={"action": OntologySyncAction.failed, "error": f"download refused: {exc}"})
     except httpx.HTTPError as exc:
         return item.model_copy(update={"action": OntologySyncAction.failed, "error": f"download failed: {exc}"})
     ttl = raw.decode("utf-8")
@@ -255,9 +291,12 @@ def sync_from_registry(
     repo: OntologyRepository,
     request: OntologySyncRequest,
     *,
-    fetcher: Fetcher = _default_fetcher,
+    fetcher: Fetcher | None = None,
 ) -> OntologySyncResponse:
     source_url = request.source_url or settings.ONTOLOGY_REGISTRY_URL
+    if fetcher is None:
+        # A user-supplied registry, and every ttl_url it lists, is fetched through the SSRF guard.
+        fetcher = _default_fetcher if is_configured_registry(request.source_url) else _guarded_fetcher
     registry = fetch_registry(source_url, fetcher)
     fetched_at = datetime.now(UTC)
     plan = build_sync_plan(repo, registry, request, source_url=source_url)
@@ -288,6 +327,8 @@ def sync_from_registry(
 
 __all__ = [
     "OntologyRegistryError",
+    "OntologySourceNotAllowedError",
+    "ensure_source_allowed",
     "build_sync_plan",
     "fetch_registry",
     "sync_from_registry",

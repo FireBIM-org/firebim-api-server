@@ -17,6 +17,10 @@ os.environ["S3_REGION"] = "us-east-1"
 os.environ["CELERY_BROKER_URL"] = "redis://localhost:6379/0"
 os.environ["CELERY_RESULT_BACKEND"] = "redis://localhost:6379/0"
 os.environ["FUSEKI_HOST"] = "http://localhost:3030"
+# The app-wide limiter would be shared by every test; the middleware has its own tests on dedicated apps.
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+# Tests drive the reconcile explicitly (tests/test_storage_reconcile.py).
+os.environ["STORAGE_RECONCILE_ON_STARTUP"] = "false"
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -102,6 +106,18 @@ def client_fixture(session: Session, test_user: User, engine: Engine):
             yield client
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def storage_accounting(engine: Engine):
+    """Storage accounting (app/storage/quota.py) runs against the in-memory test database, starting from zero."""
+    from app.storage import quota
+
+    quota.set_accounting_engine(engine)
+    SQLModel.metadata.create_all(engine, tables=list(quota.ACCOUNTING_TABLES))
+    yield engine
+    quota.set_accounting_engine(None)
+    SQLModel.metadata.drop_all(engine, tables=list(quota.ACCOUNTING_TABLES))
 
 
 @pytest.fixture(autouse=True)

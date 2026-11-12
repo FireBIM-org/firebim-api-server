@@ -22,6 +22,7 @@ from fastapi.testclient import TestClient
 from app.api import checks as checks_api
 from app.api import graphs as graphs_api
 from app.api import rules as rules_api
+from app.auth.jwt import get_current_active_user
 from app.models.database import get_db
 
 
@@ -209,9 +210,13 @@ class DummyBlindRunner:
 @pytest.fixture()
 def client(monkeypatch):
     app = FastAPI()
+    app.include_router(graphs_api.public_router)
     app.include_router(graphs_api.router)
+    app.include_router(rules_api.public_router)
     app.include_router(rules_api.router)
+    app.include_router(checks_api.public_router)
     app.include_router(checks_api.router)
+    app.dependency_overrides[get_current_active_user] = lambda: SimpleNamespace(id="user-1", is_active=True)
 
     # Mock database to avoid real Postgres connection
     mock_db = MagicMock()

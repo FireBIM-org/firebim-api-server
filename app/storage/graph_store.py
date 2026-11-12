@@ -4,18 +4,24 @@ import logging
 from time import monotonic
 from urllib.parse import quote, unquote
 
-import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from rdflib import DCTERMS, RDFS, Graph, URIRef
 
 from app.core.config import settings
 from app.core.observability import is_request_profiling_enabled, log_event, record_metric
+from app.core.s3 import create_s3_client
+from app.storage import quota
 
 logger = logging.getLogger(__name__)
 
 
 class GraphStoreError(Exception):
     pass
+
+
+def _content_length(head) -> int:
+    size = head.get("ContentLength") if isinstance(head, dict) else None
+    return size if isinstance(size, int) else 0
 
 
 class GraphStoreNotFoundError(GraphStoreError):
@@ -39,12 +45,11 @@ class GraphStoreClient:
         self.bucket_name = bucket_name or settings.S3_BUCKET_NAME
         self.prefix = self.ROOT_PREFIX
         self.timeout = timeout
-        self.client = s3_client or boto3.client(
-            "s3",
-            endpoint_url=endpoint_url or settings.S3_ENDPOINT_URL,
-            aws_access_key_id=access_key_id or settings.S3_ACCESS_KEY_ID,
-            aws_secret_access_key=(secret_access_key or settings.S3_SECRET_ACCESS_KEY.get_secret_value()),
-            region_name=region_name or settings.S3_REGION,
+        self.client = s3_client or create_s3_client(
+            endpoint_url=endpoint_url,
+            access_key_id=access_key_id,
+            secret_access_key=secret_access_key,
+            region_name=region_name,
         )
 
     def _dataset_prefix(self, dataset: str) -> str:
@@ -154,18 +159,21 @@ class GraphStoreClient:
         if triple_count is None:
             triple_count = len(graph)
         key = self._object_key(dataset, graph_uri)
+        body = ttl.encode("utf-8")
         try:
-            self.client.put_object(
-                Bucket=self.bucket_name,
-                Key=key,
-                Body=ttl.encode("utf-8"),
-                ContentType="text/turtle; charset=utf-8",
-                Metadata={
-                    "graph-uri": graph_uri,
-                    "triple-count": str(triple_count),
-                    **self._self_description(graph, graph_uri),
-                },
-            )
+            # Graphs are shared, not owned by a user: they only count towards the global limit.
+            with quota.account_write(self.client, self.bucket_name, key, len(body)):
+                self.client.put_object(
+                    Bucket=self.bucket_name,
+                    Key=key,
+                    Body=body,
+                    ContentType="text/turtle; charset=utf-8",
+                    Metadata={
+                        "graph-uri": graph_uri,
+                        "triple-count": str(triple_count),
+                        **self._self_description(graph, graph_uri),
+                    },
+                )
         except (BotoCoreError, ClientError) as exc:
             raise GraphStoreError(f"Graph store publish failed: {exc}") from exc
 
@@ -199,7 +207,7 @@ class GraphStoreClient:
     def delete_graph(self, dataset: str, graph_uri: str) -> None:
         key = self._object_key(dataset, graph_uri)
         try:
-            self.client.head_object(Bucket=self.bucket_name, Key=key)
+            head = self.client.head_object(Bucket=self.bucket_name, Key=key)
         except ClientError as exc:
             if self._is_not_found(exc):
                 raise GraphStoreNotFoundError(f"Graph not found: {graph_uri}") from exc
@@ -211,6 +219,7 @@ class GraphStoreClient:
             self.client.delete_object(Bucket=self.bucket_name, Key=key)
         except (BotoCoreError, ClientError) as exc:
             raise GraphStoreError(f"Graph store delete failed: {exc}") from exc
+        quota.record_delete(key, _content_length(head))
 
     def list_named_graphs(self, dataset: str, base_uri: str) -> list[dict]:
         items: list[dict] = []

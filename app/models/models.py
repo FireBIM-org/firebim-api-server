@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Optional
 
-from sqlalchemy import JSON, ForeignKey, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, ForeignKey, UniqueConstraint
 from sqlmodel import Column, DateTime, Field, Relationship, SQLModel
 
 
@@ -117,3 +117,50 @@ class IfcQuantity(SQLModel, table=True):
     value_type: str = Field(nullable=False)
 
     entity: "IfcEntity" = Relationship(back_populates="quantities")
+
+
+# Storage accounting (app/storage/quota.py). New tables only: they are created by create_all at startup.
+
+
+class StorageUsage(SQLModel, table=True):
+    """Bucket-wide byte and object counters; a single row with ``scope='global'``."""
+
+    __tablename__ = "storage_usage"
+
+    scope: str = Field(default="global", primary_key=True)
+    used_bytes: int = Field(default=0, sa_column=Column(BigInteger, nullable=False, default=0))
+    object_count: int = Field(default=0, sa_column=Column(BigInteger, nullable=False, default=0))
+    updated_at: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True), nullable=True))
+    last_reconciled_at: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True), nullable=True))
+
+
+class StorageUsageUser(SQLModel, table=True):
+    """Bytes and objects attributed to one user (IFC/IDS uploads, worker results, user-scoped JSON, sync jobs)."""
+
+    __tablename__ = "storage_usage_user"
+
+    user_id: str = Field(primary_key=True)
+    used_bytes: int = Field(default=0, sa_column=Column(BigInteger, nullable=False, default=0))
+    object_count: int = Field(default=0, sa_column=Column(BigInteger, nullable=False, default=0))
+    updated_at: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True), nullable=True))
+
+
+class StorageUsagePrefix(SQLModel, table=True):
+    """Bytes and objects per top-level key prefix (``models``, ``graphs``, ..., ``other``)."""
+
+    __tablename__ = "storage_usage_prefix"
+
+    prefix: str = Field(primary_key=True)
+    used_bytes: int = Field(default=0, sa_column=Column(BigInteger, nullable=False, default=0))
+    object_count: int = Field(default=0, sa_column=Column(BigInteger, nullable=False, default=0))
+
+
+class UserActivity(SQLModel, table=True):
+    """When a user was last seen by the API (updated at most every few minutes per user)."""
+
+    __tablename__ = "user_activity"
+
+    user_id: str = Field(primary_key=True)
+    last_seen_at: datetime = Field(
+        sa_column=Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+    )

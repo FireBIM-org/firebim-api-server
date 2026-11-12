@@ -24,6 +24,11 @@ class FakeS3Client:
             raise ClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject")
         return {"Body": BytesIO(self.objects[Key])}
 
+    def head_object(self, *, Bucket, Key):
+        if Key not in self.objects:
+            raise ClientError({"Error": {"Code": "404"}}, "HeadObject")
+        return {"ContentLength": len(self.objects[Key])}
+
 
 def test_sync_job_store_round_trip():
     client = FakeS3Client()

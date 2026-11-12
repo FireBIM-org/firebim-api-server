@@ -9,6 +9,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from app.core.s3 import BUCKET_NAME, s3_client
 from app.schemas.ontologies import OntologySyncJobStatus, OntologySyncRequest
+from app.storage import quota
 from app.storage.graph_store import GraphStoreError
 
 JOB_PREFIX = "ontology-sync/jobs"
@@ -45,7 +46,7 @@ class OntologySyncJobStore:
             "result": None,
             "error": None,
         }
-        self._save(record)
+        self._save(record, new=True)
         return record
 
     def get(self, job_id: str) -> dict[str, Any]:
@@ -66,15 +67,19 @@ class OntologySyncJobStore:
         self._save(record)
         return record
 
-    def _save(self, record: dict[str, Any]) -> None:
+    def _save(self, record: dict[str, Any], *, new: bool = False) -> None:
         payload = json.dumps(record, ensure_ascii=True, sort_keys=True).encode("utf-8")
+        key = self._key(str(record["job_id"]))
         try:
-            self.client.put_object(
-                Bucket=self.bucket_name,
-                Key=self._key(str(record["job_id"])),
-                Body=payload,
-                ContentType="application/json",
-            )
+            with quota.account_write(
+                self.client, self.bucket_name, key, len(payload), user_id=record.get("owner_id"), new_object=new
+            ):
+                self.client.put_object(
+                    Bucket=self.bucket_name,
+                    Key=key,
+                    Body=payload,
+                    ContentType="application/json",
+                )
         except (BotoCoreError, ClientError) as exc:
             raise GraphStoreError(f"Ontology sync job save failed: {exc}") from exc
 
