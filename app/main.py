@@ -32,6 +32,7 @@ from app.models.database import init_db
 from app.storage.demo_content_bootstrap import bootstrap_default_demo_content
 from app.storage.ontology_bootstrap import bootstrap_default_ontologies
 from app.storage.ontology_repository import OntologyRepository
+from app.storage.reconcile import start_startup_reconcile
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -57,6 +58,10 @@ async def lifespan(app: FastAPI):
                 ) from exc
         else:
             raise
+
+    if settings.STORAGE_RECONCILE_ON_STARTUP:
+        # Best effort and non-blocking; a pg advisory lock keeps replicas from listing the bucket twice.
+        start_startup_reconcile()
 
     if settings.ENVIRONMENT == "local":
         seeded_ontologies = bootstrap_default_ontologies(ontologies_repo)

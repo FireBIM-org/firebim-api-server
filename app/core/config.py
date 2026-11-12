@@ -175,6 +175,9 @@ class Settings(BaseSettings):
     STORAGE_HARD_LIMIT_BYTES: int = Field(default=1_000_000_000_000, ge=0)
     STORAGE_USER_QUOTA_BYTES: int = Field(default=0, ge=0)
     STORAGE_WARN_RATIO: float = Field(default=0.8, ge=0, le=1)
+    # Recompute the storage counters from a bucket listing in the background at startup, once, if they have never
+    # been reconciled (``python -m app.storage.reconcile`` does the same on demand).
+    STORAGE_RECONCILE_ON_STARTUP: bool = True
 
     # Request body limits (413 when exceeded). MAX_UPLOAD_BYTES applies to multipart file uploads,
     # MAX_JSON_BODY_BYTES to every other request body.

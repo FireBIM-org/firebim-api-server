@@ -165,12 +165,33 @@ samples the IFC models of the current user. `GET /livez`, `/readyz`, `/health` a
 | `ONTOLOGY_SYNC_ALLOWED_HOSTS` | empty | Optional host allowlist for user-supplied sync sources |
 | `CHECK_CACHE_MAX_ENTRIES` | `32` | Graphs kept in the in-process check execution cache (LRU) |
 | `CELERY_TASK_TIME_LIMIT` / `CELERY_TASK_SOFT_TIME_LIMIT` | `3600` / `3300` | Worker task time limits in seconds |
-| `STORAGE_HARD_LIMIT_BYTES`, `STORAGE_USER_QUOTA_BYTES`, `STORAGE_WARN_RATIO` | `1 TB`, `0`, `0.8` | Bucket storage caps |
+| `STORAGE_HARD_LIMIT_BYTES`, `STORAGE_USER_QUOTA_BYTES`, `STORAGE_WARN_RATIO` | `1 TB`, `0`, `0.8` | Bucket storage caps (see below) |
+| `STORAGE_RECONCILE_ON_STARTUP` | `true` | Reconcile the storage counters once at startup if they never were |
 | `ADMIN_GROUP`, `ADMIN_EMAILS` | `firebim-admins`, empty | Who counts as an admin |
 
 Rate-limited responses are 429 `{"detail": ..., "code": "RATE_LIMITED"}` with `Retry-After`,
 `X-RateLimit-Limit` and `X-RateLimit-Remaining`. Unexpected errors return a generic
 500 `{"detail": "Internal server error", "request_id": ...}`; the exception is logged with the same request id.
+
+### Storage cap and usage accounting
+
+Every write to the bucket (IFC/IDS uploads, graphs, user-scoped JSON documents, ontology manifests and sync jobs,
+worker results) first reserves its bytes in the `storage_usage` tables with an atomic conditional update
+(`app/storage/quota.py`); deletes give them back. A write that would take the bucket past
+`STORAGE_HARD_LIMIT_BYTES` is refused before anything reaches S3 with 507
+`{"detail": ..., "code": "STORAGE_LIMIT_EXCEEDED"}`, or `USER_QUOTA_EXCEEDED` when `STORAGE_USER_QUOTA_BYTES` is set
+and the user's attributed objects would exceed it. If the accounting database is unreachable the write is refused
+with 503 `STORAGE_ACCOUNTING_UNAVAILABLE` (the cap fails closed). Graphs, ontology manifests and `checks/*` results
+are global; uploads, worker results of a model, user-scoped JSON and sync jobs count towards their owner.
+
+New code that writes to the bucket must go through `quota.account_write(...)` (or `delete_object_accounted` /
+`record_delete` for deletes). Uploads that bypass the API, such as presigned PUT URLs, must call
+`quota.reserve_upload(key, size, user_id=...)` *before* the URL is issued (sign it with the same `ContentLength`) and
+`reservation.release()` when the upload is abandoned.
+
+The counters are recomputed from a bucket listing by `python -m app.storage.reconcile`, which prints the resulting
+storage summary as JSON (exit 0; 1 on failure; 2 when another reconcile holds the lock). Deployments run it as a
+CronJob; the API also runs it once in the background at startup while the counters have never been reconciled.
 
 ## Validating RuleBuilder ontology terms
 
