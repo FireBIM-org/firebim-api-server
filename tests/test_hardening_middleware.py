@@ -4,7 +4,7 @@ from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from app.core.body_limit import BodySizeLimitMiddleware
+from app.core.body_limit import BodySizeLimitMiddleware, compile_routes
 from app.core.errors import install_error_handlers, payload_too_large
 from app.core.security_headers import SecurityHeadersMiddleware
 
@@ -28,11 +28,17 @@ def _body_app(*, max_json: int = 100, max_upload: int = 1000, overhead: int = 30
     async def upload_endpoint(file: UploadFile = File(...)):
         return {"size": file.size}
 
+    @app.post("/large/{item_id}")
+    async def large_endpoint(item_id: str, request: Request):
+        return {"length": len(await request.body())}
+
     app.add_middleware(
         BodySizeLimitMiddleware,
         max_json_body_bytes=max_json,
         max_upload_bytes=max_upload,
         multipart_overhead_bytes=overhead,
+        upload_routes=(("POST", r"/upload"),),
+        large_body_routes=(("POST", r"/large/[^/]+"),),
     )
     return app
 
@@ -87,6 +93,55 @@ def test_multipart_uploads_get_the_upload_limit_plus_overhead():
     too_big = client.post("/upload", files={"file": ("model.ifc", b"a" * 1400)})
     assert too_big.status_code == 413
     assert too_big.json()["code"] == "PAYLOAD_TOO_LARGE"
+
+
+def test_multipart_content_type_does_not_raise_the_limit_of_other_routes():
+    client = TestClient(_body_app())
+    spoofed = client.post(
+        "/json",
+        content=b"x" * 500,
+        headers={"Content-Type": "multipart/form-data; boundary=zz"},
+    )
+    assert spoofed.status_code == 413
+    assert spoofed.json()["code"] == "PAYLOAD_TOO_LARGE"
+
+    # Streamed without a Content-Length, the body is cut off at the JSON limit too.
+    chunked = client.post(
+        "/raw",
+        content=iter([b"x" * 80, b"x" * 80]),
+        headers={"Content-Type": "multipart/form-data; boundary=zz"},
+    )
+    assert chunked.status_code == 413
+
+
+def test_upload_route_with_a_json_body_gets_the_json_limit():
+    client = TestClient(_body_app())
+    response = client.post("/upload", content=b"x" * 500, headers={"Content-Type": "application/json"})
+    assert response.status_code == 413
+
+
+def test_large_body_routes_get_the_upload_limit():
+    client = TestClient(_body_app())
+    ok = client.post("/large/m1", content=b"x" * 900, headers={"Content-Type": "application/json"})
+    assert ok.status_code == 200
+    assert ok.json() == {"length": 900}
+
+    too_big = client.post("/large/m1", content=b"x" * 1001, headers={"Content-Type": "application/json"})
+    assert too_big.status_code == 413
+
+
+def test_default_body_limit_routes_match_the_upload_endpoints():
+    from app.core.body_limit import LARGE_BODY_ROUTES, UPLOAD_ROUTES
+
+    def matches(routes, method, path):
+        return any(m == method and pattern.fullmatch(path) for m, pattern in compile_routes(routes))
+
+    assert matches(UPLOAD_ROUTES, "POST", "/ifc-models")
+    assert matches(UPLOAD_ROUTES, "POST", "/ids-files/")
+    assert not matches(UPLOAD_ROUTES, "POST", "/ifc-models/m1/data-payload")
+    assert not matches(UPLOAD_ROUTES, "POST", "/lexicon/reconstruction")
+    assert matches(LARGE_BODY_ROUTES, "POST", "/ifc-models/m1/data-payload")
+    assert not matches(LARGE_BODY_ROUTES, "PUT", "/ifc-models/m1/data-payload")
 
 
 def _headers_app() -> FastAPI:
