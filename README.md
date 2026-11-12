@@ -214,6 +214,38 @@ is chained on `1e9e75ea63ae`; another branch adding revisions on the same parent
 a merge revision) so there is a single head. Deployed databases have no `alembic_version` table, so stamp a baseline
 before ever running `alembic upgrade` there.
 
+## Telemetry and logs
+
+The API (`firebim-api`) and the Celery worker (`firebim-worker`) export OpenTelemetry traces and metrics over
+OTLP/HTTP (`app/core/telemetry.py`). Telemetry is off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set, so tests and local
+runs export nothing. When it is on, FastAPI requests (except `/livez`, `/readyz`, `/health` and `/metrics`),
+SQLAlchemy, botocore (S3), httpx, requests and Celery are traced. A task's trace continues the request that queued it,
+and server spans carry the request's `X-Request-ID` as `firebim.request_id`. The worker starts telemetry in each pool
+process (`worker_process_init`).
+
+| Variable | Example / default | Effect |
+| --- | --- | --- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | unset (in the clusters `http://alloy.monitoring.svc.cluster.local:4318`) | OTLP/HTTP collector; unset = telemetry off |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` | Only `http/protobuf` is supported |
+| `OTEL_SERVICE_NAME` | `firebim-api` / `firebim-worker` | Overrides the built-in service name (also the `service` field of JSON logs) |
+| `OTEL_RESOURCE_ATTRIBUTES` | `deployment.environment=staging,k8s.cluster.name=firebim-staging` | Extra resource attributes; `deployment.environment` defaults to `ENVIRONMENT`, `service.version` to `GIT_COMMIT` |
+| `OTEL_TRACES_SAMPLER` / `OTEL_TRACES_SAMPLER_ARG` | `parentbased_traceidratio` / `0.2` | Trace sampling (SDK default: every trace) |
+| `OTEL_SDK_DISABLED` | `false` | `true` turns telemetry off even with an endpoint |
+| `OTEL_PYTHON_FASTAPI_EXCLUDED_URLS` | unset | More URL regexes not to trace, added to the probe paths |
+| `LOG_FORMAT` | `json` in staging/production, `text` otherwise | `json`: one JSON object per line on stdout |
+
+Metrics are exported every 30 s. Besides the standard HTTP server metrics (`http.server.request.duration`, stable
+semantic conventions) the API reports `firebim.ratelimit.rejected{route_class}`, `firebim.storage.rejected{reason}`
+and the gauges `firebim.storage.used`, `.limit`, `.objects`, `firebim.storage.prefix.used{prefix}` and
+`firebim.users{state=total|active_7d}` (`app/core/metrics.py`). The gauges read the storage accounting tables, cached
+for 60 s, so an export queries the database at most once a minute. The worker reports
+`firebim.celery.tasks{task,state}` and the histogram `firebim.celery.task.duration{task,state}` (seconds). A task
+whose pool process is killed (hard time limit, out of memory) is not counted.
+
+JSON log lines have `timestamp`, `level`, `logger`, `message`, `trace_id`, `span_id` and `service`, plus `request_id`
+during a request and any `extra=` fields; `log_event()` fields become top-level keys. Uvicorn's and Celery's own logs
+use the same format.
+
 ## Validating RuleBuilder ontology terms
 
 `POST /lexicon/catalog/rule-term-validation` validates the non-empty `target_class` and
