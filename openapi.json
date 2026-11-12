@@ -91,7 +91,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/graphs/publish": {
@@ -132,6 +137,69 @@
               }
             }
           }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/graphs/{graph_id}/answers": {
+      "post": {
+        "tags": [
+          "graphs"
+        ],
+        "summary": "Answer Graph",
+        "description": "Write answers (facts the model did not state) into an answered copy of `graph_id` and publish that copy.\n\nThe first call copies the base graph to `<graph_id>--answered`; later calls extend the copy, so a person can\nanswer the open questions of a rule run one at a time and re-run against the same copy.",
+        "operationId": "answer_graph_graphs__graph_id__answers_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "graph_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Graph Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphAnswersRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphAnswersResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -142,6 +210,11 @@
         ],
         "summary": "Delete Graph",
         "operationId": "delete_graph_graphs__graph_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "graph_id",
@@ -182,6 +255,11 @@
         ],
         "summary": "Fetch Graph",
         "operationId": "fetch_graph_graphs__graph_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "graph_id",
@@ -255,7 +333,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/ifc-models": {
@@ -4563,7 +4646,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/compile": {
@@ -4604,7 +4692,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/decompile": {
@@ -4645,7 +4738,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/publish": {
@@ -4686,7 +4784,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/list": {
@@ -4707,7 +4810,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/fetch": {
@@ -4748,7 +4856,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/delete": {
@@ -4789,7 +4902,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/assemble": {
@@ -4830,7 +4948,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/assemble/compile": {
@@ -4871,7 +4994,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/rule-elements/derive": {
@@ -4912,7 +5040,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/rule-elements": {
@@ -4933,7 +5066,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -4972,7 +5110,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/rule-elements/fetch": {
@@ -5013,7 +5156,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/rule-elements/delete": {
@@ -5054,7 +5202,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/connect": {
@@ -5095,7 +5248,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/disconnect": {
@@ -5136,7 +5294,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/check-completeness": {
@@ -5177,7 +5340,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/force-end": {
@@ -5218,7 +5386,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/rule-elements/{element_id}": {
@@ -5228,6 +5401,11 @@
         ],
         "summary": "Get Rule Element",
         "operationId": "get_rule_element_rules_rule_elements__element_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "element_id",
@@ -5270,6 +5448,11 @@
         ],
         "summary": "Get Rule",
         "operationId": "get_rule_rules__rule_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "rule_id",
@@ -5312,6 +5495,11 @@
         ],
         "summary": "Get Rule Terms",
         "operationId": "get_rule_terms_rules__rule_id__terms_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "rule_id",
@@ -5397,7 +5585,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/rules/{rule_id}/ttl": {
@@ -5407,6 +5600,11 @@
         ],
         "summary": "Get Rule Ttl",
         "operationId": "get_rule_ttl_rules__rule_id__ttl_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "rule_id",
@@ -5452,6 +5650,11 @@
         ],
         "summary": "Get Rule Ttl Json",
         "operationId": "get_rule_ttl_json_rules__rule_id__ttl_json_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "rule_id",
@@ -5544,7 +5747,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/checks/run-vertical": {
@@ -5585,7 +5793,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/checks/run-horisontal": {
@@ -5626,7 +5839,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/checks/run-diagnostic": {
@@ -5667,7 +5885,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/checks/run-blind": {
@@ -5708,7 +5931,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/checks/compatibility": {
@@ -5748,6 +5976,60 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/livez": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Livez",
+        "description": "Liveness: answers while the process serves requests. Checks no dependencies.",
+        "operationId": "livez_livez_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Livez Livez Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readyz",
+        "description": "Readiness: the database and object storage are reachable. Authentik and Celery are deliberately excluded,\nso an outage there does not take the API out of rotation.",
+        "operationId": "readyz_readyz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable"
           }
         }
       }
@@ -5815,6 +6097,14 @@
             "type": "array",
             "title": "Target Nodes",
             "description": "see CheckRunOptions.target_nodes"
+          },
+          "overrides": {
+            "items": {
+              "$ref": "#/components/schemas/GraphAssertion"
+            },
+            "type": "array",
+            "title": "Overrides",
+            "description": "see CheckRunOptions.overrides"
           }
         },
         "type": "object",
@@ -6336,6 +6626,14 @@
             "title": "Derived Persisted",
             "default": false
           },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/CheckQuestion"
+            },
+            "type": "array",
+            "title": "Questions",
+            "description": "What the rule would need to know for the targets that ended Unknown (answer with options.overrides or POST /graphs/{graph_id}/answers and run again)"
+          },
           "compiled_rule": {
             "additionalProperties": true,
             "type": "object",
@@ -6567,6 +6865,142 @@
         ],
         "title": "CheckEndNodeTargets"
       },
+      "CheckQuestion": {
+        "properties": {
+          "target_node": {
+            "type": "string",
+            "title": "Target Node"
+          },
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "node_type": {
+            "type": "string",
+            "title": "Node Type",
+            "default": "decision"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "property_path": {
+            "type": "string",
+            "title": "Property Path"
+          },
+          "operator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operator"
+          },
+          "value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "reason_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason Code"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "boolean | choice | number | text",
+            "default": "text"
+          },
+          "options": {
+            "items": {},
+            "type": "array",
+            "title": "Options"
+          },
+          "current_value": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Value"
+          },
+          "write_subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Write Subject",
+            "description": "Where an answer is written (None if ambiguous)"
+          },
+          "write_property": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Write Property"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_node",
+          "node_id",
+          "property_path"
+        ],
+        "title": "CheckQuestion",
+        "description": "What a rule would need to know about one target to get past an Unknown."
+      },
       "CheckRunEngineInfo": {
         "properties": {
           "engine": {
@@ -6654,6 +7088,14 @@
             "type": "boolean",
             "title": "Diagnostics Enabled",
             "default": false
+          },
+          "merged_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Merged Schemas",
+            "description": "Published ontologies (family/country/version) whose schema subset was merged into the graph"
           }
         },
         "type": "object",
@@ -6778,6 +7220,20 @@
             "type": "array",
             "title": "Use Derived From",
             "description": "Rule ids whose persisted derived graphs are merged into the building graph before evaluation"
+          },
+          "overrides": {
+            "items": {
+              "$ref": "#/components/schemas/GraphAssertion"
+            },
+            "type": "array",
+            "title": "Overrides",
+            "description": "Facts to assert on the building graph for this run only (a person's answers / what-if)"
+          },
+          "include_questions": {
+            "type": "boolean",
+            "title": "Include Questions",
+            "description": "Return open questions for the targets that ended Unknown",
+            "default": true
           },
           "target_nodes": {
             "items": {
@@ -6983,6 +7439,14 @@
             "type": "boolean",
             "title": "Derived Persisted",
             "default": false
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/CheckQuestion"
+            },
+            "type": "array",
+            "title": "Questions",
+            "description": "What the rule would need to know for the targets that ended Unknown (answer with options.overrides or POST /graphs/{graph_id}/answers and run again)"
           }
         },
         "type": "object",
@@ -7137,6 +7601,130 @@
         ],
         "title": "CompatibilityWarning"
       },
+      "GraphAnswersRequest": {
+        "properties": {
+          "assertions": {
+            "items": {
+              "$ref": "#/components/schemas/GraphAssertion"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Assertions"
+          },
+          "answered_graph_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answered Graph Id",
+            "description": "Id of the answered copy (default '<graph_id>--answered'); answering again extends the same copy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assertions"
+        ],
+        "title": "GraphAnswersRequest",
+        "description": "Write a person's answers into an *answered copy* of a building graph (the original is never changed)."
+      },
+      "GraphAnswersResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "graph_id": {
+            "type": "string",
+            "title": "Graph Id",
+            "description": "The answered copy"
+          },
+          "graph_uri": {
+            "type": "string",
+            "title": "Graph Uri"
+          },
+          "base_graph_id": {
+            "type": "string",
+            "title": "Base Graph Id"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created",
+            "description": "False when the answered copy already existed and was extended"
+          },
+          "applied": {
+            "type": "integer",
+            "title": "Applied"
+          },
+          "triple_count": {
+            "type": "integer",
+            "title": "Triple Count"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "graph_id",
+          "graph_uri",
+          "base_graph_id",
+          "created",
+          "applied",
+          "triple_count",
+          "message"
+        ],
+        "title": "GraphAnswersResponse"
+      },
+      "GraphAssertion": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "description": "IRI of the node the fact is about"
+          },
+          "property": {
+            "type": "string",
+            "title": "Property",
+            "description": "IRI of the property"
+          },
+          "value": {
+            "title": "Value",
+            "description": "Literal value (bool / number / string) or {\"iri\": ...} for a resource"
+          },
+          "datatype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datatype",
+            "description": "Optional XSD local name or IRI, or 'iri'"
+          },
+          "replace": {
+            "type": "boolean",
+            "title": "Replace",
+            "description": "Remove the existing values of the property first",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "property",
+          "value"
+        ],
+        "title": "GraphAssertion",
+        "description": "A fact supplied by a person: `subject property value` (replaces existing values of that property)."
+      },
       "GraphDeleteResponse": {
         "properties": {
           "success": {
@@ -7246,7 +7834,20 @@
                 "type": "null"
               }
             ],
-            "title": "Label"
+            "title": "Label",
+            "description": "What the graph calls itself (`<graph_uri> rdfs:label`)"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What the graph says about itself (`<graph_uri> rdfs:comment`), e.g. which rules it is meant for"
           },
           "source": {
             "anyOf": [
@@ -8634,6 +9235,52 @@
         ],
         "title": "LexiconConformityIssue"
       },
+      "LexiconDerivedProperty": {
+        "properties": {
+          "property_path": {
+            "type": "string",
+            "title": "Property Path"
+          },
+          "target_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Class"
+          },
+          "node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Node Ids"
+          },
+          "expressions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Expressions"
+          },
+          "read_by_node_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Read By Node Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "property_path"
+        ],
+        "title": "LexiconDerivedProperty",
+        "description": "A property the rule *writes* with a derive element; it is produced, not required from the graph."
+      },
       "LexiconEntityInput": {
         "properties": {
           "entity_id": {
@@ -8885,6 +9532,13 @@
             },
             "type": "array",
             "title": "Targets"
+          },
+          "derived_properties": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconDerivedProperty"
+            },
+            "type": "array",
+            "title": "Derived Properties"
           },
           "nodes": {
             "items": {
@@ -9983,6 +10637,39 @@
             },
             "type": "array",
             "title": "Node Ids"
+          },
+          "via": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via"
+          },
+          "instances": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instances"
+          },
+          "with_value": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "With Value"
           }
         },
         "type": "object",
@@ -10112,6 +10799,18 @@
             },
             "type": "array",
             "title": "Rules"
+          },
+          "graph_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Id",
+            "description": "Optional stored building graph: when given, the response also says which of the profile's requirements that graph can satisfy (graph_coverage), without saving the profile first"
           }
         },
         "type": "object",
@@ -10175,6 +10874,16 @@
           },
           "profile": {
             "$ref": "#/components/schemas/LexiconExecutionProfile"
+          },
+          "graph_coverage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconProfileGraphCoverageResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -10247,6 +10956,20 @@
             "type": "boolean",
             "title": "Complete"
           },
+          "merged_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Merged Schemas"
+          },
+          "target_instances": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Target Instances"
+          },
           "covered_target_classes": {
             "items": {
               "type": "string"
@@ -10275,6 +10998,14 @@
             "type": "array",
             "title": "Missing Properties"
           },
+          "partial_properties": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconNeededProperty"
+            },
+            "type": "array",
+            "title": "Partial Properties",
+            "description": "Covered, but not on every instance \u2014 the rule will ask the user for the others"
+          },
           "associations": {
             "items": {
               "$ref": "#/components/schemas/LexiconProfileGraphAssociation"
@@ -10290,7 +11021,8 @@
           "graph_uri",
           "complete"
         ],
-        "title": "LexiconProfileGraphCoverageResponse"
+        "title": "LexiconProfileGraphCoverageResponse",
+        "description": "Which of a profile's requirements a stored graph can satisfy.\n\nEvaluated on the graph with the selected ontologies' schema merged (sub-classes count as the target class,\n`partOf` follows `hasSubitem` backwards \u2026), so sequence paths are followed the way the rule engine follows them.\nA property is *covered* when at least one instance of the target class has a value at the end of the path;\n`instances` / `with_value` on each entry say how many. `profile_id` is \"derived\" for an unsaved profile."
       },
       "LexiconProfileListResponse": {
         "properties": {
@@ -10671,6 +11403,35 @@
             "type": "string",
             "title": "Property Path"
           },
+          "property": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Property"
+          },
+          "via": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Via"
+          },
+          "steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
           "node_ids": {
             "items": {
               "type": "string"
@@ -10685,6 +11446,13 @@
             "type": "array",
             "title": "Operators"
           },
+          "aggregates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aggregates"
+          },
           "sample_values": {
             "items": {
               "type": "string"
@@ -10697,7 +11465,8 @@
         "required": [
           "property_path"
         ],
-        "title": "LexiconPropertyRequirement"
+        "title": "LexiconPropertyRequirement",
+        "description": "A fact the graph has to hold for a target so the rule can decide (rule elements v2 aware).\n\n`property_path` may be a sequence path (`fbo-dk:partOf/fbo-dk:FunctionType`): `steps` are its expanded IRIs, `via`\nthe relation prefix (None for a direct property) and `property` the last step \u2014 the term the fact is stored under.\n`aggregates` lists the aggregate functions a derive element applies over the path (count, sum, min, max \u2026)."
       },
       "LexiconReconstructionRequest": {
         "properties": {
@@ -11257,7 +12026,9 @@
             "type": "string",
             "enum": [
               "target_class",
-              "property_path"
+              "property_path",
+              "value",
+              "expression"
             ],
             "title": "Field"
           },
@@ -11318,7 +12089,9 @@
             "type": "string",
             "enum": [
               "target_class",
-              "property_path"
+              "property_path",
+              "value",
+              "expression"
             ],
             "title": "Field"
           },
@@ -11332,7 +12105,8 @@
           },
           "value": {
             "type": "string",
-            "title": "Value"
+            "title": "Value",
+            "description": "The term that was checked (one step of a path, or the whole field)"
           },
           "code": {
             "type": "string",
@@ -11345,6 +12119,18 @@
           "message": {
             "type": "string",
             "title": "Message"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context",
+            "description": "The whole field value when `value` is one step of it"
           }
         },
         "type": "object",
@@ -15381,6 +16167,42 @@
             },
             "type": "array",
             "title": "Elements"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Human-facing name of the rule (e.g. the Miro frame title). Falls back to the start element's label without a leading 'Start:'."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Where the rule comes from, e.g. {system: miro, board, frame_id, frame_title, url}"
           }
         },
         "type": "object",
@@ -16318,6 +17140,28 @@
               }
             ],
             "title": "Label"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
           },
           "element_count": {
             "type": "integer",

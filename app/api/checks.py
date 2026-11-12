@@ -7,7 +7,7 @@ from contextlib import suppress
 from time import perf_counter
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from rdflib import Graph
 from rdflib.namespace import RDF, SH
 
@@ -16,6 +16,7 @@ try:
 except Exception:  # pragma: no cover
     BlindShaclRuleRunner = None
 
+from app.auth.jwt import get_current_active_user
 from app.checks.assertions import apply_assertions, open_questions
 from app.checks.compiler import RuleCompiler
 from app.checks.derived import default_derived_graph_uri
@@ -63,7 +64,9 @@ class CheckInputNotFoundError(Exception):
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/checks", tags=["checks"])
+# Every endpoint requires an authenticated user, except the probe on `public_router`.
+router = APIRouter(prefix="/checks", tags=["checks"], dependencies=[Depends(get_current_active_user)])
+public_router = APIRouter(prefix="/checks", tags=["checks"])
 
 
 def _error_payload(error_code: str, message: str, exc: Exception) -> dict:
@@ -350,7 +353,7 @@ def _build_compatibility_response(
     )
 
 
-@router.get("/health")
+@public_router.get("/health")
 def checks_health():
     selector = CheckSolverSelector(default_mode=settings.CHECKS_SOLVER)
     return {

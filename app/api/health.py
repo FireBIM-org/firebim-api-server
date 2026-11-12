@@ -22,28 +22,58 @@ async def _run_check(func, *, timeout: float):
     return await asyncio.wait_for(asyncio.to_thread(func), timeout=timeout)
 
 
+def _check_db_sync() -> None:
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+
+
+async def _db_check() -> tuple[str, str, bool]:
+    try:
+        await _run_check(_check_db_sync, timeout=3.0)
+        return "database", "ok", True
+    except Exception as e:
+        logger.error("Health check database error: %s", e)
+        return "database", "error", False
+
+
+async def _s3_check() -> tuple[str, str, bool]:
+    try:
+        await _run_check(lambda: s3_client.head_bucket(Bucket=BUCKET_NAME), timeout=3.0)
+        return "s3", "ok", True
+    except Exception as e:
+        logger.error("Health check S3 error: %s", e)
+        return "s3", "error", False
+
+
+def _aggregate(results: list[tuple[str, str, bool]] | tuple[tuple[str, str, bool], ...]) -> JSONResponse:
+    checks: dict[str, str] = {}
+    healthy = True
+    for name, check_status, is_ok in results:
+        checks[name] = check_status
+        if not is_ok:
+            healthy = False
+
+    return JSONResponse(
+        content={"status": "ok" if healthy else "degraded", "checks": checks},
+        status_code=200 if healthy else 503,
+    )
+
+
+@router.get("/livez")
+async def livez() -> dict[str, str]:
+    """Liveness: answers while the process serves requests. Checks no dependencies."""
+    return {"status": "ok"}
+
+
+@router.get("/readyz", responses={503: {"description": "Service Unavailable"}})
+async def readyz() -> JSONResponse:
+    """Readiness: the database and object storage are reachable. Authentik and Celery are deliberately excluded,
+    so an outage there does not take the API out of rotation."""
+    return _aggregate(await asyncio.gather(_db_check(), _s3_check()))
+
+
 @router.get("/health", responses={503: {"description": "Service Unavailable"}})
 async def health() -> JSONResponse:
-    async def _db_check() -> tuple[str, str, bool]:
-        try:
-
-            def _check_db_sync() -> None:
-                with engine.connect() as conn:
-                    conn.execute(text("SELECT 1"))
-
-            await _run_check(_check_db_sync, timeout=3.0)
-            return "database", "ok", True
-        except Exception as e:
-            logger.error("Health check database error: %s", e)
-            return "database", "error", False
-
-    async def _s3_check() -> tuple[str, str, bool]:
-        try:
-            await _run_check(lambda: s3_client.head_bucket(Bucket=BUCKET_NAME), timeout=3.0)
-            return "s3", "ok", True
-        except Exception as e:
-            logger.error("Health check S3 error: %s", e)
-            return "s3", "error", False
 
     async def _celery_check() -> tuple[str, str, bool]:
         try:
@@ -73,14 +103,4 @@ async def health() -> JSONResponse:
         _authentik_check(),
     )
 
-    checks: dict[str, str] = {}
-    healthy = True
-    for name, check_status, is_ok in results:
-        checks[name] = check_status
-        if not is_ok:
-            healthy = False
-
-    return JSONResponse(
-        content={"status": "ok" if healthy else "degraded", "checks": checks},
-        status_code=200 if healthy else 503,
-    )
+    return _aggregate(results)

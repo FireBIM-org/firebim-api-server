@@ -8,7 +8,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.build_info import router as build_info_router
+from app.api.checks import public_router as checks_public_router
 from app.api.checks import router as checks_router
+from app.api.graphs import public_router as graph_public_router
 from app.api.graphs import router as graph_router
 from app.api.health import router as health_router
 from app.api.ids import router as ids_router
@@ -16,11 +18,16 @@ from app.api.lexicon import router as lexicon_router
 from app.api.models import router as models_router
 from app.api.ontologies import router as ontologies_router
 from app.api.rulebuilder import router as rulebuilder_router
+from app.api.rules import public_router as rules_public_router
 from app.api.rules import router as rules_router
 from app.auth.router import router as auth_router
+from app.core.body_limit import BodySizeLimitMiddleware
 from app.core.config import settings
+from app.core.errors import install_error_handlers
 from app.core.observability import log_event, reset_request_context, set_request_context, snapshot_metrics
+from app.core.rate_limit import RateLimitMiddleware
 from app.core.s3 import BUCKET_NAME, s3_client
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.models.database import init_db
 from app.storage.demo_content_bootstrap import bootstrap_default_demo_content
 from app.storage.ontology_bootstrap import bootstrap_default_ontologies
@@ -63,17 +70,28 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="FireBIM API", lifespan=lifespan)
+def api_docs_urls(enabled: bool) -> dict[str, str | None]:
+    """FastAPI docs/schema URLs; all None when ENABLE_API_DOCS is off."""
+    if not enabled:
+        return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
+
+
+app = FastAPI(title="FireBIM API", lifespan=lifespan, **api_docs_urls(settings.ENABLE_API_DOCS))
+install_error_handlers(app)
 
 app.include_router(auth_router)
 app.include_router(build_info_router)
+app.include_router(graph_public_router)
 app.include_router(graph_router)
 app.include_router(models_router)
 app.include_router(ids_router)
 app.include_router(lexicon_router)
 app.include_router(ontologies_router)
 app.include_router(rulebuilder_router)
+app.include_router(rules_public_router)
 app.include_router(rules_router)
+app.include_router(checks_public_router)
 app.include_router(checks_router)
 app.include_router(health_router)
 
@@ -93,6 +111,22 @@ if settings.ENVIRONMENT == "local":
 
 logger.info("CORS origins configured", extra={"origins": origins})
 
+# Middleware added later wraps the ones added earlier. Resulting order, outermost first:
+# security headers -> request id/observability -> CORS -> rate limit -> body size limit -> routes.
+# Rate limiting sits inside CORS so browsers can read 429 responses; the body limit only runs for admitted requests.
+app.add_middleware(
+    BodySizeLimitMiddleware,
+    max_json_body_bytes=settings.MAX_JSON_BODY_BYTES,
+    max_upload_bytes=settings.MAX_UPLOAD_BYTES,
+)
+app.add_middleware(
+    RateLimitMiddleware,
+    enabled=settings.RATE_LIMIT_ENABLED,
+    default=settings.RATE_LIMIT_DEFAULT,
+    expensive=settings.RATE_LIMIT_EXPENSIVE,
+    anon=settings.RATE_LIMIT_ANON,
+    trusted_proxy_cidrs=settings.trusted_proxy_cidrs,
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -147,3 +181,6 @@ async def request_observability_middleware(request: Request, call_next):
 
     response.headers["X-Request-ID"] = request_id
     return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)

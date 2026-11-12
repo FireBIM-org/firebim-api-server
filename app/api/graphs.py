@@ -5,11 +5,12 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
+from app.auth.jwt import get_current_active_user
 from app.checks.assertions import answered_graph_id, apply_assertions
 from app.checks.schema_service import extract_graph_schema_payload
 from app.core.config import settings
 from app.models.database import get_db
-from app.models.models import IfcModel
+from app.models.models import IfcModel, User
 from app.schemas.graphs import (
     GraphAnswersRequest,
     GraphAnswersResponse,
@@ -32,12 +33,15 @@ from app.storage.graph_store import GraphStoreError, GraphStoreNotFoundError
 from app.storage.sampling_service import SamplingService
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/graphs", tags=["graphs"])
+# Every endpoint requires an authenticated user, except the probe on `public_router` (included before `router`
+# so `/graphs/health` is not captured by `/graphs/{graph_id}`).
+router = APIRouter(prefix="/graphs", tags=["graphs"], dependencies=[Depends(get_current_active_user)])
+public_router = APIRouter(prefix="/graphs", tags=["graphs"])
 
 repo = BuildingRepository()
 
 
-@router.get("/health", response_model=GraphsHealthResponse)
+@public_router.get("/health", response_model=GraphsHealthResponse)
 def graphs_health() -> GraphsHealthResponse:
     connected = repo.health()
     return GraphsHealthResponse(
@@ -50,14 +54,16 @@ def graphs_health() -> GraphsHealthResponse:
 
 
 @router.get("", response_model=GraphListResponse)
-def list_graphs(db: Session = Depends(get_db)) -> GraphListResponse:
+def list_graphs(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+) -> GraphListResponse:
     try:
         # 1. Fetch legacy TTL graphs from repository
         items = repo.list_graphs()
         graph_items = [GraphListItem(**item) for item in items]
 
-        # 2. Fetch IFC models from SQL database
-        ifc_models = db.exec(select(IfcModel)).all()
+        # 2. Fetch the current user's IFC models from SQL database
+        ifc_models = db.exec(select(IfcModel).where(IfcModel.user_id == current_user.id)).all()
         for model in ifc_models:
             graph_items.append(
                 GraphListItem(
@@ -190,9 +196,13 @@ def delete_graph(graph_id: str) -> GraphDeleteResponse:
 
 
 @router.get("/{graph_id}", response_model=GraphFetchResponse)
-def fetch_graph(graph_id: str, db: Session = Depends(get_db)) -> GraphFetchResponse:
-    # 1. Check if it's an IFC model ID
+def fetch_graph(
+    graph_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+) -> GraphFetchResponse:
+    # 1. Check if it's an IFC model ID (samples are only served to the model's owner)
     ifc_model = db.exec(select(IfcModel).where(IfcModel.id == graph_id)).first()
+    if ifc_model and ifc_model.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Building graph not found: {graph_id}")
     if ifc_model:
         sampling_service = SamplingService(db)
         sampled_data = sampling_service.get_sampled_graph(graph_id)
@@ -278,6 +288,7 @@ def extract_graph_schema(payload: GraphSchemaExtractRequest) -> GraphSchemaExtra
 
 # Optional helper for consistency with checks engine and future reuse
 __all__ = [
+    "public_router",
     "router",
     "default_building_graph_uri",
 ]

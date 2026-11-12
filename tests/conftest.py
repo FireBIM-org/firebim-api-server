@@ -17,6 +17,8 @@ os.environ["S3_REGION"] = "us-east-1"
 os.environ["CELERY_BROKER_URL"] = "redis://localhost:6379/0"
 os.environ["CELERY_RESULT_BACKEND"] = "redis://localhost:6379/0"
 os.environ["FUSEKI_HOST"] = "http://localhost:3030"
+# The app-wide limiter would be shared by every test; the middleware has its own tests on dedicated apps.
+os.environ["RATE_LIMIT_ENABLED"] = "false"
 
 from unittest.mock import AsyncMock, MagicMock, patch
 

@@ -45,9 +45,13 @@ Application startup complete.
 Or use:
 
 ```bash
+curl http://localhost:8000/readyz
 curl http://localhost:8000/health
-curl http://localhost:8000/docs
 ```
+
+`GET /livez` (process is serving, no dependency checks) and `GET /readyz` (database and S3 reachable) are meant
+for Kubernetes liveness and readiness probes. `GET /health` additionally checks Celery and Authentik and is meant
+for humans and blackbox monitoring, not for probes.
 
 5. Access the services:
 - Backend API: http://localhost:8000
@@ -136,6 +140,37 @@ Synced versions land in the same place as manually published ones
 registry's `sha256` before publishing. To sync from another site, point `source_url` at any index that
 follows the same format (see `app/ontologies/registry_sync.py` for the schema); relative `ttl_url`s are
 resolved against the index's `base_url`.
+
+A user-supplied `source_url` (anything other than `ONTOLOGY_REGISTRY_URL`) and every URL its index lists are
+only fetched from public http(s) hosts: URLs with credentials, and hosts that resolve to private, loopback,
+link-local or other internal addresses, are refused with 400, and each redirect hop is checked again. Set
+`ONTOLOGY_SYNC_ALLOWED_HOSTS` (comma list, `.example.org` matches subdomains) to restrict the hosts further.
+
+## Authentication, limits and hardening
+
+`/graphs`, `/rules` and `/checks` require a bearer token (except their `/health` probes), like `/ifc-models`,
+`/ids-files`, `/rulebuilder` and the write endpoints of `/ontologies` and `/lexicon`. `/graphs` only lists and
+samples the IFC models of the current user. `GET /livez`, `/readyz`, `/health` and `/build-info` are public.
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `MAX_UPLOAD_BYTES` | `524288000` (500 MiB) | Max IFC/IDS file upload → 413 `PAYLOAD_TOO_LARGE` |
+| `MAX_JSON_BODY_BYTES` | `52428800` (50 MiB) | Max size of any other request body → 413 `PAYLOAD_TOO_LARGE` |
+| `RATE_LIMIT_ENABLED` | `true` | In-memory, per-process rate limiting |
+| `RATE_LIMIT_DEFAULT` | `300/minute` | Per bearer token (SHA-256 of the token), all routes |
+| `RATE_LIMIT_EXPENSIVE` | `20/minute` | Per bearer token, in addition, on uploads, check runs, publish, sync and conversions |
+| `RATE_LIMIT_ANON` | `60/minute` | Per client IP for requests without a token |
+| `TRUSTED_PROXY_CIDRS` | `10.42.0.0/16,10.43.0.0/16,127.0.0.1/32` | Peers whose `X-Forwarded-For` is honoured |
+| `ENABLE_API_DOCS` | `true` | Serve `/docs`, `/redoc` and `/openapi.json` |
+| `ONTOLOGY_SYNC_ALLOWED_HOSTS` | empty | Optional host allowlist for user-supplied sync sources |
+| `CHECK_CACHE_MAX_ENTRIES` | `32` | Graphs kept in the in-process check execution cache (LRU) |
+| `CELERY_TASK_TIME_LIMIT` / `CELERY_TASK_SOFT_TIME_LIMIT` | `3600` / `3300` | Worker task time limits in seconds |
+| `STORAGE_HARD_LIMIT_BYTES`, `STORAGE_USER_QUOTA_BYTES`, `STORAGE_WARN_RATIO` | `1 TB`, `0`, `0.8` | Bucket storage caps |
+| `ADMIN_GROUP`, `ADMIN_EMAILS` | `firebim-admins`, empty | Who counts as an admin |
+
+Rate-limited responses are 429 `{"detail": ..., "code": "RATE_LIMITED"}` with `Retry-After`,
+`X-RateLimit-Limit` and `X-RateLimit-Remaining`. Unexpected errors return a generic
+500 `{"detail": "Internal server error", "request_id": ...}`; the exception is logged with the same request id.
 
 ## Validating RuleBuilder ontology terms
 
