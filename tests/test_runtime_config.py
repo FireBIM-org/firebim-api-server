@@ -60,12 +60,58 @@ def test_celery_reliability_settings():
     from app.workers.celery_app import celery_app
 
     conf = celery_app.conf
-    assert conf.task_time_limit == 3600
-    assert conf.task_soft_time_limit == 3300
+    # Late acks: the hard limit must stay below RabbitMQ's default consumer_timeout (1800 s).
+    assert conf.task_time_limit == 1680 < 1800
+    assert conf.task_soft_time_limit == 1500
     assert conf.task_acks_late is True
-    assert conf.task_reject_on_worker_lost is True
+    # A worker process that dies must not requeue the task (poison-message loop).
+    assert conf.task_reject_on_worker_lost is False
     assert conf.worker_prefetch_multiplier == 1
     assert conf.broker_connection_retry_on_startup is True
+
+
+@pytest.mark.parametrize(
+    ("task_name", "args"),
+    [
+        ("process_model", ("m1", "models/m1/a.ifc")),
+        ("check_model_with_ids", ("i1", "m1", "ids/i1/x.ids", "models/m1/a.ifc")),
+    ],
+)
+def test_ifc_tasks_refuse_redelivered_messages(task_name, args):
+    from unittest.mock import patch
+
+    from app.workers import celery_worker
+
+    task = getattr(celery_worker, task_name)
+    with patch.object(celery_worker, "s3_client") as s3, patch.object(celery_worker.ifcopenshell, "open") as ifc_open:
+        task.push_request(delivery_info={"redelivered": True})
+        try:
+            result = task(*args)
+        finally:
+            task.pop_request()
+
+    assert result["status"] == "error"
+    assert "not retried" in result["error"]
+    s3.download_file.assert_not_called()
+    ifc_open.assert_not_called()
+
+
+def test_ifc_tasks_run_first_deliveries():
+    from unittest.mock import patch
+
+    from app.workers import celery_worker
+
+    task = celery_worker.process_model
+    with patch.object(celery_worker, "s3_client") as s3:
+        s3.download_file.side_effect = RuntimeError("bucket unreachable")
+        task.push_request(delivery_info={"redelivered": False})
+        try:
+            result = task("m1", "models/m1/a.ifc")
+        finally:
+            task.pop_request()
+
+    s3.download_file.assert_called_once()
+    assert result == {"status": "error", "id": "m1", "error": "bucket unreachable"}
 
 
 def test_celery_soft_limit_must_be_below_hard_limit():

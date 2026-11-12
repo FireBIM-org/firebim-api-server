@@ -158,9 +158,10 @@ class Settings(BaseSettings):
     # Upper bound on distinct graphs/rules kept in the in-process check execution cache (LRU).
     CHECK_CACHE_MAX_ENTRIES: int = Field(default=32, ge=1)
 
-    # Celery task limits (seconds). The soft limit raises SoftTimeLimitExceeded inside the task first.
-    CELERY_TASK_TIME_LIMIT: int = Field(default=3600, ge=1)
-    CELERY_TASK_SOFT_TIME_LIMIT: int = Field(default=3300, ge=1)
+    # Celery task limits (seconds). The soft limit raises SoftTimeLimitExceeded inside the task first. Tasks are
+    # acknowledged late, so the hard limit must stay below RabbitMQ's consumer_timeout (default 1800 s).
+    CELERY_TASK_TIME_LIMIT: int = Field(default=1680, ge=1)
+    CELERY_TASK_SOFT_TIME_LIMIT: int = Field(default=1500, ge=1)
 
     # Optional comma-separated allowlist of hosts a user-supplied ontology sync source_url may point at.
     # Empty = any public host (private, loopback, link-local and other internal addresses are always refused).

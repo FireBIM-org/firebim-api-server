@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import tempfile
 import uuid
@@ -14,6 +15,8 @@ from app.models.models import IfcModel
 from app.storage.quota import account_write
 from app.workers.celery_app import celery_app
 
+logger = logging.getLogger(__name__)
+
 
 def _put_json(key: str, payload, *, user_id: str | None = None) -> None:
     """Write a JSON result object, reserved against the storage cap (raises when the cap is reached)."""
@@ -27,11 +30,30 @@ def _model_owner(model_id) -> str | None:
         return db.exec(select(IfcModel.user_id).where(IfcModel.id == model_id)).first()
 
 
-@celery_app.task(name="process_model")
-def process_model(model_id, s3_key):
+def _is_redelivery(task) -> bool:
+    """True when the broker delivers this message again, i.e. a previous attempt never finished (the worker died)."""
+    delivery_info = getattr(task.request, "delivery_info", None) or {}
+    return bool(delivery_info.get("redelivered"))
+
+
+def _refuse_redelivery(task, **ids) -> dict | None:
+    """Fail a redelivered IFC task instead of running it again.
+
+    Opening the IFC is what usually kills a worker (out of memory), so retrying the same input would only kill the
+    next worker too, over and over, while every other task waits behind it."""
+    if not _is_redelivery(task):
+        return None
+    logger.error("Refusing redelivered task %s %s: a previous attempt did not finish", task.name, ids)
+    return {"status": "error", **ids, "error": "A previous attempt did not finish (worker lost); not retried"}
+
+
+@celery_app.task(name="process_model", bind=True)
+def process_model(self, model_id, s3_key):
     """
     Process an IFC model file asynchronously.
     """
+    if (refused := _refuse_redelivery(self, id=model_id)) is not None:
+        return refused
     try:
         # Download file from S3
         with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False) as temp_file:
@@ -71,11 +93,13 @@ def process_model(model_id, s3_key):
         return {"status": "error", "id": model_id, "error": str(e)}
 
 
-@celery_app.task(name="check_model_with_ids")
-def check_model_with_ids(ids_id, model_id, ids_s3_key, model_s3_key):
+@celery_app.task(name="check_model_with_ids", bind=True)
+def check_model_with_ids(self, ids_id, model_id, ids_s3_key, model_s3_key):
     """
     Check an IFC model against an IDS file asynchronously.
     """
+    if (refused := _refuse_redelivery(self, ids_id=ids_id, model_id=model_id)) is not None:
+        return refused
     try:
         # Download files from S3
         with tempfile.NamedTemporaryFile(suffix=".ifc", delete=False) as model_file:
