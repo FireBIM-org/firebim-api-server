@@ -3,8 +3,8 @@
     python -m app.storage.reconcile
 
 lists every object with ``list_objects_v2`` (paginated), totals bytes and objects globally, per top-level prefix and
-per user, and writes those absolute values (plus ``last_reconciled_at``) to ``storage_usage``,
-``storage_usage_prefix`` and ``storage_usage_user``. It prints the resulting StorageSummary as JSON and exits 0, or
+per user, and writes those values (plus ``last_reconciled_at``) to ``storage_usage``, ``storage_usage_prefix`` and
+``storage_usage_user``. It prints the resulting StorageSummary as JSON and exits 0, or
 exits non-zero on failure (2 when another reconcile holds the lock). Deploy runs it as a CronJob; the API runs it
 once in the background at startup when the bucket has never been reconciled, and the admin API calls
 :func:`reconcile_storage` directly.
@@ -14,8 +14,14 @@ segment), ``results/{model_id}/`` via the model's owner, user-scoped JSON docume
 and ontology sync jobs via the ``owner_id`` in the job document. Everything else (graphs, manifests, check results)
 is global.
 
-Writes that happen while the listing runs may or may not be included; the next reconcile settles them. Incomplete
-multipart uploads and non-current object versions are not listed and therefore not counted.
+Writes keep going while the bucket is listed, and the listing may or may not include them. So the counters are read
+before the listing starts, and when the totals are written (with the global row locked, which every accounting write
+updates first) each row gets the listed value plus whatever its counter gained in the meantime (net, never
+negative). A write during the listing is then counted at least once (twice if the listing saw it too, an over-count
+the next reconcile settles), and :class:`app.storage.quota.Reservation` skips releases of reservations made before a
+reconcile. What remains is an under-count by uploads that were already in flight when the listing started and finish
+after it passed their key, until the next reconcile. Incomplete multipart uploads and non-current object versions are
+not listed and therefore not counted.
 """
 
 from __future__ import annotations
@@ -28,7 +34,7 @@ import time
 from collections import defaultdict
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, insert, select, text, update
@@ -150,16 +156,66 @@ def _last_reconciled_at(engine: Engine) -> datetime | None:
         ).scalar()
 
 
-def _write_totals(
-    engine: Engine,
-    *,
-    total: _Totals,
-    by_prefix: dict[str, _Totals],
-    by_user: dict[str, _Totals],
-    reconciled_at: datetime,
-) -> None:
+@dataclass
+class _Counters:
+    total: _Totals = field(default_factory=_Totals)
+    by_prefix: dict[str, _Totals] = field(default_factory=dict)
+    by_user: dict[str, _Totals] = field(default_factory=dict)
+
+
+def _read_counters(session: Session, *, lock: bool = False) -> _Counters:
+    """The accounting rows as they are now; ``lock`` holds the global row (SELECT ... FOR UPDATE) until commit."""
+    statement = select(quota.GLOBAL_TABLE.c.used_bytes, quota.GLOBAL_TABLE.c.object_count).where(
+        quota.GLOBAL_TABLE.c.scope == quota.GLOBAL_SCOPE
+    )
+    if lock:
+        statement = statement.with_for_update()
+    row = session.execute(statement).first()
+    prefix_table, user_table = quota.PREFIX_TABLE, quota.USER_TABLE
+    return _Counters(
+        total=_Totals(int(row.used_bytes), int(row.object_count)) if row else _Totals(),
+        by_prefix={
+            r.prefix: _Totals(int(r.used_bytes), int(r.object_count))
+            for r in session.execute(
+                select(prefix_table.c.prefix, prefix_table.c.used_bytes, prefix_table.c.object_count)
+            )
+        },
+        by_user={
+            r.user_id: _Totals(int(r.used_bytes), int(r.object_count))
+            for r in session.execute(select(user_table.c.user_id, user_table.c.used_bytes, user_table.c.object_count))
+        },
+    )
+
+
+def _with_carry_over(listed: _Totals | None, start: _Totals | None, current: _Totals | None) -> _Totals:
+    """``listed`` plus what the counter gained between ``start`` (before the listing) and ``current`` (net, >= 0)."""
+    listed, start, current = listed or _Totals(), start or _Totals(), current or _Totals()
+    return _Totals(
+        listed.bytes + max(0, current.bytes - start.bytes),
+        listed.objects + max(0, current.objects - start.objects),
+    )
+
+
+def _write_totals(engine: Engine, *, listed: _Counters, start: _Counters, reconciled_at: datetime) -> _Counters:
+    """Write the listed totals plus the carry-over since ``start``; return what was written."""
     with Session(engine) as session:
         quota.ensure_counter_row(session, quota.GLOBAL_TABLE, scope=quota.GLOBAL_SCOPE)
+        # Every accounting write updates the global row first, so holding it keeps the carry-over exact until commit.
+        current = _read_counters(session, lock=True)
+        total = _with_carry_over(listed.total, start.total, current.total)
+        by_prefix = {
+            prefix: _with_carry_over(
+                listed.by_prefix.get(prefix), start.by_prefix.get(prefix), current.by_prefix.get(prefix)
+            )
+            for prefix in (*quota.STORAGE_PREFIXES, quota.OTHER_PREFIX)
+        }
+        by_user: dict[str, _Totals] = {}
+        for user_id in sorted(set(listed.by_user) | set(current.by_user)):
+            totals = _with_carry_over(
+                listed.by_user.get(user_id), start.by_user.get(user_id), current.by_user.get(user_id)
+            )
+            if totals.bytes or totals.objects:
+                by_user[user_id] = totals
         session.execute(
             update(quota.GLOBAL_TABLE)
             .where(quota.GLOBAL_TABLE.c.scope == quota.GLOBAL_SCOPE)
@@ -188,6 +244,7 @@ def _write_totals(
                 ],
             )
         session.commit()
+    return _Counters(total=total, by_prefix=by_prefix, by_user=by_user)
 
 
 def reconcile_storage(
@@ -197,7 +254,7 @@ def reconcile_storage(
     engine: Engine | None = None,
     only_if_never_reconciled: bool = False,
 ) -> StorageSummary | None:
-    """List the bucket and overwrite the accounting tables with the actual totals; return the new summary.
+    """List the bucket and rebuild the accounting tables from it (plus the carry-over); return the new summary.
 
     Raises ReconcileInProgressError if another process is reconciling. With ``only_if_never_reconciled`` it returns
     None without listing when the global row already has a ``last_reconciled_at``."""
@@ -215,25 +272,26 @@ def reconcile_storage(
         started = time.monotonic()
         with Session(engine) as session:
             attribution = _Attribution(session, client, bucket)
-        total = _Totals()
-        by_prefix: dict[str, _Totals] = defaultdict(_Totals)
-        by_user: dict[str, _Totals] = defaultdict(_Totals)
+            start = _read_counters(session)
+        listed = _Counters(by_prefix=defaultdict(_Totals), by_user=defaultdict(_Totals))
         for key, size in list_bucket_objects(client, bucket):
-            total.add(size)
-            by_prefix[quota.prefix_for_key(key)].add(size)
+            listed.total.add(size)
+            listed.by_prefix[quota.prefix_for_key(key)].add(size)
             user_id = attribution.user_for(key)
             if user_id:
-                by_user[user_id].add(size)
+                listed.by_user[user_id].add(size)
 
-        _write_totals(engine, total=total, by_prefix=by_prefix, by_user=by_user, reconciled_at=datetime.now(UTC))
+        written = _write_totals(engine, listed=listed, start=start, reconciled_at=datetime.now(UTC))
 
     summary = quota.get_storage_summary(engine)
     quota.report_usage(summary.used_bytes, summary.object_count)
     logger.info(
-        "Storage reconciled: %d bytes in %d objects (%d users) in %.1fs",
-        total.bytes,
-        total.objects,
-        len(by_user),
+        "Storage reconciled: %d bytes in %d objects listed (%d bytes carried over from concurrent writes), "
+        "%d users, in %.1fs",
+        listed.total.bytes,
+        listed.total.objects,
+        written.total.bytes - listed.total.bytes,
+        len(written.by_user),
         time.monotonic() - started,
     )
     return summary

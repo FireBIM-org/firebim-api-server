@@ -190,3 +190,68 @@ def test_startup_reconcile_never_raises(monkeypatch):
     monkeypatch.setattr(reconcile, "reconcile_storage", boom)
 
     reconcile.start_startup_reconcile().join(timeout=30)
+
+
+class WriteDuringListingClient(PagedS3Client):
+    """Runs ``on_first_page`` while the first page is listed, like a concurrent writer on another replica."""
+
+    def __init__(self, objects: dict[str, bytes], on_first_page) -> None:
+        super().__init__(objects)
+        self.on_first_page = on_first_page
+
+    def list_objects_v2(self, **kwargs):
+        if self.list_calls == 0:
+            self.on_first_page()
+        return super().list_objects_v2(**kwargs)
+
+
+def test_writes_during_the_listing_are_carried_over(bucket: PagedS3Client):
+    listed_total = sum(len(body) for body in bucket.objects.values())
+
+    def upload_in_flight():
+        # An upload reserved while the bucket is listed; the object is not in the bucket (yet).
+        quota.reserve(500, prefix="models", user_id="u9")
+
+    client = WriteDuringListingClient(bucket.objects, upload_in_flight)
+    summary = reconcile.reconcile_storage(s3_client=client, bucket="bucket")
+
+    assert (summary.used_bytes, summary.object_count) == (listed_total + 500, 11)
+    assert _by_prefix(summary)["models"] == (650, 3)
+    assert quota.get_user_usage("u9").bytes == 500
+    assert quota.get_user_usage("u1").bytes == 110
+
+
+def test_deletes_during_the_listing_never_push_the_counters_below_the_listing(bucket: PagedS3Client):
+    quota.reserve(1_000, prefix="graphs")
+    listed_total = sum(len(body) for body in bucket.objects.values())
+
+    client = WriteDuringListingClient(bucket.objects, lambda: quota.record_delete("graphs/old.ttl", 1_000))
+    summary = reconcile.reconcile_storage(s3_client=client, bucket="bucket")
+
+    assert summary.used_bytes == listed_total
+
+
+def test_reservation_released_after_a_reconcile_is_not_subtracted_again(bucket: PagedS3Client):
+    listed_total = sum(len(body) for body in bucket.objects.values())
+    in_flight = quota.reserve(300, prefix="models", user_id="u1")  # upload still running, not listed
+
+    reconcile.reconcile_storage(s3_client=bucket, bucket="bucket")
+    assert quota.get_storage_summary().used_bytes == listed_total
+
+    in_flight.release()  # the upload failed after the reconcile
+
+    assert quota.get_storage_summary().used_bytes == listed_total
+    assert quota.get_user_usage("u1").bytes == 110
+
+
+def test_reservation_made_after_a_reconcile_is_released_normally(bucket: PagedS3Client):
+    reconcile.reconcile_storage(s3_client=bucket, bucket="bucket")
+    before = quota.get_storage_summary()
+
+    reservation = quota.reserve(30, prefix="models", user_id="u1")
+    assert quota.get_storage_summary().used_bytes == before.used_bytes + 30
+    reservation.release()
+
+    after = quota.get_storage_summary()
+    assert (after.used_bytes, after.object_count) == (before.used_bytes, before.object_count)
+    assert quota.get_user_usage("u1").bytes == 110

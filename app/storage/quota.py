@@ -22,8 +22,12 @@ Helpers, from high to low level:
 - :func:`reserve` / :class:`Reservation` — the primitive the others build on.
 
 The counters are kept honest by ``python -m app.storage.reconcile`` (see app/storage/reconcile.py), which recomputes
-them from a bucket listing; small drift between reconciles (e.g. two concurrent first writes of the same key) is
-expected and always errs towards over-counting.
+them from a bucket listing and carries over what the counters gained while the listing ran. Small drift between
+reconciles is expected. Most of it over-counts: two concurrent first writes of the same key, a write counted both by
+the listing and by the carry-over, or a reservation released after a reconcile (the release is then skipped rather
+than subtracted from totals that never held it). It can under-count in one case: an upload already in flight when a
+reconcile starts that finishes after the listing has passed its key is missing until the next reconcile, so the cap
+can be exceeded by at most the bytes in flight at that moment.
 """
 
 from __future__ import annotations
@@ -191,12 +195,26 @@ def _normalize_user_id(user_id: str | None) -> str | None:
     return (str(user_id).strip() or None) if user_id is not None else None
 
 
-def _apply(*, delta_bytes: int, object_delta: int, user_id: str | None, prefix: str, enforce: bool) -> tuple[int, int]:
-    """Add the deltas to the global, user and prefix rows in one transaction; return the new global totals.
+# Sentinel for "apply whether or not a reconcile ran" (None is a meaningful last_reconciled_at).
+_ANY_EPOCH = object()
+
+
+def _apply(
+    *,
+    delta_bytes: int,
+    object_delta: int,
+    user_id: str | None,
+    prefix: str,
+    enforce: bool,
+    only_if_reconciled_at=_ANY_EPOCH,
+) -> tuple[int, int, datetime | None] | None:
+    """Add the deltas to the global, user and prefix rows in one transaction; return the new global totals and the
+    global row's ``last_reconciled_at``.
 
     With ``enforce`` a positive delta is conditional on the hard limit (and the user quota): if the update matches no
-    row, the transaction is rolled back and the matching StorageWriteRefused subclass is raised. Rows are always
-    touched in the same order (global, user, prefix), so concurrent writers cannot deadlock."""
+    row, the transaction is rolled back and the matching StorageWriteRefused subclass is raised. With
+    ``only_if_reconciled_at`` nothing changes, and None is returned, when a reconcile has run since that value was
+    read. Rows are always touched in the same order (global, user, prefix), so concurrent writers cannot deadlock."""
     engine = accounting_engine()
     ensure_accounting_tables(engine)
     now = datetime.now(UTC)
@@ -218,13 +236,20 @@ def _apply(*, delta_bytes: int, object_delta: int, user_id: str | None, prefix: 
                 object_count=_clamped_add(GLOBAL_TABLE.c.object_count, object_delta),
                 updated_at=now,
             )
-            .returning(GLOBAL_TABLE.c.used_bytes, GLOBAL_TABLE.c.object_count)
+            .returning(GLOBAL_TABLE.c.used_bytes, GLOBAL_TABLE.c.object_count, GLOBAL_TABLE.c.last_reconciled_at)
         )
         if check and limit > 0:
             statement = statement.where(GLOBAL_TABLE.c.used_bytes + delta_bytes <= limit)
+        if only_if_reconciled_at is not _ANY_EPOCH:
+            reconciled = GLOBAL_TABLE.c.last_reconciled_at
+            statement = statement.where(
+                reconciled.is_(None) if only_if_reconciled_at is None else reconciled == only_if_reconciled_at
+            )
         totals = session.execute(statement).first()
         if totals is None:
             session.rollback()
+            if only_if_reconciled_at is not _ANY_EPOCH:
+                return None
             raise StorageLimitExceeded()
 
         if user_id:
@@ -252,7 +277,7 @@ def _apply(*, delta_bytes: int, object_delta: int, user_id: str | None, prefix: 
             )
         )
         session.commit()
-    return int(totals[0]), int(totals[1])
+    return int(totals[0]), int(totals[1]), totals[2]
 
 
 def report_usage(used_bytes: int, object_count: int, *, previous_bytes: int | None = None) -> None:
@@ -277,19 +302,30 @@ def _limits_enabled() -> bool:
 
 @dataclass
 class Reservation:
-    """Bytes and objects added to the counters by :func:`reserve`; ``release()`` takes them back (idempotent)."""
+    """Bytes and objects added to the counters by :func:`reserve`; ``release()`` takes them back (idempotent).
+
+    ``reconciled_at`` is the global ``last_reconciled_at`` when the reservation was made. If a reconcile has run since,
+    the counters were rebuilt from the bucket (plus the reconcile's carry-over), so ``release()`` leaves them alone:
+    subtracting the reservation again could only under-count."""
 
     delta_bytes: int
     object_delta: int
     prefix: str
     user_id: str | None = None
     applied: bool = True
+    reconciled_at: datetime | None = None
 
     def release(self) -> None:
         if not self.applied:
             return
         self.applied = False
-        adjust(-self.delta_bytes, object_delta=-self.object_delta, prefix=self.prefix, user_id=self.user_id)
+        adjust(
+            -self.delta_bytes,
+            object_delta=-self.object_delta,
+            prefix=self.prefix,
+            user_id=self.user_id,
+            only_if_reconciled_at=self.reconciled_at,
+        )
 
 
 def reserve(delta_bytes: int, *, prefix: str, user_id: str | None = None, object_delta: int = 1) -> Reservation:
@@ -302,7 +338,7 @@ def reserve(delta_bytes: int, *, prefix: str, user_id: str | None = None, object
     prefix = prefix if prefix in STORAGE_PREFIXES else OTHER_PREFIX
     user_id = _normalize_user_id(user_id)
     try:
-        used, objects = _apply(
+        used, objects, reconciled_at = _apply(
             delta_bytes=delta_bytes, object_delta=object_delta, user_id=user_id, prefix=prefix, enforce=True
         )
     except StorageWriteRefused as exc:
@@ -319,23 +355,43 @@ def reserve(delta_bytes: int, *, prefix: str, user_id: str | None = None, object
         logger.exception("Storage accounting unavailable; refusing the write")
         raise StorageAccountingUnavailable() from exc
     report_usage(used, objects, previous_bytes=used - delta_bytes)
-    return Reservation(delta_bytes, object_delta, prefix, user_id)
+    return Reservation(delta_bytes, object_delta, prefix, user_id, reconciled_at=reconciled_at)
 
 
-def adjust(delta_bytes: int, *, prefix: str, user_id: str | None = None, object_delta: int = 0) -> None:
-    """Unconditionally add to the counters (clamped at 0). Never raises: on a database error the change is logged
-    and left for the next reconcile (an unrecorded decrement only over-counts, which is the safe direction)."""
+def adjust(
+    delta_bytes: int,
+    *,
+    prefix: str,
+    user_id: str | None = None,
+    object_delta: int = 0,
+    only_if_reconciled_at=_ANY_EPOCH,
+) -> None:
+    """Add to the counters (clamped at 0). Never raises: on a database error the change is logged and left for the
+    next reconcile (an unrecorded decrement only over-counts, which is the safe direction).
+
+    With ``only_if_reconciled_at`` the change is skipped when a reconcile has run since that ``last_reconciled_at``."""
     prefix = prefix if prefix in STORAGE_PREFIXES else OTHER_PREFIX
     user_id = _normalize_user_id(user_id)
     try:
-        used, objects = _apply(
-            delta_bytes=delta_bytes, object_delta=object_delta, user_id=user_id, prefix=prefix, enforce=False
+        applied = _apply(
+            delta_bytes=delta_bytes,
+            object_delta=object_delta,
+            user_id=user_id,
+            prefix=prefix,
+            enforce=False,
+            only_if_reconciled_at=only_if_reconciled_at,
         )
     except Exception:
         logger.exception(
             "Storage accounting update failed (%d bytes under %s); reconcile will correct it", delta_bytes, prefix
         )
         return
+    if applied is None:
+        logger.info(
+            "Storage counters were reconciled since the reservation; %d bytes left to the reconcile", delta_bytes
+        )
+        return
+    used, objects, _ = applied
     report_usage(used, objects)
 
 
