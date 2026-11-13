@@ -85,10 +85,11 @@ class OntologyPublishRequest(BaseModel):
     @field_validator("ttl")
     @classmethod
     def _normalize_ttl(cls, value: str | None) -> str | None:
-        if value is None:
+        # Keep the payload byte-exact so the stored sha256 matches the published file
+        # (e.g. the firebim.org registry); only reject whitespace-only content.
+        if value is None or not value.strip():
             return None
-        ttl = value.strip()
-        return ttl or None
+        return value
 
     @field_validator("default_version")
     @classmethod
@@ -398,6 +399,11 @@ class OntologySummaryResponse(BaseModel):
     stable_url: str
 
 
+class OntologyListResponse(BaseModel):
+    count: int
+    ontologies: list[OntologySummaryResponse] = Field(default_factory=list)
+
+
 class OntologyVersionListResponse(BaseModel):
     ontology_family: str
     country: str
@@ -431,3 +437,131 @@ class OntologyVersionSummaryResponse(BaseModel):
     class_property_link_count: int
     publish_ready: bool
     warnings: list[str] = Field(default_factory=list)
+
+
+class OntologySyncAction(StrEnum):
+    publish = "publish"
+    update = "update"
+    current = "current"
+    skip = "skip"
+    failed = "failed"
+
+
+class OntologySyncRequest(BaseModel):
+    source_url: str | None = Field(
+        default=None,
+        description=(
+            "URL of a registry index (default: the public firebim.org registry). "
+            "Any registry serving the same JSON format is accepted."
+        ),
+    )
+    families: list[str] | None = Field(default=None, description="Only sync these ontology families, e.g. ['fbo']")
+    countries: list[str] | None = Field(default=None, description="Only sync these countries, e.g. ['dk', 'core']")
+    selections: list[str] | None = Field(
+        default=None,
+        description="Explicit '<family>/<country>/<version>' identifiers to sync; overrides the other filters",
+    )
+    include_unlisted: bool = Field(default=True, description="Also sync entries the registry marks as unlisted")
+    latest_only: bool = Field(default=False, description="Only sync the newest version of each ontology")
+    overwrite: bool = Field(
+        default=False,
+        description="Re-publish versions that already exist locally but whose content or status differs",
+    )
+    dry_run: bool = Field(default=False, description="Only compute the plan; publish nothing")
+
+    @field_validator("families", "countries")
+    @classmethod
+    def _normalize_slugs(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        normalized = sorted({item.strip().lower() for item in value if item and item.strip()})
+        return normalized or None
+
+    @field_validator("selections")
+    @classmethod
+    def _normalize_selections(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        normalized: list[str] = []
+        for item in value:
+            parts = [part.strip() for part in item.split("/")]
+            if len(parts) != 3 or not all(parts):
+                raise ValueError("selections must use '<family>/<country>/<version>'")
+            normalized.append(f"{parts[0].lower()}/{parts[1].lower()}/{parts[2]}")
+        return sorted(set(normalized)) or None
+
+    @field_validator("source_url")
+    @classmethod
+    def _validate_source_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        url = value.strip()
+        if not url.startswith(("http://", "https://")):
+            raise ValueError("source_url must be an http(s) URL")
+        return url
+
+
+class OntologySyncItem(BaseModel):
+    id: str = Field(description="'<family>/<country>/<version>'")
+    ontology_family: str
+    country: str
+    version: str
+    status: OntologyReleaseStatus
+    issued_at: date
+    kind: str = "ontology"
+    visibility: str = "public"
+    title: str | None = None
+    ttl_url: str
+    remote_sha256: str | None = None
+    remote_byte_size: int | None = None
+    is_latest: bool = False
+    is_stable: bool = False
+    is_default: bool = False
+    local_exists: bool = False
+    local_sha256: str | None = None
+    local_status: OntologyReleaseStatus | None = None
+    action: OntologySyncAction
+    reason: str
+    published: bool = False
+    error: str | None = None
+
+
+class OntologySyncResponse(BaseModel):
+    success: bool = True
+    source_url: str
+    registry: str | None = None
+    schema_version: int | None = None
+    dry_run: bool
+    fetched_at: datetime
+    total: int
+    to_publish: int
+    to_update: int
+    current: int
+    skipped: int
+    published: int
+    failed: int
+    items: list[OntologySyncItem] = Field(default_factory=list)
+
+
+class OntologySyncJobStatus(StrEnum):
+    queued = "queued"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+
+
+class OntologySyncJobResponse(BaseModel):
+    job_id: str
+    status: OntologySyncJobStatus
+    created_at: datetime
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    result: OntologySyncResponse | None = None
+    error: str | None = None
+
+
+class OntologySyncSourceResponse(BaseModel):
+    default_source_url: str
+    registry_format: str = "firebim-ontology-registry"
+    schema_version: int = 1
+    documentation_url: str = "https://firebim.org/documentation/ontologies/#developers"

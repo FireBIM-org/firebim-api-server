@@ -191,12 +191,11 @@ def check_ruleset_completeness(ruleset: RuleSetDict) -> RulesetCompletenessResul
         element_id = element.get("id")
         element_type = element.get("element_type") or element.get("node_type", "decision")
 
-        if element_type == "decision":
-            for branch_name, path_field in [
-                ("true", "true_path"),
-                ("false", "false_path"),
-                ("unknown", "unknown_path"),
-            ]:
+        if element_type in ("decision", "derive"):
+            branches = [("true", "true_path"), ("unknown", "unknown_path")]
+            if element_type == "decision":
+                branches.insert(1, ("false", "false_path"))
+            for branch_name, path_field in branches:
                 target = element.get(path_field)
 
                 if not target:
@@ -277,16 +276,15 @@ def force_end_ruleset(
 
     for element in elements:
         element_type = element.get("element_type") or element.get("node_type", "decision")
-        if element_type != "decision":
+        if element_type not in ("decision", "derive"):
             continue
 
         element_id = element.get("id")
 
-        for branch, path_field in [
-            ("true", "true_path"),
-            ("false", "false_path"),
-            ("unknown", "unknown_path"),
-        ]:
+        branches = [("true", "true_path"), ("unknown", "unknown_path")]
+        if element_type == "decision":
+            branches.insert(1, ("false", "false_path"))
+        for branch, path_field in branches:
             if element.get(path_field):
                 continue
 

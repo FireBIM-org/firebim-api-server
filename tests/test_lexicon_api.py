@@ -1324,6 +1324,75 @@ def test_rule_ontology_similarity_with_multiple_rules_and_ontologies(monkeypatch
     )
 
 
+def test_rule_term_validation_reports_unknown_and_wrong_kind_terms(monkeypatch):
+    client = _build_client(monkeypatch)
+    response = client.post(
+        "/lexicon/catalog/rule-term-validation",
+        json={
+            "selected_ontologies": [
+                {"ontology_family": "fbo", "country": "dk", "version": "latest"},
+            ],
+            "rule": {
+                "id": "rule_with_invalid_terms",
+                "entry": "valid",
+                "elements": [
+                    {
+                        "id": "valid",
+                        "element_type": "decision",
+                        "target_class": "Wall",
+                        "property_path": "Combustible",
+                        "label": "Valid terms",
+                    },
+                    {
+                        "id": "unknown",
+                        "element_type": "decision",
+                        "target_class": "NotARealClass",
+                        "property_path": "NotARealProperty",
+                        "label": "Unknown terms",
+                    },
+                    {
+                        "id": "wrong-kind",
+                        "element_type": "decision",
+                        "target_class": "Combustible",
+                        "property_path": "Wall",
+                        "label": "Terms of the wrong kind",
+                    },
+                    {
+                        "id": "empty",
+                        "element_type": "decision",
+                        "target_class": None,
+                        "property_path": None,
+                        "label": "Completeness handles empty fields",
+                    },
+                ],
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["valid"] is False
+    assert body["rule_ids"] == ["rule_with_invalid_terms"]
+    assert body["stats"] == {
+        "rule_count": 1,
+        "ontology_count": 1,
+        "validated_node_count": 3,
+        "validated_field_count": 6,
+        "invalid_node_count": 2,
+        "issue_count": 4,
+    }
+    valid_node = next(node for node in body["nodes"] if node["node_id"] == "valid")
+    assert valid_node["valid"] is True
+    assert all(field["matches"] for field in valid_node["fields"])
+    issue_codes = {(issue["node_id"], issue["field"]): issue["code"] for issue in body["issues"]}
+    assert issue_codes == {
+        ("unknown", "target_class"): "unknown_term",
+        ("unknown", "property_path"): "unknown_term",
+        ("wrong-kind", "target_class"): "wrong_term_kind",
+        ("wrong-kind", "property_path"): "wrong_term_kind",
+    }
+
+
 def test_property_and_property_set_related_catalog_endpoints(monkeypatch):
     client = _build_client(monkeypatch)
 
@@ -2054,3 +2123,196 @@ def test_handshake_conformity_uses_profile_and_mappings(monkeypatch):
     assert body["execution_ready"] is True
     assert body["missing_profile_target_classes"] == []
     assert body["missing_profile_properties"] == []
+
+
+V2_ONTOLOGY_TTL = """
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix fbo: <https://firebim.org/ontologies/fbo#> .
+@prefix fbo-dk: <https://firebim.org/ontologies/fbo/dk#> .
+<https://firebim.org/ontologies/fbo/dk#> a owl:Ontology .
+fbo-dk:BuildingFunctionalFireUnit a owl:Class .
+fbo-dk:FireCompartment a owl:Class .
+fbo-dk:SubCompartment a owl:Class ; rdfs:subClassOf fbo-dk:FireCompartment .
+fbo:hasSubitem a owl:ObjectProperty .
+fbo-dk:partOf a owl:ObjectProperty ; owl:inverseOf fbo:hasSubitem .
+fbo-dk:FunctionType a owl:DatatypeProperty .
+fbo-dk:AreaFireCompartment a owl:DatatypeProperty .
+fbo-dk:MaxAreaFireCompartment a owl:DatatypeProperty .
+fbo-dk:RiskClass a owl:DatatypeProperty .
+"""
+
+V2_GRAPH_TTL = """
+@prefix fbo: <https://firebim.org/ontologies/fbo#> .
+@prefix fbo-dk: <https://firebim.org/ontologies/fbo/dk#> .
+@prefix ex: <https://example.org/b/> .
+ex:unit a fbo-dk:BuildingFunctionalFireUnit ; fbo-dk:FunctionType "office" ; fbo:hasSubitem ex:c1, ex:c2 .
+ex:c1 a fbo-dk:FireCompartment ; fbo-dk:AreaFireCompartment 900.0 ; fbo-dk:RiskClass "RK1" .
+ex:c2 a fbo-dk:SubCompartment ; fbo-dk:AreaFireCompartment 400.0 .
+ex:orphan a fbo-dk:FireCompartment .
+"""
+
+V2_RULE = {
+    "id": "v2_rule",
+    "entry": "start",
+    "elements": [
+        {"id": "start", "element_type": "start", "true_path": "office", "config": {}},
+        {
+            "id": "office",
+            "element_type": "decision",
+            "target_class": "https://firebim.org/ontologies/fbo/dk#FireCompartment",
+            "property_path": "https://firebim.org/ontologies/fbo/dk#partOf/https://firebim.org/ontologies/fbo/dk#FunctionType",
+            "operator": "==",
+            "value": "office",
+            "true_path": "limit",
+            "false_path": "na",
+            "unknown_path": "ask",
+            "config": {},
+        },
+        {
+            "id": "limit",
+            "element_type": "derive",
+            "target_class": "https://firebim.org/ontologies/fbo/dk#FireCompartment",
+            "property_path": "https://firebim.org/ontologies/fbo/dk#MaxAreaFireCompartment",
+            "expression": "1000",
+            "true_path": "check",
+            "unknown_path": "ask",
+            "config": {},
+        },
+        {
+            "id": "check",
+            "element_type": "decision",
+            "target_class": "https://firebim.org/ontologies/fbo/dk#FireCompartment",
+            "property_path": "https://firebim.org/ontologies/fbo/dk#AreaFireCompartment",
+            "operator": "<=",
+            "value": {"$ref": "https://firebim.org/ontologies/fbo/dk#MaxAreaFireCompartment"},
+            "true_path": "ok",
+            "false_path": "fail",
+            "unknown_path": "ask",
+            "config": {},
+        },
+        {"id": "ok", "element_type": "end", "config": {"end_kind": "pass"}},
+        {"id": "fail", "element_type": "end", "config": {"end_kind": "fail"}},
+        {"id": "na", "element_type": "end", "config": {"end_kind": "not_applicable"}},
+        {"id": "ask", "element_type": "end", "config": {"end_kind": "missing_data"}},
+    ],
+}
+
+V2_UNIT_RULE = {
+    "id": "v2_unit_rule",
+    "entry": "start",
+    "elements": [
+        {"id": "start", "element_type": "start", "true_path": "rk", "config": {}},
+        {
+            "id": "rk",
+            "element_type": "derive",
+            "target_class": "https://firebim.org/ontologies/fbo/dk#BuildingFunctionalFireUnit",
+            "property_path": "https://firebim.org/ontologies/fbo/dk#RiskClass",
+            "expression": "max($https://firebim.org/ontologies/fbo#hasSubitem/https://firebim.org/ontologies/fbo/dk#RiskClass)",
+            "true_path": "done",
+            "unknown_path": "ask",
+            "config": {},
+        },
+        {"id": "done", "element_type": "end", "config": {"end_kind": "pass"}},
+        {"id": "ask", "element_type": "end", "config": {"end_kind": "missing_data"}},
+    ],
+}
+
+
+class V2OntologyRepo(DummyOntologyRepo):
+    def fetch_version(self, ontology_family: str, country: str, version: str):
+        item = super().fetch_version(ontology_family, country, version)
+        item.ttl = V2_ONTOLOGY_TTL
+        return item
+
+
+class V2BuildingRepo:
+    def fetch_graph(self, graph_id: str):
+        return f"https://firebim.org/graphs/buildings/{graph_id}", V2_GRAPH_TTL
+
+
+def _build_v2_client(monkeypatch) -> TestClient:
+    app = FastAPI()
+    app.include_router(lexicon_api.router)
+    monkeypatch.setattr(lexicon_api, "service", LexiconService(V2OntologyRepo(), V2BuildingRepo()))
+    return TestClient(app)
+
+
+def test_derive_profile_understands_rule_elements_v2(monkeypatch):
+    """Sequence paths are validated per step, derived properties are outputs (not requirements), $ref resolves,
+    and the expression paths of a derive element are the inputs."""
+    client = _build_v2_client(monkeypatch)
+    response = client.post(
+        "/lexicon/profiles/derive",
+        json={"ontology_family": "fbo", "country": "dk", "version": "2026.09.06", "rules": [V2_RULE, V2_UNIT_RULE]},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    compartment, unit = body["rule_profiles"]
+    assert (
+        compartment["warnings"] == []
+    )  # partOf and FunctionType are both declared: no false alarm on the sequence path
+    [target] = compartment["targets"]
+    by_path = {req["property_path"]: req for req in target["property_requirements"]}
+    assert set(by_path) == {
+        "https://firebim.org/ontologies/fbo/dk#AreaFireCompartment",
+        "https://firebim.org/ontologies/fbo/dk#partOf/https://firebim.org/ontologies/fbo/dk#FunctionType",
+    }
+    seq = by_path["https://firebim.org/ontologies/fbo/dk#partOf/https://firebim.org/ontologies/fbo/dk#FunctionType"]
+    assert seq["via"] == "https://firebim.org/ontologies/fbo/dk#partOf"
+    assert seq["property"] == "https://firebim.org/ontologies/fbo/dk#FunctionType"
+    assert target["relation_requirements"] == ["https://firebim.org/ontologies/fbo/dk#partOf"]
+    assert by_path["https://firebim.org/ontologies/fbo/dk#AreaFireCompartment"]["sample_values"] == [
+        "$ref https://firebim.org/ontologies/fbo/dk#MaxAreaFireCompartment"
+    ]
+    [derived] = compartment["derived_properties"]
+    assert derived["property_path"] == "https://firebim.org/ontologies/fbo/dk#MaxAreaFireCompartment"
+    assert derived["node_ids"] == ["limit"] and derived["read_by_node_ids"] == ["check"]
+
+    [unit_target] = unit["targets"]
+    [agg] = unit_target["property_requirements"]
+    assert agg["via"] == "https://firebim.org/ontologies/fbo#hasSubitem"
+    assert agg["aggregates"] == ["max"]
+    assert unit["derived_properties"][0]["property_path"] == "https://firebim.org/ontologies/fbo/dk#RiskClass"
+
+    # the aggregate profile keeps both, with node ids prefixed by rule
+    assert len(body["profile"]["derived_properties"]) == 2
+    assert body["profile"]["relation_paths"] == [
+        "https://firebim.org/ontologies/fbo#hasSubitem",
+        "https://firebim.org/ontologies/fbo/dk#partOf",
+    ]
+
+
+def test_derive_profile_with_graph_coverage_follows_paths(monkeypatch):
+    """graph_id on derive: paths are followed on the graph with the schema merged (partOf via inverseOf, sub-class
+    instances count), and coverage says how many instances have the fact."""
+    client = _build_v2_client(monkeypatch)
+    response = client.post(
+        "/lexicon/profiles/derive",
+        json={
+            "ontology_family": "fbo",
+            "country": "dk",
+            "version": "2026.09.06",
+            "rule": V2_RULE,
+            "graph_id": "v2-graph",
+        },
+    )
+    assert response.status_code == 200, response.text
+    coverage = response.json()["graph_coverage"]
+    assert coverage["profile_id"] == "derived"
+    assert coverage["merged_schemas"] == ["fbo/dk/2026.09.06"]
+    assert coverage["target_instances"] == {
+        "https://firebim.org/ontologies/fbo/dk#FireCompartment": 3
+    }  # c1, c2 (sub-class), orphan
+    assert coverage["covered_target_classes"] == ["https://firebim.org/ontologies/fbo/dk#FireCompartment"]
+    partial = {
+        item["property_path"]: (item["with_value"], item["instances"]) for item in coverage["partial_properties"]
+    }
+    assert partial == {
+        "https://firebim.org/ontologies/fbo/dk#AreaFireCompartment": (2, 3),
+        "https://firebim.org/ontologies/fbo/dk#partOf/https://firebim.org/ontologies/fbo/dk#FunctionType": (2, 3),
+    }
+    assert coverage["missing_properties"] == [] and coverage["covered_properties"] == []
+    assert coverage["complete"] is False
+    orphan = next(a for a in coverage["associations"] if a["source_object_ref"].endswith("orphan"))
+    assert orphan["matched_properties"] == []

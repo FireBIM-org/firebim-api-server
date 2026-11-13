@@ -56,6 +56,7 @@ def _publish_rule_element_snapshot(node_rule) -> tuple[str, str]:
         property_path=node_rule.property_path,
         operator=node_rule.operator,
         value=node_rule.value,
+        expression=getattr(node_rule, "expression", None),
         true_path=node_rule.true_path,
         false_path=node_rule.false_path,
         unknown_path=node_rule.unknown_path,
@@ -85,6 +86,9 @@ def _normalize_rule_draft(raw_rule: dict | None) -> RuleDraft:
     return RuleDraft(
         id=raw_rule["id"],
         entry=raw_rule["entry"],
+        title=raw_rule.get("title"),
+        description=raw_rule.get("description"),
+        source=raw_rule.get("source"),
         elements=[
             RuleElementPayload(
                 id=element["id"],
@@ -93,6 +97,7 @@ def _normalize_rule_draft(raw_rule: dict | None) -> RuleDraft:
                 property_path=element.get("property_path"),
                 operator=element.get("operator"),
                 value=element.get("value"),
+                expression=element.get("expression"),
                 true_path=element.get("true_path"),
                 false_path=element.get("false_path"),
                 unknown_path=element.get("unknown_path"),

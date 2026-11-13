@@ -21,6 +21,18 @@ GRAPH_FIXTURES: dict[str, str] = {
     "fbo-only-graph-compliant": "building_fbo_only_compliant.ttl",
     "ifc-fbo-graph-compliant": "building_ifc_fbo_compliant.ttl",
     "ifc-rir-fbo-graph-compliant": "building_ifc_rir_fbo_compliant.ttl",
+    "synthetic-three-storey-office-fbo-be": "synthetic-three-storey-office-fbo-be.ttl",
+    "synthetic-three-storey-office-fbo-dk": "synthetic-three-storey-office-fbo-dk.ttl",
+    "synthetic-three-storey-office-fbo-dk-v2": "synthetic-three-storey-office-fbo-dk-v2.ttl",
+    "synthetic-rules-v2-aggregate-cases-fbo-dk": "synthetic-rules-v2-aggregate-cases-fbo-dk.ttl",
+    "synthetic-three-storey-office-fbo-lt": "synthetic-three-storey-office-fbo-lt.ttl",
+    "synthetic-three-storey-office-fbo-nl": "synthetic-three-storey-office-fbo-nl.ttl",
+    "synthetic-three-storey-office-fbo-pt": "synthetic-three-storey-office-fbo-pt.ttl",
+    "synthetic-unrealistic-edge-case-fbo-be": "synthetic-unrealistic-edge-case-fbo-be.ttl",
+    "synthetic-unrealistic-edge-case-fbo-dk": "synthetic-unrealistic-edge-case-fbo-dk.ttl",
+    "synthetic-unrealistic-edge-case-fbo-lt": "synthetic-unrealistic-edge-case-fbo-lt.ttl",
+    "synthetic-unrealistic-edge-case-fbo-nl": "synthetic-unrealistic-edge-case-fbo-nl.ttl",
+    "synthetic-unrealistic-edge-case-fbo-pt": "synthetic-unrealistic-edge-case-fbo-pt.ttl",
 }
 RULE_IDS = {
     "ifc_only": "ifc-only-rule-compliant",

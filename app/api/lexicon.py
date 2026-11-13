@@ -60,6 +60,8 @@ from app.schemas.lexicon import (
     LexiconReconstructionResponse,
     LexiconRuleOntologySimilarityRequest,
     LexiconRuleOntologySimilarityResponse,
+    LexiconRuleTermValidationRequest,
+    LexiconRuleTermValidationResponse,
 )
 from app.storage.graph_store import GraphStoreError, GraphStoreNotFoundError
 from app.storage.lexicon_handshake_repository import (
@@ -277,6 +279,23 @@ def score_rule_ontology_similarity(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to score rule ontology similarity",
+        ) from exc
+
+
+@router.post("/catalog/rule-term-validation", response_model=LexiconRuleTermValidationResponse)
+def validate_rule_terms(payload: LexiconRuleTermValidationRequest) -> LexiconRuleTermValidationResponse:
+    """Validate rule target classes and property paths against the selected ontologies."""
+    try:
+        return service.validate_rule_terms(payload)
+    except (GraphStoreError, GraphStoreNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to validate rule terms against lexicon catalogs", exc_info=exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to validate rule terms against lexicon catalogs",
         ) from exc
 
 
@@ -706,6 +725,14 @@ def derive_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconPro
             selected_ontologies=payload.selected_ontologies,
             canonical_target_ontology=payload.canonical_target_ontology,
         )
+        graph_coverage = None
+        if payload.graph_id:
+            graph_coverage = service.compute_profile_graph_coverage(
+                profile_id="derived",
+                graph_id=payload.graph_id,
+                selected_ontologies=selected_ontologies["selected_ontologies"],
+                expected_profile=profile,
+            )
         return LexiconProfileDeriveResponse(
             ontology_family=ontology.ontology_family,
             country=ontology.country,
@@ -717,6 +744,7 @@ def derive_execution_profile(payload: LexiconProfileDeriveRequest) -> LexiconPro
             rule_ids=rule_ids,
             rule_profiles=rule_profiles,
             profile=profile,
+            graph_coverage=graph_coverage,
         )
     except (GraphStoreError, GraphStoreNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

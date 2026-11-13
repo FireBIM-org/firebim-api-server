@@ -1,5 +1,6 @@
 import os
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 # Minimal settings needed before importing the API modules.
 os.environ.setdefault("POSTGRES_HOST", "localhost")
@@ -21,6 +22,7 @@ from fastapi.testclient import TestClient
 from app.api import checks as checks_api
 from app.api import graphs as graphs_api
 from app.api import rules as rules_api
+from app.models.database import get_db
 
 
 class DummyRepo:
@@ -211,6 +213,14 @@ def client(monkeypatch):
     app.include_router(rules_api.router)
     app.include_router(checks_api.router)
 
+    # Mock database to avoid real Postgres connection
+    mock_db = MagicMock()
+    # Mock for list_graphs
+    mock_db.exec.return_value.all.return_value = []
+    # Mock for single model lookups (IfcModel)
+    mock_db.exec.return_value.first.return_value = None
+    app.dependency_overrides[get_db] = lambda: mock_db
+
     # Graphs API
     monkeypatch.setattr(graphs_api, "repo", DummyRepo())
 
@@ -343,7 +353,7 @@ def client(monkeypatch):
 
     # Checks API
     monkeypatch.setattr(
-        checks_api.CheckSolverSelector, "build_engine", lambda self, requested_mode=None: DummyCheckEngine()
+        checks_api.CheckSolverSelector, "build_engine", lambda self, requested_mode=None, **kwargs: DummyCheckEngine()
     )
     monkeypatch.setattr(
         checks_api.CheckSolverSelector,
@@ -351,6 +361,7 @@ def client(monkeypatch):
         lambda self, requested_mode=None: requested_mode or "standard",
     )
     monkeypatch.setattr(checks_api, "BlindShaclRuleRunner", DummyBlindRunner)
+    monkeypatch.setattr(checks_api, "_published_ontology_summaries", lambda: [])
     monkeypatch.setattr(
         checks_api,
         "fetch_rule_ttl",
@@ -846,12 +857,14 @@ def test_checks_run(client):
 def test_checks_run_vertical(client):
     response = client.post("/checks/run-vertical", json={"rule_id": "room_area_rule", "graph_id": "building-a"})
     assert response.status_code == 200
+    assert response.json()["success"] is True
     assert response.json()["solver"] == "vertical"
 
 
 def test_checks_run_horisontal(client):
     response = client.post("/checks/run-horisontal", json={"rule_id": "room_area_rule", "graph_id": "building-a"})
     assert response.status_code == 200
+    assert response.json()["success"] is True
     assert response.json()["solver"] == "horizontal"
 
 
@@ -859,6 +872,7 @@ def test_checks_run_diagnostic(client):
     response = client.post("/checks/run-diagnostic", json={"rule_id": "room_area_rule", "graph_id": "building-a"})
     assert response.status_code == 200
     body = response.json()
+    assert body["success"] is True
     assert body["engine"]["diagnostics_enabled"] is True
     assert "timings" in body
     assert "completed_chains" in body

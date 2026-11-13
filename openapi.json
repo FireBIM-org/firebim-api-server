@@ -370,6 +370,45 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "ifc-models"
+        ],
+        "summary": "Delete Model",
+        "description": "Delete an IFC model, its related data in DB, and its files in S3.",
+        "operationId": "delete_model_ifc_models__id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/ifc-models/{id}/download": {
@@ -398,6 +437,62 @@
         ],
         "responses": {
           "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ifc-models/{id}/data-payload": {
+      "post": {
+        "tags": [
+          "ifc-models"
+        ],
+        "summary": "Upload Data Payload",
+        "description": "Bulk upload IFC model data (entities, properties, relationships) into SQL tables.",
+        "operationId": "upload_data_payload_ifc_models__id__data_payload_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IfcSqlDataUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -1024,6 +1119,48 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LexiconRuleOntologySimilarityResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lexicon/catalog/rule-term-validation": {
+      "post": {
+        "tags": [
+          "lexicon"
+        ],
+        "summary": "Validate Rule Terms",
+        "description": "Validate rule target classes and property paths against the selected ontologies.",
+        "operationId": "validate_rule_terms_lexicon_catalog_rule_term_validation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LexiconRuleTermValidationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LexiconRuleTermValidationResponse"
                 }
               }
             }
@@ -2803,6 +2940,28 @@
         }
       }
     },
+    "/ontologies": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "List Ontologies",
+        "description": "List every ontology family/country currently published in this API.",
+        "operationId": "list_ontologies_ontologies_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologyListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ontologies/publish": {
       "post": {
         "tags": [
@@ -2847,6 +3006,237 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/ontologies/sync/source": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Get Sync Source",
+        "description": "The public registry this API syncs from by default (no credentials needed to read it).",
+        "operationId": "get_sync_source_ontologies_sync_source_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologySyncSourceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ontologies/sync/preview": {
+      "post": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Preview Ontology Sync",
+        "description": "Fetch a registry index and report what a sync would publish, update or skip. Publishes nothing.",
+        "operationId": "preview_ontology_sync_ontologies_sync_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/OntologySyncRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologySyncResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/ontologies/sync": {
+      "post": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Sync Ontologies",
+        "description": "Pull ontology releases from a public registry (default: firebim.org) into this API.\n\nNew versions are published; existing versions are left untouched unless ``overwrite`` is set.\nUse ``selections`` to sync specific ``family/country/version`` items, or ``dry_run`` to preview.",
+        "operationId": "sync_ontologies_ontologies_sync_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/OntologySyncRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologySyncResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/ontologies/sync/jobs": {
+      "post": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Start Ontology Sync Job",
+        "description": "Queue an ontology sync so large releases do not hold an HTTP request open.",
+        "operationId": "start_ontology_sync_job_ontologies_sync_jobs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/OntologySyncRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologySyncJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/ontologies/sync/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "ontologies"
+        ],
+        "summary": "Get Ontology Sync Job",
+        "operationId": "get_ontology_sync_job_ontologies_sync_jobs__job_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OntologySyncJobResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/ontologies/conversions/dictionary-json-to-ttl": {
@@ -5403,6 +5793,28 @@
             "type": "integer",
             "title": "Max Steps",
             "default": 100000
+          },
+          "schema": {
+            "type": "string",
+            "title": "Schema",
+            "description": "see CheckRunOptions.schema",
+            "default": "auto"
+          },
+          "use_derived_from": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Use Derived From",
+            "description": "see CheckRunOptions.use_derived_from"
+          },
+          "target_nodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Nodes",
+            "description": "see CheckRunOptions.target_nodes"
           }
         },
         "type": "object",
@@ -5499,6 +5911,13 @@
             },
             "type": "object",
             "title": "Message Counts"
+          },
+          "derived_values": {
+            "items": {
+              "$ref": "#/components/schemas/CheckDerivedValue"
+            },
+            "type": "array",
+            "title": "Derived Values"
           },
           "debug": {
             "additionalProperties": true,
@@ -5745,6 +6164,57 @@
         ],
         "title": "CheckCompatibilityResponse"
       },
+      "CheckDerivedValue": {
+        "properties": {
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "property": {
+            "type": "string",
+            "title": "Property"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "expression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expression"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Inputs"
+          },
+          "overwrote_previous": {
+            "title": "Overwrote Previous"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target",
+          "property"
+        ],
+        "title": "CheckDerivedValue"
+      },
       "CheckDiagnosticResponse": {
         "properties": {
           "success": {
@@ -5842,6 +6312,29 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Debug"
+          },
+          "derived_values": {
+            "items": {
+              "$ref": "#/components/schemas/CheckDerivedValue"
+            },
+            "type": "array",
+            "title": "Derived Values"
+          },
+          "derived_graph_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived Graph Uri"
+          },
+          "derived_persisted": {
+            "type": "boolean",
+            "title": "Derived Persisted",
+            "default": false
           },
           "compiled_rule": {
             "additionalProperties": true,
@@ -6029,6 +6522,18 @@
               }
             ],
             "title": "Analysis Code"
+          },
+          "next_rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Rule",
+            "description": "end_kind 'rule': rule that continues for these targets"
           },
           "count": {
             "type": "integer",
@@ -6259,6 +6764,34 @@
             "type": "boolean",
             "title": "Diagnostic Success Only",
             "default": false
+          },
+          "persist_derived": {
+            "type": "boolean",
+            "title": "Persist Derived",
+            "description": "Publish values written by derive elements to the derived named graph of this graph/rule",
+            "default": false
+          },
+          "use_derived_from": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Use Derived From",
+            "description": "Rule ids whose persisted derived graphs are merged into the building graph before evaluation"
+          },
+          "target_nodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Nodes",
+            "description": "Restrict the run to these target IRIs (used by the RuleBook to chain a rule only for the targets that reached an end element with next_rule)"
+          },
+          "schema": {
+            "type": "string",
+            "title": "Schema",
+            "description": "Which published ontologies' schema triples (subClassOf, subPropertyOf, equivalentClass/Property, inverseOf) are merged into the building graph before evaluation: 'auto' = every ontology whose namespace the rule uses, 'none' = no merge, or a comma-separated list of family/country[/version]",
+            "default": "auto"
           }
         },
         "type": "object",
@@ -6427,6 +6960,29 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Debug"
+          },
+          "derived_values": {
+            "items": {
+              "$ref": "#/components/schemas/CheckDerivedValue"
+            },
+            "type": "array",
+            "title": "Derived Values"
+          },
+          "derived_graph_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived Graph Uri"
+          },
+          "derived_persisted": {
+            "type": "boolean",
+            "title": "Derived Persisted",
+            "default": false
           }
         },
         "type": "object",
@@ -6630,15 +7186,37 @@
             "title": "Graph Uri"
           },
           "ttl": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Ttl"
+          },
+          "nodes": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "edges": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Edges"
           }
         },
         "type": "object",
         "required": [
           "graph_id",
-          "graph_uri",
-          "ttl"
+          "graph_uri"
         ],
         "title": "GraphFetchResponse"
       },
@@ -6658,6 +7236,28 @@
               }
             ],
             "title": "Triple Count"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
           }
         },
         "type": "object",
@@ -6954,6 +7554,153 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "IfcEntityCreate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "globalId": {
+            "type": "string",
+            "title": "Globalid"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "attributes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Attributes",
+            "default": {}
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parentid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "globalId"
+        ],
+        "title": "IfcEntityCreate"
+      },
+      "IfcPropertyCreate": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id"
+          },
+          "property_set_name": {
+            "type": "string",
+            "title": "Property Set Name"
+          },
+          "property_name": {
+            "type": "string",
+            "title": "Property Name"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_id",
+          "property_set_name",
+          "property_name",
+          "value",
+          "value_type"
+        ],
+        "title": "IfcPropertyCreate"
+      },
+      "IfcQuantityCreate": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id"
+          },
+          "quantity_set_name": {
+            "type": "string",
+            "title": "Quantity Set Name"
+          },
+          "quantity_name": {
+            "type": "string",
+            "title": "Quantity Name"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_id",
+          "quantity_set_name",
+          "quantity_name",
+          "value",
+          "value_type"
+        ],
+        "title": "IfcQuantityCreate"
+      },
+      "IfcSqlDataUpload": {
+        "properties": {
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/IfcEntityCreate"
+            },
+            "type": "array",
+            "title": "Entities",
+            "default": []
+          },
+          "properties": {
+            "items": {
+              "$ref": "#/components/schemas/IfcPropertyCreate"
+            },
+            "type": "array",
+            "title": "Properties",
+            "default": []
+          },
+          "quantities": {
+            "items": {
+              "$ref": "#/components/schemas/IfcQuantityCreate"
+            },
+            "type": "array",
+            "title": "Quantities",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "IfcSqlDataUpload"
       },
       "LexiconAcceptedTarget": {
         "properties": {
@@ -10504,6 +11251,320 @@
         ],
         "title": "LexiconRuleSimilarityTermResult"
       },
+      "LexiconRuleTermValidationFieldResult": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "target_class",
+              "property_path"
+            ],
+            "title": "Field"
+          },
+          "expected_kind": {
+            "type": "string",
+            "enum": [
+              "class",
+              "property"
+            ],
+            "title": "Expected Kind"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleTermValidationMatch"
+            },
+            "type": "array",
+            "title": "Matches"
+          },
+          "issue": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LexiconRuleTermValidationIssue"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "expected_kind",
+          "value",
+          "valid"
+        ],
+        "title": "LexiconRuleTermValidationFieldResult"
+      },
+      "LexiconRuleTermValidationIssue": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "field": {
+            "type": "string",
+            "enum": [
+              "target_class",
+              "property_path"
+            ],
+            "title": "Field"
+          },
+          "expected_kind": {
+            "type": "string",
+            "enum": [
+              "class",
+              "property"
+            ],
+            "title": "Expected Kind"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "unknown_term",
+              "wrong_term_kind"
+            ],
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "node_id",
+          "field",
+          "expected_kind",
+          "value",
+          "code",
+          "message"
+        ],
+        "title": "LexiconRuleTermValidationIssue"
+      },
+      "LexiconRuleTermValidationMatch": {
+        "properties": {
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "term_id": {
+            "type": "string",
+            "title": "Term Id"
+          },
+          "uri": {
+            "type": "string",
+            "title": "Uri"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ontology_family",
+          "country",
+          "version",
+          "term_id",
+          "uri"
+        ],
+        "title": "LexiconRuleTermValidationMatch"
+      },
+      "LexiconRuleTermValidationNodeResult": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleTermValidationFieldResult"
+            },
+            "type": "array",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "node_id",
+          "valid"
+        ],
+        "title": "LexiconRuleTermValidationNodeResult"
+      },
+      "LexiconRuleTermValidationRequest": {
+        "properties": {
+          "selected_ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSelectedOntology"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Selected Ontologies"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id"
+          },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
+          "rule": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuleDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/RuleDraft"
+            },
+            "type": "array",
+            "title": "Rules"
+          }
+        },
+        "type": "object",
+        "title": "LexiconRuleTermValidationRequest"
+      },
+      "LexiconRuleTermValidationResponse": {
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "rule_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rule Ids"
+          },
+          "selected_ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconSelectedOntology"
+            },
+            "type": "array",
+            "title": "Selected Ontologies"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleTermValidationNodeResult"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/LexiconRuleTermValidationIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/LexiconRuleTermValidationStats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valid",
+          "stats"
+        ],
+        "title": "LexiconRuleTermValidationResponse"
+      },
+      "LexiconRuleTermValidationStats": {
+        "properties": {
+          "rule_count": {
+            "type": "integer",
+            "title": "Rule Count"
+          },
+          "ontology_count": {
+            "type": "integer",
+            "title": "Ontology Count"
+          },
+          "validated_node_count": {
+            "type": "integer",
+            "title": "Validated Node Count"
+          },
+          "validated_field_count": {
+            "type": "integer",
+            "title": "Validated Field Count"
+          },
+          "invalid_node_count": {
+            "type": "integer",
+            "title": "Invalid Node Count"
+          },
+          "issue_count": {
+            "type": "integer",
+            "title": "Issue Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_count",
+          "ontology_count",
+          "validated_node_count",
+          "validated_field_count",
+          "invalid_node_count",
+          "issue_count"
+        ],
+        "title": "LexiconRuleTermValidationStats"
+      },
       "LexiconSelectedOntology": {
         "properties": {
           "ontology_family": {
@@ -12069,6 +13130,26 @@
         ],
         "title": "OntologyHealthResponse"
       },
+      "OntologyListResponse": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/OntologySummaryResponse"
+            },
+            "type": "array",
+            "title": "Ontologies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count"
+        ],
+        "title": "OntologyListResponse"
+      },
       "OntologyPublishRequest": {
         "properties": {
           "ontology_family": {
@@ -12345,6 +13426,456 @@
           "stable_url"
         ],
         "title": "OntologySummaryResponse"
+      },
+      "OntologySyncAction": {
+        "type": "string",
+        "enum": [
+          "publish",
+          "update",
+          "current",
+          "skip",
+          "failed"
+        ],
+        "title": "OntologySyncAction"
+      },
+      "OntologySyncItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "'<family>/<country>/<version>'"
+          },
+          "ontology_family": {
+            "type": "string",
+            "title": "Ontology Family"
+          },
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OntologyReleaseStatus"
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date",
+            "title": "Issued At"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "default": "ontology"
+          },
+          "visibility": {
+            "type": "string",
+            "title": "Visibility",
+            "default": "public"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "ttl_url": {
+            "type": "string",
+            "title": "Ttl Url"
+          },
+          "remote_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remote Sha256"
+          },
+          "remote_byte_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remote Byte Size"
+          },
+          "is_latest": {
+            "type": "boolean",
+            "title": "Is Latest",
+            "default": false
+          },
+          "is_stable": {
+            "type": "boolean",
+            "title": "Is Stable",
+            "default": false
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "default": false
+          },
+          "local_exists": {
+            "type": "boolean",
+            "title": "Local Exists",
+            "default": false
+          },
+          "local_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Local Sha256"
+          },
+          "local_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OntologyReleaseStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "action": {
+            "$ref": "#/components/schemas/OntologySyncAction"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "published": {
+            "type": "boolean",
+            "title": "Published",
+            "default": false
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ontology_family",
+          "country",
+          "version",
+          "status",
+          "issued_at",
+          "ttl_url",
+          "action",
+          "reason"
+        ],
+        "title": "OntologySyncItem"
+      },
+      "OntologySyncJobResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OntologySyncJobStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OntologySyncResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "status",
+          "created_at"
+        ],
+        "title": "OntologySyncJobResponse"
+      },
+      "OntologySyncJobStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "completed",
+          "failed"
+        ],
+        "title": "OntologySyncJobStatus"
+      },
+      "OntologySyncRequest": {
+        "properties": {
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "URL of a registry index (default: the public firebim.org registry). Any registry serving the same JSON format is accepted."
+          },
+          "families": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Families",
+            "description": "Only sync these ontology families, e.g. ['fbo']"
+          },
+          "countries": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Countries",
+            "description": "Only sync these countries, e.g. ['dk', 'core']"
+          },
+          "selections": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selections",
+            "description": "Explicit '<family>/<country>/<version>' identifiers to sync; overrides the other filters"
+          },
+          "include_unlisted": {
+            "type": "boolean",
+            "title": "Include Unlisted",
+            "description": "Also sync entries the registry marks as unlisted",
+            "default": true
+          },
+          "latest_only": {
+            "type": "boolean",
+            "title": "Latest Only",
+            "description": "Only sync the newest version of each ontology",
+            "default": false
+          },
+          "overwrite": {
+            "type": "boolean",
+            "title": "Overwrite",
+            "description": "Re-publish versions that already exist locally but whose content or status differs",
+            "default": false
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "description": "Only compute the plan; publish nothing",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "OntologySyncRequest"
+      },
+      "OntologySyncResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "registry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry"
+          },
+          "schema_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schema Version"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run"
+          },
+          "fetched_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetched At"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "to_publish": {
+            "type": "integer",
+            "title": "To Publish"
+          },
+          "to_update": {
+            "type": "integer",
+            "title": "To Update"
+          },
+          "current": {
+            "type": "integer",
+            "title": "Current"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "published": {
+            "type": "integer",
+            "title": "Published"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OntologySyncItem"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_url",
+          "dry_run",
+          "fetched_at",
+          "total",
+          "to_publish",
+          "to_update",
+          "current",
+          "skipped",
+          "published",
+          "failed"
+        ],
+        "title": "OntologySyncResponse"
+      },
+      "OntologySyncSourceResponse": {
+        "properties": {
+          "default_source_url": {
+            "type": "string",
+            "title": "Default Source Url"
+          },
+          "registry_format": {
+            "type": "string",
+            "title": "Registry Format",
+            "default": "firebim-ontology-registry"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version",
+            "default": 1
+          },
+          "documentation_url": {
+            "type": "string",
+            "title": "Documentation Url",
+            "default": "https://firebim.org/documentation/ontologies/#developers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "default_source_url"
+        ],
+        "title": "OntologySyncSourceResponse"
       },
       "OntologyVersionFetchResponse": {
         "properties": {
@@ -13476,6 +15007,13 @@
             "type": "string",
             "title": "Ttl"
           },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
           "success": {
             "type": "boolean",
             "title": "Success",
@@ -14083,6 +15621,18 @@
             ],
             "title": "Value"
           },
+          "expression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expression",
+            "description": "derive elements only: expression written to property_path (see app.rules.expressions)"
+          },
           "true_path": {
             "anyOf": [
               {
@@ -14313,6 +15863,18 @@
             ],
             "title": "Value"
           },
+          "expression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expression",
+            "description": "derive elements only: expression written to property_path (see app.rules.expressions)"
+          },
           "true_path": {
             "anyOf": [
               {
@@ -14421,6 +15983,18 @@
               }
             ],
             "title": "Value"
+          },
+          "expression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expression",
+            "description": "derive elements only: expression written to property_path (see app.rules.expressions)"
           },
           "true_path": {
             "anyOf": [
@@ -15375,6 +16949,13 @@
             },
             "type": "array",
             "title": "Errors"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
           },
           "success": {
             "type": "boolean",

@@ -15,11 +15,14 @@ from app.rules.composer import (
 from app.rules.decompiler import decompile_rule_element_ttl, decompile_ruleset_ttl
 from app.rules.dsl import RuleElementBuilder
 from app.rules.element_validator import validate_rule_element_payload
+from app.rules.lint import lint_rule
 from app.rules.models import fbRuleElement
+from app.rules.paths import is_ref_value, ref_path, split_property_path
 from app.rules.publisher import (
     default_rule_element_graph_uri,
     default_rule_graph_uri,
     delete_graph_ttl,
+    display_title,
     fetch_graph_ttl,
     forget_graph,
     list_rule_element_entries,
@@ -106,6 +109,7 @@ def _rule_element_to_json(element: dict, graph_uri: str | None = None) -> RuleEl
         property_path=element.get("property_path"),
         operator=element.get("operator"),
         value=element.get("value"),
+        expression=element.get("expression"),
         true_path=element.get("true_path"),
         false_path=element.get("false_path"),
         unknown_path=element.get("unknown_path"),
@@ -124,6 +128,9 @@ def _normalize_rule_dict(rule: dict | None) -> dict | None:
         "id": rule.get("id"),
         "entry": rule.get("entry"),
         "elements": [],
+        "title": rule.get("title"),
+        "description": rule.get("description"),
+        "source": rule.get("source"),
     }
     for raw in elements:
         item = dict(raw)
@@ -144,6 +151,9 @@ def _rule_to_composer_dict(rule: dict) -> dict:
         "id": rule.get("id"),
         "entry": rule.get("entry"),
         "nodes": nodes,
+        "title": rule.get("title"),
+        "description": rule.get("description"),
+        "source": rule.get("source"),
     }
 
 
@@ -160,6 +170,7 @@ def _build_rule(rule_payload) -> Rule:
             property_path=raw_element.property_path,
             operator=raw_element.operator,
             value=raw_element.value,
+            expression=raw_element.expression,
             true_path=raw_element.true_path,
             false_path=raw_element.false_path,
             unknown_path=raw_element.unknown_path,
@@ -171,7 +182,36 @@ def _build_rule(rule_payload) -> Rule:
 
     rule.start(rule_payload.entry)
     rule.validate()
+    rule.title = _rule_title(rule_payload)
+    rule.description = rule_payload.description
+    rule.source = rule_payload.source
     return rule
+
+
+def _rule_title(rule_payload) -> str | None:
+    """Explicit title, else the start element's `config.rule_title`, else its label without 'Start:'."""
+    if rule_payload.title and rule_payload.title.strip():
+        return rule_payload.title.strip()
+    for element in rule_payload.elements:
+        if element.id == rule_payload.entry:
+            config = element.config or {}
+            if config.get("rule_title"):
+                return str(config["rule_title"]).strip()
+            return display_title(None, element.label)
+    return None
+
+
+def _lint_rule_payload(rule_payload) -> list[str]:
+    """Whole-rule checks (cycles, derive ordering, degenerate comparisons). Raises on errors, returns warnings."""
+    rule_dict = {
+        "id": rule_payload.id,
+        "entry": rule_payload.entry,
+        "elements": [element.as_internal_dict() for element in rule_payload.elements],
+    }
+    errors, warnings = lint_rule(rule_dict)
+    if errors:
+        raise ValueError("; ".join(errors))
+    return warnings
 
 
 def _rule_label(rule_payload) -> str | None:
@@ -262,7 +302,18 @@ def _local_name_groups(terms: list[str]) -> list[RuleTermLocalNameGroup]:
 def _collect_rule_term_values(rule: dict) -> dict:
     elements = rule.get("elements", [])
     target_classes_raw = [str(item["target_class"]) for item in elements if item.get("target_class")]
-    property_paths_raw = [str(item["property_path"]) for item in elements if item.get("property_path")]
+    # sequence paths and $ref values contribute every segment they touch
+    property_paths_raw = [
+        segment
+        for item in elements
+        if item.get("property_path")
+        for segment in split_property_path(str(item["property_path"]))
+    ] + [
+        segment
+        for item in elements
+        if is_ref_value(item.get("value"))
+        for segment in split_property_path(ref_path(item.get("value")))
+    ]
     pair_keys = {
         (str(item["target_class"]), str(item["property_path"]))
         for item in elements
@@ -463,6 +514,7 @@ def rules_health():
 def validate_rule(payload: RuleValidateRequest):
     try:
         rule = _build_rule(payload.rule)
+        warnings = _lint_rule_payload(payload.rule)
         count = len(rule.elements)
         return RuleValidateResponse(
             valid=True,
@@ -470,6 +522,7 @@ def validate_rule(payload: RuleValidateRequest):
             entry=rule.entry,
             element_count=count,
             errors=[],
+            warnings=warnings,
         )
     except ValueError as exc:
         count = len(payload.rule.elements)
@@ -501,6 +554,7 @@ def validate_rule(payload: RuleValidateRequest):
 def compile_rule(payload: RuleCompileRequest):
     try:
         rule = _build_rule(payload.rule)
+        warnings = _lint_rule_payload(payload.rule)
         builder = SHACLBuilder()
         builder.add_rule_set(rule)
         ttl = builder.get_graph().serialize(format="turtle")
@@ -509,6 +563,7 @@ def compile_rule(payload: RuleCompileRequest):
             rule_id=rule.id,
             element_count=count,
             ttl=str(ttl),
+            warnings=warnings,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -543,6 +598,7 @@ def publish_rule(payload: RulePublishRequest):
 
     try:
         rule = _build_rule(payload.rule)
+        _lint_rule_payload(payload.rule)
         builder = SHACLBuilder()
         builder.add_rule_set(rule)
         ttl = builder.get_graph().serialize(format="turtle")
@@ -708,15 +764,16 @@ def derive_rule_element(payload: RuleElementDeriveRequest):
 def publish_rule_element(payload: RuleElementPublishRequest):
     graph_uri = _resolve_rule_element_graph_uri(payload.id)
     node_data = payload.as_internal_dict()
-    validate_rule_element_payload(node_data)
 
     try:
+        validate_rule_element_payload(node_data)
         element = fbRuleElement(
             id=payload.id,
             target_class=payload.target_class,
             property_path=payload.property_path,
             operator=payload.operator,
             value=payload.value,
+            expression=payload.expression,
             true_path=payload.true_path,
             false_path=payload.false_path,
             unknown_path=payload.unknown_path,

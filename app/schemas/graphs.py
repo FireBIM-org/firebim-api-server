@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from app.schemas.checks import GraphAssertion
+
 
 class GraphsHealthResponse(BaseModel):
     status: str
@@ -25,9 +27,36 @@ class GraphPublishResponse(BaseModel):
     message: str
 
 
+class GraphAnswersRequest(BaseModel):
+    """Write a person's answers into an *answered copy* of a building graph (the original is never changed)."""
+
+    assertions: list[GraphAssertion] = Field(..., min_length=1)
+    answered_graph_id: str | None = Field(
+        default=None,
+        description="Id of the answered copy (default '<graph_id>--answered'); answering again extends the same copy",
+    )
+
+
+class GraphAnswersResponse(BaseModel):
+    success: bool = True
+    graph_id: str = Field(..., description="The answered copy")
+    graph_uri: str
+    base_graph_id: str
+    created: bool = Field(..., description="False when the answered copy already existed and was extended")
+    applied: int
+    triple_count: int
+    message: str
+
+
 class GraphListItem(BaseModel):
     graph_uri: str
     triple_count: int | None = None
+    label: str | None = Field(default=None, description="What the graph calls itself (`<graph_uri> rdfs:label`)")
+    description: str | None = Field(
+        default=None,
+        description="What the graph says about itself (`<graph_uri> rdfs:comment`), e.g. which rules it is meant for",
+    )
+    source: str | None = None
 
 
 class GraphListResponse(BaseModel):
@@ -48,7 +77,9 @@ class GraphFetchResponse(BaseModel):
     success: bool = True
     graph_id: str
     graph_uri: str
-    ttl: str
+    ttl: str | None = None
+    nodes: list[dict] = Field(default_factory=list)
+    edges: list[dict] = Field(default_factory=list)
 
 
 class GraphSchemaExtractRequest(BaseModel):

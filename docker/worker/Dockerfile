@@ -48,4 +48,4 @@ ENV GIT_BRANCH=$GIT_BRANCH \
 USER appuser
 
 # Command to run the Celery worker
-CMD ["celery", "-A", "app.workers.celery_worker", "worker", "--loglevel=info"]
+CMD ["celery", "-A", "app.workers.celery_worker", "worker", "--loglevel=info", "--concurrency=1"]

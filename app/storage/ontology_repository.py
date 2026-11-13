@@ -71,6 +71,47 @@ class OntologyRepository:
 
     def get_summary(self, ontology_family: str, country: str) -> dict:
         manifest = self._load_manifest(ontology_family, country)
+        return self._summary_from_manifest(manifest, ontology_family, country)
+
+    def list_summaries(self) -> list[dict]:
+        prefix = f"{MANIFEST_ROOT_PREFIX}/"
+        pairs: set[tuple[str, str]] = set()
+        continuation_token: str | None = None
+
+        while True:
+            kwargs = {
+                "Bucket": self.client.bucket_name,
+                "Prefix": prefix,
+                "MaxKeys": 1000,
+            }
+            if continuation_token:
+                kwargs["ContinuationToken"] = continuation_token
+
+            try:
+                response = self.client.client.list_objects_v2(**kwargs)
+            except (BotoCoreError, ClientError) as exc:
+                raise GraphStoreError(f"Ontology manifest list failed: {exc}") from exc
+
+            for obj in response.get("Contents", []):
+                key = str(obj.get("Key", ""))
+                relative = key.removeprefix(prefix)
+                parts = relative.split("/")
+                if len(parts) != 2 or not parts[1].endswith(".json"):
+                    continue
+                ontology_family = parts[0].strip().lower()
+                country = parts[1][:-5].strip().lower()
+                if ontology_family and country:
+                    pairs.add((ontology_family, country))
+
+            if not response.get("IsTruncated"):
+                break
+            continuation_token = response.get("NextContinuationToken")
+            if not continuation_token:
+                break
+
+        return [self.get_summary(family, country) for family, country in sorted(pairs)]
+
+    def _summary_from_manifest(self, manifest: dict, ontology_family: str, country: str) -> dict:
         versions = manifest.get("versions", [])
         latest_version = self._latest_version(versions)
         stable_version = self._latest_stable_version(versions)
@@ -182,7 +223,12 @@ class OntologyRepository:
         else:
             manifest["default_version"] = manifest.get("default_version") or latest_stable_version or latest_version
 
-        self.client.put_graph_ttl(self.dataset, graph_uri, ttl)
+        self.client.put_graph_ttl(
+            self.dataset,
+            graph_uri,
+            ttl,
+            triple_count=metadata["triple_count"],
+        )
         self._save_manifest(payload.ontology_family, payload.country, manifest)
 
         return {

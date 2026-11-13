@@ -1,0 +1,334 @@
+# SYNTHETIC TEST GRAPH — NOT A REAL BUILDING.
+# Three-storey office with 25 rooms, using generic FBO and FBO-LT.
+
+@prefix ex: <https://firebim.org/test-data/lt/three-storey-office/>.
+@prefix fbo: <https://firebim.org/ontologies/fbo#>.
+@prefix fbo-lt: <https://firebim.org/ontologies/fbo/lt#>.
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>.
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#>.
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#>.
+
+ex:office-building a fbo:Building;
+    rdfs:label "FireBIM Harbour Office"@en;
+    fbo:hasSubitem ex:ground-storey, ex:first-storey, ex:second-storey.
+ex:project-new-office rdfs:label "New office construction"@en.
+ex:passive-protection-package rdfs:label "Compartmentation and protected egress package"@en.
+ex:alarm-system a fbo:AutomaticFireAlarmsystem;
+    rdfs:label "Addressable automatic fire alarm system"@en.
+ex:warning-system a fbo:AutomaticWarningSystem;
+    rdfs:label "Voice warning system"@en.
+ex:sprinkler-system rdfs:label "Office sprinkler system"@en.
+ex:smoke-alarm-system a fbo:FireSafetyInstallationSmokeAlarmsystem;
+    rdfs:label "Smoke alarm installation"@en.
+ex:smoke-ventilation-system a fbo:AutomaticFireVentilationsystem;
+    rdfs:label "Stair and canteen smoke ventilation system"@en.
+ex:hose-reel a fbo:HoseReel;
+    rdfs:label "Central stair hose reel"@en.
+ex:ground-storey a fbo:BuildingStorey;
+    rdfs:label "Ground storey"@en;
+    fbo:hasSubitem ex:g-corridor, ex:g-stair, ex:g-lift, ex:g-toilet, ex:g-printer, ex:g-reception, ex:g-open-office, ex:g-meeting.
+ex:first-storey a fbo:BuildingStorey;
+    rdfs:label "First storey"@en;
+    fbo:hasSubitem ex:f-corridor, ex:f-stair, ex:f-lift, ex:f-toilet, ex:f-printer, ex:f-open-office, ex:f-private-office, ex:f-meeting.
+ex:second-storey a fbo:BuildingStorey;
+    rdfs:label "Second storey"@en;
+    fbo:hasSubitem ex:s-corridor, ex:s-stair, ex:s-lift, ex:s-toilet, ex:s-printer, ex:s-canteen, ex:s-kitchen, ex:s-boardroom, ex:s-storage.
+ex:function-lift-lobby rdfs:label "Lift lobby"@en.
+ex:function-toilet rdfs:label "Toilet and washroom"@en.
+ex:function-reception rdfs:label "Reception"@en.
+ex:function-office rdfs:label "Office space"@en.
+ex:function-copyroom rdfs:label "Printer and copy room"@en.
+ex:function-canteen rdfs:label "Canteen"@en.
+ex:function-storage rdfs:label "Storage room"@en.
+ex:g-corridor rdfs:label "G01 Central corridor"@en;
+    fbo:hasRemarks "Runs along the centre line from the west stair to the east lift."@en.
+ex:g-stair rdfs:label "G02 West-end protected staircase"@en;
+    fbo:hasRemarks "Protected stair at the west end of the central corridor."@en.
+ex:g-lift rdfs:label "G03 East-end lift lobby and lift"@en;
+    fbo:hasRemarks "Lift is at the east end, opposite the protected west stair."@en.
+ex:g-toilet rdfs:label "G04 Accessible toilet"@en.
+ex:g-printer rdfs:label "G05 Printer and copy room"@en.
+ex:g-reception rdfs:label "G06 Reception and waiting area"@en.
+ex:g-open-office rdfs:label "G07 Open office west"@en;
+    fbo:AutomaticFireExtinguishSystem true.
+ex:g-meeting rdfs:label "G08 Client meeting room"@en.
+ex:f-corridor rdfs:label "F01 Central corridor"@en;
+    fbo:hasRemarks "Runs along the centre line from the west stair to the east lift."@en.
+ex:f-stair rdfs:label "F02 West-end protected staircase"@en;
+    fbo:hasRemarks "Protected stair at the west end of the central corridor."@en.
+ex:f-lift rdfs:label "F03 East-end lift lobby and lift"@en;
+    fbo:hasRemarks "Lift is at the east end, opposite the protected west stair."@en.
+ex:f-toilet rdfs:label "F04 Toilet"@en.
+ex:f-printer rdfs:label "F05 Printer and copy room"@en.
+ex:f-open-office rdfs:label "F06 Open office east"@en;
+    fbo:AutomaticFireExtinguishSystem true.
+ex:f-private-office rdfs:label "F07 Private office"@en.
+ex:f-meeting rdfs:label "F08 Project meeting room"@en.
+ex:s-corridor rdfs:label "S01 Central corridor"@en;
+    fbo:hasRemarks "Runs along the centre line from the west stair to the east lift."@en.
+ex:s-stair rdfs:label "S02 West-end protected staircase"@en;
+    fbo:hasRemarks "Protected stair at the west end of the central corridor."@en.
+ex:s-lift rdfs:label "S03 East-end lift lobby and lift"@en;
+    fbo:hasRemarks "Lift is at the east end, opposite the protected west stair."@en.
+ex:s-toilet rdfs:label "S04 Toilet"@en.
+ex:s-printer rdfs:label "S05 Printer and copy room"@en.
+ex:s-canteen rdfs:label "S06 Top-floor canteen"@en;
+    fbo:AutomaticFireExtinguishSystem true.
+ex:s-kitchen rdfs:label "S07 Canteen production kitchen"@en;
+    fbo:AutomaticFireExtinguishSystem true.
+ex:s-boardroom rdfs:label "S08 Boardroom"@en.
+ex:s-storage rdfs:label "S09 Canteen dry storage"@en.
+ex:fc-g-west a fbo:FireCompartment;
+    rdfs:label "Ground west fire compartment"@en;
+    fbo:hasSubitem ex:g-corridor, ex:g-stair, ex:g-printer, ex:g-open-office.
+ex:fc-g-east a fbo:FireCompartment;
+    rdfs:label "Ground east fire compartment"@en;
+    fbo:hasSubitem ex:g-lift, ex:g-toilet, ex:g-reception, ex:g-meeting.
+ex:fc-f-west a fbo:FireCompartment;
+    rdfs:label "First west fire compartment"@en;
+    fbo:hasSubitem ex:f-corridor, ex:f-stair, ex:f-printer, ex:f-private-office, ex:f-meeting.
+ex:fc-f-east a fbo:FireCompartment;
+    rdfs:label "First east fire compartment"@en;
+    fbo:hasSubitem ex:f-lift, ex:f-toilet, ex:f-open-office.
+ex:fc-s-office a fbo:FireCompartment;
+    rdfs:label "Second office fire compartment"@en;
+    fbo:hasSubitem ex:s-corridor, ex:s-stair, ex:s-lift, ex:s-toilet, ex:s-printer, ex:s-boardroom.
+ex:fc-s-canteen a fbo:FireCompartment;
+    rdfs:label "Second canteen fire compartment"@en;
+    fbo:hasSubitem ex:s-canteen, ex:s-kitchen, ex:s-storage.
+ex:wall-g-west a fbo:BoundaryFireCompartment.
+ex:wall-g-east a fbo:BoundaryFireCompartment.
+ex:wall-f-west a fbo:BoundaryFireCompartment.
+ex:wall-f-east a fbo:BoundaryFireCompartment.
+ex:wall-s-office a fbo:BoundaryFireCompartment.
+ex:wall-s-canteen a fbo:BoundaryFireCompartment.
+ex:wall-type-ei60 rdfs:label "EI 60 compartment wall"@en.
+ex:hazard-cooking-oil rdfs:label "Commercial cooking oil fire hazard"@en.
+ex:kitchen-suppression rdfs:label "Wet-chemical cooking hood suppression"@en.
+ex:stair-core-west rdfs:label "Protected west stair core"@en.
+ex:route-ground rdfs:label "Primary route to the protected west stair and ground exit"@en.
+ex:route-first rdfs:label "Primary route to the protected west stair and ground exit"@en.
+ex:route-second rdfs:label "Primary route to the protected west stair and ground exit"@en.
+ex:route-width rdfs:label "Route clear width"@en;
+    fbo:UsefulWidth "1.8"^^xsd:float.
+ex:door-west-exit a fbo:DoorExit, fbo:DoorEscaperoute;
+    rdfs:label "West protected-stair exit door"@en;
+    fbo:SelfClosing true;
+    fbo:SwingDirection "outward".
+ex:ground-exit a fbo:Exit;
+    rdfs:label "Ground-floor final exit"@en.
+ex:exit-lighting rdfs:label "Maintained escape-route lighting"@en.
+ex:panic-lighting rdfs:label "Anti-panic lighting"@en.
+ex:office-building fbo:HeightBuilding "10.8"^^xsd:float;
+    fbo:BuildingFireCompartmentDaytimeoccupancy true;
+    fbo:ActiveFireProtection ex:alarm-system, ex:warning-system, ex:sprinkler-system;
+    fbo:PassiveFireProtection ex:passive-protection-package;
+    fbo:FireSafetyUnit ex:fc-g-west, ex:fc-g-east, ex:fc-f-west, ex:fc-f-east, ex:fc-s-office, ex:fc-s-canteen.
+ex:hose-reel fbo:LengthHosepath "30.0"^^xsd:float.
+ex:ground-storey fbo:FireSafetyUnit ex:fc-g-west, ex:fc-g-east.
+ex:first-storey fbo:FireSafetyUnit ex:fc-f-west, ex:fc-f-east.
+ex:second-storey fbo:FireSafetyUnit ex:fc-s-office, ex:fc-s-canteen.
+ex:g-corridor fbo:AreaFloorRoom "30.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-g-west, ex:fc-g-east;
+    fbo:DistanceActualTravel "24.0"^^xsd:float;
+    fbo:TimeWalking "22.0"^^xsd:float;
+    fbo:EmergencyExitLighting ex:exit-lighting;
+    fbo:EmergencyPanicLights ex:panic-lighting.
+ex:g-stair fbo:AreaFloorRoom "18.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-g-west.
+ex:g-lift fbo:AreaFloorRoom "12.0"^^xsd:float;
+    fbo:Roomfunction ex:function-lift-lobby;
+    fbo:FireSafetyUnit ex:fc-g-east.
+ex:g-toilet fbo:AreaFloorRoom "10.0"^^xsd:float;
+    fbo:Roomfunction ex:function-toilet;
+    fbo:FireSafetyUnit ex:fc-g-east;
+    fbo:DistanceActualTravel "16.0"^^xsd:float.
+ex:g-printer fbo:AreaFloorRoom "12.0"^^xsd:float;
+    fbo:FireLoadDensity "650.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-g-west;
+    fbo:DistanceActualTravel "19.0"^^xsd:float.
+ex:g-reception fbo:AreaFloorRoom "40.0"^^xsd:float;
+    fbo:Roomfunction ex:function-reception;
+    fbo:FireLoadDensity "350.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-g-east;
+    fbo:DistanceActualTravel "14.0"^^xsd:float.
+ex:g-open-office fbo:AreaFloorRoom "120.0"^^xsd:float;
+    fbo:FireLoadDensity "420.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-g-west;
+    fbo:DistanceActualTravel "27.0"^^xsd:float.
+ex:g-meeting fbo:AreaFloorRoom "36.0"^^xsd:float;
+    fbo:FireLoadDensity "300.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-g-east;
+    fbo:DistanceActualTravel "22.0"^^xsd:float.
+ex:f-corridor fbo:AreaFloorRoom "32.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-f-west, ex:fc-f-east;
+    fbo:DistanceActualTravel "26.0"^^xsd:float;
+    fbo:TimeWalking "24.0"^^xsd:float;
+    fbo:EmergencyExitLighting ex:exit-lighting;
+    fbo:EmergencyPanicLights ex:panic-lighting.
+ex:f-stair fbo:AreaFloorRoom "18.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-f-west.
+ex:f-lift fbo:AreaFloorRoom "12.0"^^xsd:float;
+    fbo:Roomfunction ex:function-lift-lobby;
+    fbo:FireSafetyUnit ex:fc-f-east.
+ex:f-toilet fbo:AreaFloorRoom "12.0"^^xsd:float;
+    fbo:Roomfunction ex:function-toilet;
+    fbo:FireSafetyUnit ex:fc-f-east;
+    fbo:DistanceActualTravel "17.0"^^xsd:float.
+ex:f-printer fbo:AreaFloorRoom "10.0"^^xsd:float;
+    fbo:FireLoadDensity "680.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-f-west;
+    fbo:DistanceActualTravel "20.0"^^xsd:float.
+ex:f-open-office fbo:AreaFloorRoom "150.0"^^xsd:float;
+    fbo:FireLoadDensity "430.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-f-east;
+    fbo:DistanceActualTravel "29.0"^^xsd:float.
+ex:f-private-office fbo:AreaFloorRoom "18.0"^^xsd:float;
+    fbo:FireLoadDensity "360.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-f-west;
+    fbo:DistanceActualTravel "23.0"^^xsd:float.
+ex:f-meeting fbo:AreaFloorRoom "45.0"^^xsd:float;
+    fbo:FireLoadDensity "310.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-f-west;
+    fbo:DistanceActualTravel "25.0"^^xsd:float.
+ex:s-corridor fbo:AreaFloorRoom "34.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-s-office, ex:fc-s-canteen;
+    fbo:DistanceActualTravel "30.0"^^xsd:float;
+    fbo:TimeWalking "28.0"^^xsd:float;
+    fbo:EmergencyExitLighting ex:exit-lighting;
+    fbo:EmergencyPanicLights ex:panic-lighting.
+ex:s-stair fbo:AreaFloorRoom "18.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-s-office.
+ex:s-lift fbo:AreaFloorRoom "12.0"^^xsd:float;
+    fbo:Roomfunction ex:function-lift-lobby;
+    fbo:FireSafetyUnit ex:fc-s-office.
+ex:s-toilet fbo:AreaFloorRoom "14.0"^^xsd:float;
+    fbo:Roomfunction ex:function-toilet;
+    fbo:FireSafetyUnit ex:fc-s-office;
+    fbo:DistanceActualTravel "18.0"^^xsd:float.
+ex:s-printer fbo:AreaFloorRoom "10.0"^^xsd:float;
+    fbo:FireLoadDensity "700.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-s-office;
+    fbo:DistanceActualTravel "21.0"^^xsd:float.
+ex:s-canteen fbo:AreaFloorRoom "180.0"^^xsd:float;
+    fbo:FireLoadDensity "500.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-s-canteen;
+    fbo:DistanceActualTravel "31.0"^^xsd:float.
+ex:s-kitchen fbo:AreaFloorRoom "60.0"^^xsd:float;
+    fbo:FireHazardSpecial ex:hazard-cooking-oil;
+    fbo:FireLoadDensity "900.0"^^xsd:float;
+    fbo:ActiveFireProtection ex:kitchen-suppression;
+    fbo:FireSafetyUnit ex:fc-s-canteen;
+    fbo:DistanceActualTravel "28.0"^^xsd:float.
+ex:s-boardroom fbo:AreaFloorRoom "50.0"^^xsd:float;
+    fbo:FireLoadDensity "340.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-s-office;
+    fbo:DistanceActualTravel "26.0"^^xsd:float.
+ex:s-storage fbo:AreaFloorRoom "25.0"^^xsd:float;
+    fbo:FireLoadDensity "1050.0"^^xsd:float;
+    fbo:FireSafetyUnit ex:fc-s-canteen;
+    fbo:DistanceActualTravel "24.0"^^xsd:float.
+ex:fc-g-west fbo:AreaFireCompartment "180.0"^^xsd:float.
+ex:fc-g-east fbo:AreaFireCompartment "98.0"^^xsd:float.
+ex:fc-f-west fbo:AreaFireCompartment "123.0"^^xsd:float.
+ex:fc-f-east fbo:AreaFireCompartment "174.0"^^xsd:float.
+ex:fc-s-office fbo:AreaFireCompartment "138.0"^^xsd:float.
+ex:fc-s-canteen fbo:AreaFireCompartment "265.0"^^xsd:float;
+    fbo:FireHazardSpecial ex:hazard-cooking-oil.
+ex:wall-g-west fbo:FireResistance "60.0"^^xsd:float;
+    fbo:WalltypeCompartmentFirewall ex:wall-type-ei60;
+    fbo:PassiveFireProtection ex:passive-protection-package.
+ex:wall-g-east fbo:FireResistance "60.0"^^xsd:float;
+    fbo:WalltypeCompartmentFirewall ex:wall-type-ei60;
+    fbo:PassiveFireProtection ex:passive-protection-package.
+ex:wall-f-west fbo:FireResistance "60.0"^^xsd:float;
+    fbo:WalltypeCompartmentFirewall ex:wall-type-ei60;
+    fbo:PassiveFireProtection ex:passive-protection-package.
+ex:wall-f-east fbo:FireResistance "60.0"^^xsd:float;
+    fbo:WalltypeCompartmentFirewall ex:wall-type-ei60;
+    fbo:PassiveFireProtection ex:passive-protection-package.
+ex:wall-s-office fbo:FireResistance "60.0"^^xsd:float;
+    fbo:WalltypeCompartmentFirewall ex:wall-type-ei60;
+    fbo:PassiveFireProtection ex:passive-protection-package.
+ex:wall-s-canteen fbo:FireResistance "60.0"^^xsd:float;
+    fbo:WalltypeCompartmentFirewall ex:wall-type-ei60;
+    fbo:PassiveFireProtection ex:passive-protection-package.
+ex:stair-core-west fbo:FireResistance "60.0"^^xsd:float.
+ex:route-ground fbo:WidthFreeEvacuationroutes ex:route-width.
+ex:route-first fbo:WidthFreeEvacuationroutes ex:route-width.
+ex:route-second fbo:WidthFreeEvacuationroutes ex:route-width.
+ex:door-west-exit fbo:WidthFreeDoors "1.2"^^xsd:float;
+    fbo:FireResistance "60.0"^^xsd:float.
+ex:exit-lighting fbo:ActiveFireProtection ex:alarm-system.
+ex:panic-lighting fbo:ActiveFireProtection ex:alarm-system.
+ex:dataset rdfs:label "Lithuania: three-storey office synthetic graph"@en;
+    fbo:hasDescription "Synthetic Lithuania test graph; it does not represent a real building."@en;
+    fbo:hasRemarks "For software testing and demonstrations only; not evidence of regulatory compliance or a design reference."@en.
+ex:g-corridor fbo:Roomfunction ex:function-corridor.
+ex:function-corridor rdfs:label "corridor"@en.
+ex:g-stair fbo:Roomfunction ex:function-staircase.
+ex:function-staircase rdfs:label "staircase"@en.
+ex:function-lift-lobby rdfs:label "lift lobby"@en.
+ex:function-toilet rdfs:label "toilet"@en.
+ex:g-printer fbo:Roomfunction ex:function-copyroom.
+ex:function-copyroom rdfs:label "copyroom"@en.
+ex:function-reception rdfs:label "reception"@en.
+ex:g-open-office fbo:Roomfunction ex:function-office.
+ex:function-office rdfs:label "office"@en.
+ex:g-meeting fbo:Roomfunction ex:function-meeting.
+ex:function-meeting rdfs:label "meeting"@en.
+ex:f-corridor fbo:Roomfunction ex:function-corridor.
+ex:f-stair fbo:Roomfunction ex:function-staircase.
+ex:f-printer fbo:Roomfunction ex:function-copyroom.
+ex:f-open-office fbo:Roomfunction ex:function-office.
+ex:f-private-office fbo:Roomfunction ex:function-office.
+ex:f-meeting fbo:Roomfunction ex:function-meeting.
+ex:s-corridor fbo:Roomfunction ex:function-corridor.
+ex:s-stair fbo:Roomfunction ex:function-staircase.
+ex:s-printer fbo:Roomfunction ex:function-copyroom.
+ex:s-canteen fbo:Roomfunction ex:function-canteen.
+ex:function-canteen rdfs:label "canteen"@en.
+ex:s-kitchen fbo:Roomfunction ex:function-kitchen.
+ex:function-kitchen rdfs:label "kitchen"@en.
+ex:s-boardroom fbo:Roomfunction ex:function-meeting.
+ex:s-storage fbo:Roomfunction ex:function-storage.
+ex:function-storage rdfs:label "storage"@en.
+ex:ground-storey a fbo-lt:BuildingStorey.
+ex:first-storey a fbo-lt:BuildingStorey.
+ex:second-storey a fbo-lt:BuildingStorey.
+ex:fc-g-west a fbo-lt:FireCompartment.
+ex:fc-g-east a fbo-lt:FireCompartment.
+ex:fc-f-west a fbo-lt:FireCompartment.
+ex:fc-f-east a fbo-lt:FireCompartment.
+ex:fc-s-office a fbo-lt:FireCompartment.
+ex:fc-s-canteen a fbo-lt:FireCompartment.
+ex:g-corridor a fbo-lt:EvacuationRoute.
+ex:f-corridor a fbo-lt:EvacuationRoute.
+ex:s-corridor a fbo-lt:EvacuationRoute.
+ex:g-stair a fbo-lt:EvacuationRoute.
+ex:f-stair a fbo-lt:EvacuationRoute.
+ex:s-stair a fbo-lt:EvacuationRoute.
+ex:door-west-exit a fbo-lt:Exit.
+ex:wall-g-west a fbo-lt:FireWallFireBarrier.
+ex:wall-g-east a fbo-lt:FireWallFireBarrier.
+ex:wall-f-west a fbo-lt:FireWallFireBarrier.
+ex:wall-f-east a fbo-lt:FireWallFireBarrier.
+ex:wall-s-office a fbo-lt:FireWallFireBarrier.
+ex:wall-s-canteen a fbo-lt:FireWallFireBarrier.
+ex:sprinkler-system a fbo-lt:AutomaticFireExtinguish.
+ex:alarm-system a fbo-lt:FireAlarm.
+ex:office-building fbo-lt:HeightBuilding "10.8"^^xsd:float;
+    fbo-lt:IntendedUseOfBuilding "office building".
+ex:ground-storey fbo-lt:BuildingStoreyFloorArea "600.0"^^xsd:float.
+ex:first-storey fbo-lt:BuildingStoreyFloorArea "600.0"^^xsd:float.
+ex:second-storey fbo-lt:BuildingStoreyFloorArea "600.0"^^xsd:float.
+ex:fc-g-west fbo-lt:AreaFireCompartment "300.0"^^xsd:float.
+ex:fc-g-east fbo-lt:AreaFireCompartment "300.0"^^xsd:float.
+ex:fc-f-west fbo-lt:AreaFireCompartment "300.0"^^xsd:float.
+ex:fc-f-east fbo-lt:AreaFireCompartment "300.0"^^xsd:float.
+ex:fc-s-office fbo-lt:AreaFireCompartment "300.0"^^xsd:float.
+ex:fc-s-canteen fbo-lt:AreaFireCompartment "300.0"^^xsd:float.
+ex:g-printer fbo-lt:FireLoadDensity "650.0"^^xsd:float.
+ex:f-printer fbo-lt:FireLoadDensity "650.0"^^xsd:float.
+ex:s-printer fbo-lt:FireLoadDensity "650.0"^^xsd:float.
+ex:s-kitchen fbo-lt:FireLoadDensity "650.0"^^xsd:float.

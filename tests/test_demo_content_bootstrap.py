@@ -69,5 +69,5 @@ def test_bootstrap_default_demo_content_seeds_expected_graph_ids():
 
 @pytest.mark.parametrize("fixture_name", GRAPH_FIXTURES.values())
 def test_bootstrap_fixtures_exist(fixture_name: str):
-    fixture_path = Path(__file__).resolve().parent / "fixtures" / fixture_name
+    fixture_path = Path(__file__).resolve().parents[1] / "app" / "storage" / "demo_fixtures" / fixture_name
     assert fixture_path.exists(), fixture_name

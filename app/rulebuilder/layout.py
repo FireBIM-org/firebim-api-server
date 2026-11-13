@@ -79,7 +79,7 @@ def build_workspace_from_rule(
 
     entry_element = elements_by_id[rule.entry]
     return RuleBuilderWorkspaceCreateRequest(
-        name=workspace_name or entry_element.label or rule.id,
+        name=workspace_name or getattr(rule, "title", None) or entry_element.label or rule.id,
         entry_node_id=rule.entry,
         entry_node_label=entry_element.label,
         viewport=viewport or DEFAULT_VIEWPORT,
