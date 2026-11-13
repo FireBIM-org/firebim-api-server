@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from rdflib import Graph
-from rdflib.namespace import RDF, SH
+from rdflib.namespace import SH
 
 try:
     from app.checks.blind_runner import BlindShaclRuleRunner
@@ -93,18 +93,6 @@ def _required_classes_and_properties_from_rule_graph(shacl_graph: Graph) -> tupl
         required_properties.add(str(o))
 
     return sorted(required_classes), sorted(required_properties)
-
-
-def _graph_profile_from_graph(data_graph: Graph) -> tuple[Counter, Counter]:
-    class_counter: Counter[str] = Counter()
-    property_counter: Counter[str] = Counter()
-
-    for _, p, o in data_graph:
-        property_counter[str(p)] += 1
-        if p == RDF.type:
-            class_counter[str(o)] += 1
-
-    return class_counter, property_counter
 
 
 def _to_check_run_summary(result: RuleRunResult) -> CheckRunSummary:

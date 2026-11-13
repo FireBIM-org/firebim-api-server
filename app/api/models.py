@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -10,6 +11,8 @@ from app.models.database import get_db
 from app.models.models import IfcEntity, IfcModel, IfcProperty, IfcQuantity, User
 from app.schemas.models import IfcSqlDataUpload
 from app.workers.celery_app import celery_app
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ifc-models", tags=["ifc-models"])
 
@@ -218,7 +221,7 @@ async def delete_model(id: str, db: Session = Depends(get_db), current_user: Use
             s3_client.delete_object(Bucket=BUCKET_NAME, Key=key)
         except Exception as e:
             # Best effort: log and continue
-            print(f"Failed to delete S3 object {key}: {e}")
+            logger.warning("Failed to delete S3 object %s: %s", key, e)
 
     # 4. DB Deletion (Cascades to IfcEntity, IfcProperty, IfcQuantity, CheckResult)
     db.delete(model)

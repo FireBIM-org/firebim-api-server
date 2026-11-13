@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from app.rules.publisher import default_rule_graph_uri
-from app.rules.publisher import delete_graph_ttl as _delete_graph_ttl
 from app.rules.publisher import fetch_graph_ttl as _fetch_graph_ttl
 from app.rules.publisher import publish_graph_ttl as _publish_graph_ttl
 from app.storage.building_repository import (
@@ -11,18 +10,9 @@ from app.storage.building_repository import (
 BUILDING_GRAPH_DATASET = "buildings"
 RULE_DATASET = "rulebook"
 
-CHECK_RUN_BASE_URI = "https://firebim.org/check-runs/"
-
 
 def default_building_graph_uri(graph_id: str) -> str:
     return _default_building_graph_uri(graph_id)
-
-
-def default_check_run_uri(run_id: str) -> str:
-    run_id = str(run_id).strip()
-    if not run_id:
-        raise ValueError("run_id must not be empty")
-    return f"{CHECK_RUN_BASE_URI}{run_id}"
 
 
 def publish_building_graph_ttl(ttl_text: str, graph_uri: str) -> None:
@@ -31,10 +21,6 @@ def publish_building_graph_ttl(ttl_text: str, graph_uri: str) -> None:
 
 def fetch_building_graph_ttl(graph_uri: str) -> str:
     return _fetch_graph_ttl(dataset=BUILDING_GRAPH_DATASET, graph_uri=graph_uri)
-
-
-def delete_building_graph(graph_uri: str) -> None:
-    _delete_graph_ttl(dataset=BUILDING_GRAPH_DATASET, graph_uri=graph_uri)
 
 
 def fetch_rule_ttl(rule_id: str) -> tuple[str, str]:
