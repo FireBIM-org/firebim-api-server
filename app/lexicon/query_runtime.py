@@ -92,9 +92,6 @@ class LexiconQueryRuntime:
             )
         )
 
-    def catalog_lookup_by_uri(self) -> dict[str, dict[str, Any]]:
-        return self.dataset.catalog
-
     def resolve_term_matches(self, value: str) -> dict[str, Any]:
         if value.startswith("http://") or value.startswith("https://"):
             candidate_uris = [value]

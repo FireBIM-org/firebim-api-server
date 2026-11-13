@@ -1798,20 +1798,6 @@ class LexiconService:
             ontology_ttl=fetched.ttl,
         )
 
-    def _resolve_ontology_graph(
-        self,
-        *,
-        ontology_family: str,
-        country: str,
-        version: str,
-    ) -> tuple[LexiconOntologyContext, Graph]:
-        bundle = self._resolve_ontology_bundle(
-            ontology_family=ontology_family,
-            country=country,
-            version=version,
-        )
-        return bundle.ontology, bundle.graph
-
     def _resolve_ontology_bundle(
         self,
         *,

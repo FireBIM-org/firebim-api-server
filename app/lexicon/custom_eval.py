@@ -35,18 +35,6 @@ class LexiconCustomEvaluator:
                 stack.append(parent_uri)
         return False
 
-    def ancestor_closure(self, candidate_uri: str) -> set[str]:
-        ancestors: set[str] = {candidate_uri}
-        stack = [candidate_uri]
-        while stack:
-            current = stack.pop()
-            for parent_uri in self._parents_by_uri.get(current, set()):
-                if parent_uri in ancestors:
-                    continue
-                ancestors.add(parent_uri)
-                stack.append(parent_uri)
-        return ancestors
-
     def shared_hierarchy(self, left_uri: str, right_uri: str) -> bool:
         return self.is_same_or_subclass(left_uri, right_uri) or self.is_same_or_subclass(right_uri, left_uri)
 

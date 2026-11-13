@@ -19,21 +19,11 @@ _RULE_ELEMENT_ENTRIES_CACHE_AT: float = 0.0
 _RULE_ELEMENT_ENTRIES_CACHE_TTL_SECONDS = 5.0
 
 
-def clear_rule_element_entries_cache() -> None:
-    global _RULE_ELEMENT_ENTRIES_CACHE, _RULE_ELEMENT_ENTRIES_CACHE_AT
-    _RULE_ELEMENT_ENTRIES_CACHE = None
-    _RULE_ELEMENT_ENTRIES_CACHE_AT = 0.0
-
-
 def default_rule_graph_uri(rule_id: str) -> str:
     rule_id = str(rule_id).strip()
     if not rule_id:
         raise ValueError("rule_id must not be empty")
     return f"{RULE_GRAPH_BASE_URI}{rule_id}"
-
-
-def default_ruleset_graph_uri(ruleset_id: str) -> str:
-    return default_rule_graph_uri(ruleset_id)
 
 
 def default_rule_element_graph_uri(element_id: str) -> str:
@@ -53,10 +43,6 @@ def fetch_graph_ttl(dataset: str, graph_uri: str) -> str:
 
 def delete_graph_ttl(dataset: str, graph_uri: str) -> None:
     _client.delete_graph(dataset=dataset, graph_uri=graph_uri)
-
-
-def remember_rule_graph(*args, **kwargs) -> None:
-    return None
 
 
 def remember_rule_element_graph(
@@ -147,34 +133,6 @@ def _parse_rule_graph_metadata(ttl: str, graph_uri: str) -> dict:
         }
 
     raise ValueError("No RuleSet or SHACL NodeShape resource found in TTL")
-
-
-def _parse_rule_element_graph_metadata(ttl: str, graph_uri: str) -> dict:
-    graph = Graph()
-    graph.parse(data=ttl, format="turtle")
-
-    shape = next(iter(graph.subjects(RDF.type, SH.NodeShape)), None)
-    if shape is not None:
-        label_obj = graph.value(shape, EX.label)
-        return {
-            "element_id": _local_name(shape),
-            "graph_uri": graph_uri,
-            "element_type": "decision",
-            "label": str(label_obj) if label_obj is not None else None,
-        }
-
-    node = next(iter(graph.subjects(RDF.type, EX.RuleElement)), None)
-    if node is None:
-        raise ValueError("No RuleElement resource found in TTL")
-
-    node_type_obj = graph.value(node, EX.nodeType)
-    label_obj = graph.value(node, EX.label)
-    return {
-        "element_id": _local_name(node),
-        "graph_uri": graph_uri,
-        "element_type": str(node_type_obj) if node_type_obj is not None else None,
-        "label": str(label_obj) if label_obj is not None else None,
-    }
 
 
 def list_rule_graphs() -> list[dict]:
