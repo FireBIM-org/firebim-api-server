@@ -1,10 +1,8 @@
 import logging
-import time
-import uuid
 from contextlib import asynccontextmanager
 
 from botocore.exceptions import ClientError
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.build_info import router as build_info_router
@@ -19,7 +17,6 @@ from app.api.rulebuilder import router as rulebuilder_router
 from app.api.rules import router as rules_router
 from app.auth.router import router as auth_router
 from app.core.config import settings
-from app.core.observability import log_event, reset_request_context, set_request_context, snapshot_metrics
 from app.core.s3 import BUCKET_NAME, s3_client
 from app.models.database import init_db
 from app.storage.demo_content_bootstrap import bootstrap_default_demo_content
@@ -100,50 +97,3 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.middleware("http")
-async def request_observability_middleware(request: Request, call_next):
-    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
-    profiling_enabled = request.headers.get("x-firebim-profile") == "1" or request.url.path.startswith(
-        "/lexicon/profiles"
-    )
-    tokens = set_request_context(
-        request_id=request_id,
-        endpoint=request.url.path,
-        method=request.method,
-        profiling_enabled=profiling_enabled,
-    )
-    request.state.request_id = request_id
-    request.state.request_started_at = time.monotonic()
-    request.state.handler_completed_at = None
-
-    if profiling_enabled:
-        log_event(logger, "request.started")
-
-    try:
-        response = await call_next(request)
-    finally:
-        total_ms = round((time.monotonic() - request.state.request_started_at) * 1000, 3)
-        handler_completed_at = getattr(request.state, "handler_completed_at", None)
-        handler_ms = (
-            round((handler_completed_at - request.state.request_started_at) * 1000, 3)
-            if handler_completed_at is not None
-            else None
-        )
-        response_ms = round(total_ms - handler_ms, 3) if handler_ms is not None else None
-        metrics = snapshot_metrics()
-        if profiling_enabled:
-            log_event(
-                logger,
-                "request.completed",
-                status_code=getattr(locals().get("response"), "status_code", None),
-                total_ms=total_ms,
-                handler_ms=handler_ms,
-                response_serialization_ms=response_ms,
-                metrics=metrics,
-            )
-        reset_request_context(tokens)
-
-    response.headers["X-Request-ID"] = request_id
-    return response
