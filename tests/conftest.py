@@ -3,7 +3,6 @@ import os
 import pytest
 
 # Set required environment variables before importing app
-os.environ["ENVIRONMENT"] = "test"
 os.environ["POSTGRES_HOST"] = "localhost"
 os.environ["POSTGRES_PORT"] = "5433"
 os.environ["POSTGRES_USER"] = "testuser"
@@ -16,7 +15,6 @@ os.environ["S3_SECRET_ACCESS_KEY"] = "test-secret-key"
 os.environ["S3_REGION"] = "us-east-1"
 os.environ["CELERY_BROKER_URL"] = "redis://localhost:6379/0"
 os.environ["CELERY_RESULT_BACKEND"] = "redis://localhost:6379/0"
-os.environ["FUSEKI_HOST"] = "http://localhost:3030"
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -89,7 +87,10 @@ def client_fixture(session: Session, test_user: User, engine: Engine):
         patch("app.models.database.engine", engine),
         patch("app.api.health.engine", engine),
         patch("httpx.AsyncClient.get", new_callable=AsyncMock) as mock_get,
-        patch("app.models.database.init_db", return_value=None),
+        # Startup must not touch a real database or S3 (seeding uses its own S3 clients).
+        patch("app.main.init_db", return_value=None),
+        patch("app.main.bootstrap_default_ontologies", return_value=[]),
+        patch("app.main.bootstrap_default_demo_content", return_value=[]),
     ):
         # Mock httpx for health check
         mock_resp = MagicMock()
