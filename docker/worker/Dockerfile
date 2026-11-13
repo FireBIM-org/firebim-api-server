@@ -17,7 +17,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --package firebim-api-server --group worker --no-dev
 
 # Stage 2: Runtime
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.15-slim-bookworm AS runtime
 
 ARG APT_CACHE_BUSTER
 # Patch OS-level vulnerabilities (CVE-2026-28390: libssl3/openssl)
