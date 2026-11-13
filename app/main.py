@@ -24,21 +24,19 @@ from app.storage.ontology_bootstrap import bootstrap_default_ontologies
 from app.storage.ontology_repository import OntologyRepository
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-ontologies_repo = OntologyRepository()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     logger.info("Database tables created successfully")
-    # run_migrations()
 
     try:
         s3_client.head_bucket(Bucket=BUCKET_NAME)
     except ClientError as exc:
         if exc.response["Error"]["Code"] == "404":
             if settings.S3_ENDPOINT_URL:
+                # Only auto-create buckets for S3-compatible services (MinIO)
                 s3_client.create_bucket(Bucket=BUCKET_NAME)
             else:
                 raise RuntimeError(
@@ -49,11 +47,15 @@ async def lifespan(app: FastAPI):
             raise
 
     if settings.ENVIRONMENT == "local":
-        seeded_ontologies = bootstrap_default_ontologies(ontologies_repo)
-        logger.info("Ontology bootstrap completed", extra={"seeded_ontologies": seeded_ontologies})
+        seeded_ontologies = bootstrap_default_ontologies(OntologyRepository())
+        logger.info(
+            "Ontology bootstrap completed: %d of %d published or updated",
+            sum(1 for result in seeded_ontologies if result["seeded"]),
+            len(seeded_ontologies),
+        )
         if settings.SEED_DEMO_CONTENT:
             seeded_demo_content = bootstrap_default_demo_content()
-            logger.info("Demo content bootstrap completed", extra={"seeded_demo_content": seeded_demo_content})
+            logger.info("Demo content bootstrap completed: %d graphs and rules published", len(seeded_demo_content))
         else:
             logger.info("Demo content bootstrap skipped (SEED_DEMO_CONTENT=false)")
 
@@ -88,7 +90,7 @@ if settings.ENVIRONMENT == "local":
         ]
     )
 
-logger.info("CORS origins configured", extra={"origins": origins})
+logger.info("CORS origins: %s", origins)
 
 app.add_middleware(
     CORSMiddleware,
