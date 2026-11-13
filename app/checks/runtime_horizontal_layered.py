@@ -19,6 +19,7 @@ from app.checks.result_models import (
     TargetTraceStep,
 )
 from app.checks.runtime import CheckRuntime, _TraversalState
+from app.checks.targeting import restrict_targets
 
 
 class HorizontalLayeredCheckRuntime(CheckRuntime):
@@ -51,13 +52,17 @@ class HorizontalLayeredCheckRuntime(CheckRuntime):
             metrics=metrics,
         )
         self._active_execution_context = execution_context
+        self._new_overlay(graph_ref, compiled)
 
         started_targets = perf_counter()
-        initial_targets = self.target_resolver.resolve_targets_for_decision(
-            graph_ref=graph_ref,
-            node=first_decision,
-            graph_index=execution_context.graph_index,
-            metrics=metrics,
+        initial_targets = restrict_targets(
+            self.target_resolver.resolve_targets_for_decision(
+                graph_ref=graph_ref,
+                node=first_decision,
+                graph_index=execution_context.graph_index,
+                metrics=metrics,
+            ),
+            options.target_nodes,
         )
         accumulate_timing(metrics, "resolve_targets_total", perf_counter() - started_targets)
         execution_context.metrics.record_active_targets(first_decision.node_id, len(initial_targets))
@@ -129,7 +134,7 @@ class HorizontalLayeredCheckRuntime(CheckRuntime):
         if not options.include_report_graph_ttl:
             result.report_graph_ttl = None
         self._active_execution_context = None
-        return result
+        return self._attach_derived(result, options)
 
     def _group_states_by_node_row(self, states: list[_TraversalState]) -> OrderedDict[str, list[_TraversalState]]:
         grouped: OrderedDict[str, list[_TraversalState]] = OrderedDict()
@@ -215,7 +220,7 @@ class HorizontalLayeredCheckRuntime(CheckRuntime):
                 )
                 continue
 
-            if node.node_type != "decision":
+            if node.node_type not in self.EXECUTABLE_TYPES:
                 traces.append(
                     self._make_terminal_trace(
                         target_node=state.target_node,
@@ -232,7 +237,7 @@ class HorizontalLayeredCheckRuntime(CheckRuntime):
 
             executable_states.append(state)
 
-        if not executable_states or node.node_type != "decision":
+        if not executable_states or node.node_type not in self.EXECUTABLE_TYPES:
             return traces, next_states
 
         if self._active_execution_context is not None:
@@ -260,7 +265,7 @@ class HorizontalLayeredCheckRuntime(CheckRuntime):
                 node_type=node.node_type,
                 status=outcome.status,
                 next_node_id=next_node_id,
-                evidence=outcome.evidence,
+                evidence=self._step_evidence(outcome),
             )
             updated_steps = state.steps + [step]
             visited = state.visited_node_ids + [state.node_id]
@@ -311,6 +316,15 @@ class HorizontalLayeredCheckRuntime(CheckRuntime):
         options: RunOptions,
         metrics: dict[str, Any] | None = None,
     ) -> list[AtomicOutcome]:
+        if decision.node_type == "derive":
+            # derive elements write per target; never batched, never cached
+            started_derive = perf_counter()
+            outcomes = [
+                self._execute_derive(graph_ref=graph_ref, node=decision, target=state.target_node, metrics=metrics)
+                for state in states
+            ]
+            accumulate_timing(metrics, "evaluate_derive_total", perf_counter() - started_derive)
+            return outcomes
         self._prefetch_row_property_values(
             graph_ref=graph_ref,
             decision=decision,
@@ -362,6 +376,7 @@ class HorizontalLayeredCheckRuntime(CheckRuntime):
             "row_size": len(states),
             "graph_index": self._active_execution_context.graph_index if self._active_execution_context else None,
             "execution_context": self._active_execution_context,
+            "overlay": self._active_overlay,
         }
         if isinstance(self.evaluator, HybridAtomicEvaluator) and self.evaluator.direct_evaluator.supports(decision):
             increment_counter(metrics, "horizontal_row_direct_batches")
@@ -431,4 +446,5 @@ class HorizontalLayeredCheckRuntime(CheckRuntime):
             targets=targets,
             property_path=decision.property_path,
             metrics=metrics,
+            overlay=self._active_overlay,
         )

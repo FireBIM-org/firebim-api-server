@@ -98,6 +98,20 @@ def _local_name(uri) -> str:
     return text.rstrip("/").rsplit("/", 1)[-1]
 
 
+def display_title(title, label) -> str | None:
+    """The name a person should see for a rule: the explicit title, else the start label without 'Start:'."""
+    if title is not None and str(title).strip():
+        return str(title).strip()
+    if label is None:
+        return None
+    text = str(label).strip()
+    for prefix in ("Start:", "START:", "Start -", "Start –", "Start"):
+        if text.startswith(prefix) and len(text) > len(prefix) and not text[len(prefix)].isalnum():
+            text = text[len(prefix) :].strip(" :-–")
+            break
+    return text or None
+
+
 def _parse_rule_graph_metadata(ttl: str, graph_uri: str) -> dict:
     graph = Graph()
     graph.parse(data=ttl, format="turtle")
@@ -107,6 +121,8 @@ def _parse_rule_graph_metadata(ttl: str, graph_uri: str) -> dict:
         ruleset_uri = ruleset_subjects[0]
         entry_obj = graph.value(ruleset_uri, EX.entryPoint)
         label_obj = graph.value(graph.value(ruleset_uri, EX.entryPoint), EX.label) if entry_obj else None
+        title_obj = graph.value(ruleset_uri, EX.title)
+        description_obj = graph.value(ruleset_uri, EX.description)
         element_count = len(list(graph.subjects(RDF.type, SH.NodeShape))) + len(
             list(graph.subjects(RDF.type, EX.RuleElement))
         )
@@ -115,6 +131,8 @@ def _parse_rule_graph_metadata(ttl: str, graph_uri: str) -> dict:
             "graph_uri": graph_uri,
             "entry": _local_name(entry_obj) if entry_obj else None,
             "label": str(label_obj) if label_obj is not None else None,
+            "title": str(title_obj) if title_obj is not None else display_title(title_obj, label_obj),
+            "description": str(description_obj) if description_obj is not None else None,
             "element_count": element_count,
         }
 

@@ -7,6 +7,7 @@ from rdflib import RDF, URIRef
 
 from app.checks.evaluator_base import RDFGraphBackedEvaluator
 from app.checks.result_models import AtomicOutcome, DecisionNode, EvalContext, GraphRef
+from app.rules.paths import is_ref_value, ref_path
 
 
 class DirectAtomicEvaluator(RDFGraphBackedEvaluator):
@@ -22,7 +23,9 @@ class DirectAtomicEvaluator(RDFGraphBackedEvaluator):
     SUPPORTED_OPERATORS = {"<", "<=", ">", ">=", "=", "==", "between"}
 
     def supports(self, node: DecisionNode) -> bool:
-        return bool(node.target_class and node.property_path and node.operator in self.SUPPORTED_OPERATORS)
+        if not (node.target_class and node.property_path and node.operator in self.SUPPORTED_OPERATORS):
+            return False
+        return not (is_ref_value(node.value) and node.operator == "between")
 
     def evaluate_many(
         self,
@@ -42,12 +45,27 @@ class DirectAtomicEvaluator(RDFGraphBackedEvaluator):
         unique_targets = list(dict.fromkeys(targets))
         outcomes: dict[str, AtomicOutcome] = {}
         evaluation_shape = str(ctx.extra.get("evaluation_shape", "batch"))
+        overlay = self._overlay(ctx)
+        prefixes = self._prefixes(ctx)
         prefetched_values = self.prefetch_property_values(
             graph_ref=graph_ref,
             targets=unique_targets,
             property_path=node.property_path or "",
             metrics=ctx.extra.setdefault("metrics", {}),
+            overlay=overlay,
+            prefixes=prefixes,
         )
+        reference_path = ref_path(expected) if is_ref_value(expected) else None
+        prefetched_refs: dict[str, list[Any]] = {}
+        if reference_path:
+            prefetched_refs = self.prefetch_property_values(
+                graph_ref=graph_ref,
+                targets=unique_targets,
+                property_path=reference_path,
+                metrics=ctx.extra.setdefault("metrics", {}),
+                overlay=overlay,
+                prefixes=prefixes,
+            )
         graph = self.get_graph(graph_ref, ctx)
 
         for target in unique_targets:
@@ -71,6 +89,25 @@ class DirectAtomicEvaluator(RDFGraphBackedEvaluator):
                     continue
 
                 values = list(prefetched_values.get(target, []))
+                if node.operator == "exists":
+                    present = bool(values)
+                    outcomes[target] = AtomicOutcome(
+                        status="True" if present else "False",
+                        reason_code="value_present" if present else "value_absent",
+                        message=(
+                            f"Target '{target}' {'has' if present else 'has no'} value for "
+                            f"'{node.property_path}' in node '{node.node_id}'"
+                        ),
+                        evidence={
+                            "engine": "direct",
+                            "node_id": node.node_id,
+                            "target": target,
+                            "property_path": node.property_path,
+                            "values": [self.term_to_python(v) for v in values][:10],
+                            "evaluation_shape": evaluation_shape,
+                        },
+                    )
+                    continue
                 if not values:
                     outcomes[target] = self.unknown_outcome(
                         reason_code="missing_required_input",
@@ -108,7 +145,45 @@ class DirectAtomicEvaluator(RDFGraphBackedEvaluator):
                     continue
 
                 actual = self.term_to_python(values[0])
-                status = self._compare(actual=actual, operator=node.operator or "", expected=expected)
+                expected_for_target = expected
+                if reference_path:
+                    ref_values = list(prefetched_refs.get(target, []))
+                    if not ref_values:
+                        outcomes[target] = self.unknown_outcome(
+                            reason_code="missing_reference_input",
+                            message=(
+                                f"Target '{target}' has no value for reference path '{reference_path}' "
+                                f"in node '{node.node_id}'"
+                            ),
+                            evidence={
+                                "engine": "direct",
+                                "node_id": node.node_id,
+                                "target": target,
+                                "property_path": node.property_path,
+                                "reference_path": reference_path,
+                                "evaluation_shape": evaluation_shape,
+                            },
+                        )
+                        continue
+                    if len(ref_values) > 1:
+                        outcomes[target] = self.unknown_outcome(
+                            reason_code="ambiguous_reference_input",
+                            message=(
+                                f"Target '{target}' has multiple values for reference path '{reference_path}' "
+                                f"in node '{node.node_id}'"
+                            ),
+                            evidence={
+                                "engine": "direct",
+                                "node_id": node.node_id,
+                                "target": target,
+                                "reference_path": reference_path,
+                                "values": [self.term_to_python(v) for v in ref_values],
+                                "evaluation_shape": evaluation_shape,
+                            },
+                        )
+                        continue
+                    expected_for_target = self.term_to_python(ref_values[0])
+                status = self._compare(actual=actual, operator=node.operator or "", expected=expected_for_target)
                 evidence = {
                     "engine": "direct",
                     "node_id": node.node_id,
@@ -118,10 +193,14 @@ class DirectAtomicEvaluator(RDFGraphBackedEvaluator):
                     "target_class": node.target_class,
                     "property_path": node.property_path,
                     "operator": node.operator,
-                    "expected_value": expected,
+                    "expected_value": expected_for_target,
                     "actual_value": actual,
                     "evaluation_shape": evaluation_shape,
                 }
+                if reference_path:
+                    evidence["reference_path"] = reference_path
+                if overlay is not None and overlay.has(target, self._written_key(node, prefixes)):
+                    evidence["actual_value_source"] = "derived"
                 if status:
                     outcomes[target] = self.true_outcome(
                         reason_code="direct_condition_satisfied",
@@ -165,6 +244,13 @@ class DirectAtomicEvaluator(RDFGraphBackedEvaluator):
             )[target]
         except NotImplementedError:
             raise
+
+    @staticmethod
+    def _written_key(node: DecisionNode, prefixes: dict[str, str] | None) -> str:
+        from app.rules.paths import expand_property_path
+
+        segments = expand_property_path(node.property_path, prefixes)
+        return segments[0] if len(segments) == 1 else ""
 
     def _compare(self, *, actual: Any, operator: str, expected: Any) -> bool:
         op = "==" if operator == "=" else operator

@@ -11,6 +11,10 @@ class Rule:
         self.id = rule_id
         self.elements = {}
         self.entry = None
+        # human-facing metadata (the Miro frame title, a description, where it came from)
+        self.title: str | None = None
+        self.description: str | None = None
+        self.source: dict | None = None
 
     def add(self, element):
         if element.id in self.elements:

@@ -1,0 +1,141 @@
+@prefix ex: <https://firebim.org/test-data/dk/rules-v2-aggregate-cases/> .
+@prefix fbo: <https://firebim.org/ontologies/fbo#> .
+@prefix fbo-dk: <https://firebim.org/ontologies/fbo/dk#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:adjacency-1 a fbo-dk:Adjacency ;
+    fbo-dk:adjacencyFrom ex:compartment-one-storey-no-sprinkler ;
+    fbo-dk:adjacencyTo ex:compartment-multi-storey-no-sprinkler ;
+    fbo-dk:adjacencyVia ex:wall-1 .
+
+ex:adjacency-2 a fbo-dk:Adjacency ;
+    fbo-dk:adjacencyFrom ex:compartment-multi-storey-no-sprinkler ;
+    fbo-dk:adjacencyTo ex:compartment-high-risk ;
+    fbo-dk:adjacencyVia ex:wall-2 .
+
+ex:adjacency-3 a fbo-dk:Adjacency ;
+    fbo-dk:adjacencyFrom ex:compartment-high-risk ;
+    fbo-dk:adjacencyTo ex:compartment-multivalue-category ;
+    fbo-dk:adjacencyVia ex:wall-3 .
+
+ex:building a fbo:Building ;
+    fbo:hasSubitem ex:unit-mixed-risk,
+        ex:unit-multivalue-category .
+
+ex:dataset rdfs:label "Denmark: rules-v2 aggregate cases synthetic graph"@en ;
+    fbo:hasDescription "Synthetic rule-runner branch coverage; not a real building."@en .
+
+ex:door-1 a fbo-dk:Door ;
+    fbo-dk:IsFireExit true .
+
+ex:door-2 a fbo-dk:Door ;
+    fbo-dk:IsFireExit true .
+
+ex:door-3 a fbo-dk:Door ;
+    fbo-dk:IsFireExit false .
+
+ex:door-4 a fbo-dk:Door ;
+    fbo-dk:IsFireExit true .
+
+ex:room-1 a fbo-dk:Room ;
+    fbo-dk:AreaFloorRoom 100.0 .
+
+ex:room-2 a fbo-dk:Room ;
+    fbo-dk:AreaFloorRoom 100.0 .
+
+ex:room-3 a fbo-dk:Room ;
+    fbo-dk:AreaFloorRoom 100.0 .
+
+ex:room-4 a fbo-dk:Room ;
+    fbo-dk:AreaFloorRoom 100.0 .
+
+ex:unit-mixed-risk a fbo-dk:BuildingFunctionalFireUnit ;
+    fbo:hasSubitem ex:compartment-high-risk,
+        ex:compartment-multi-storey-no-sprinkler,
+        ex:compartment-one-storey-no-sprinkler ;
+    fbo-dk:AreaBuildingFunctionalFireUnit 4000.0 ;
+    fbo-dk:BuildingFireCompartmentDaytimeoccupancy true ;
+    fbo-dk:ComparableFireRiskConditions true ;
+    fbo-dk:CompartmentSleeping false ;
+    fbo-dk:HasAutomaticFireAlarmsystem true ;
+    fbo-dk:HasAutomaticFireSprinklersystem false ;
+    fbo-dk:HasAutomaticFireVentilationsystem false ;
+    fbo-dk:HasAutomaticWarningsystem true ;
+    fbo-dk:NumberOfBuildingStoreys 3 ;
+    fbo-dk:PeopleKnowledgeEscaperoutes true ;
+    fbo-dk:PeopleSelfRescueAbility true ;
+    fbo-dk:UseCategory "AK2" .
+
+ex:unit-multivalue-category a fbo-dk:BuildingFunctionalFireUnit ;
+    fbo:hasSubitem ex:compartment-multivalue-category ;
+    fbo-dk:AreaBuildingFunctionalFireUnit 450.0 ;
+    fbo-dk:BuildingFireCompartmentDaytimeoccupancy true ;
+    fbo-dk:ComparableFireRiskConditions true ;
+    fbo-dk:CompartmentSleeping false ;
+    fbo-dk:HasAutomaticFireAlarmsystem true ;
+    fbo-dk:HasAutomaticFireSprinklersystem false ;
+    fbo-dk:HasAutomaticFireVentilationsystem false ;
+    fbo-dk:HasAutomaticWarningsystem true ;
+    fbo-dk:NumberOfBuildingStoreys 1 ;
+    fbo-dk:PeopleKnowledgeEscaperoutes false ;
+    fbo-dk:PeopleSelfRescueAbility true ;
+    fbo-dk:UseCategory "AK2",
+        "AK3" .
+
+ex:wall-4 a fbo-dk:Wall ;
+    fbo-dk:FireResistance "EI60" ;
+    fbo-dk:IsExternal true .
+
+ex:compartment-multivalue-category a fbo-dk:FireCompartment ;
+    fbo:hasSubitem ex:door-4,
+        ex:room-4,
+        ex:wall-4 ;
+    fbo-dk:AreaFireCompartment 450.0 ;
+    fbo-dk:HasAutomaticFireSprinklersystem false ;
+    fbo-dk:NumberOfBuildingStoreys 1 ;
+    fbo-dk:RiskClass "RK2" ;
+    fbo-dk:UseCategory "AK2",
+        "AK3" .
+
+ex:compartment-one-storey-no-sprinkler a fbo-dk:FireCompartment ;
+    fbo:hasSubitem ex:door-1,
+        ex:room-1,
+        ex:wall-1 ;
+    fbo-dk:AreaFireCompartment 1900.0 ;
+    fbo-dk:HasAutomaticFireSprinklersystem false ;
+    fbo-dk:NumberOfBuildingStoreys 1 ;
+    fbo-dk:RiskClass "RK1" ;
+    fbo-dk:UseCategory "AK2" .
+
+ex:wall-1 a fbo-dk:Wall ;
+    fbo-dk:FireResistance "EI60" ;
+    fbo-dk:IsExternal true .
+
+ex:wall-2 a fbo-dk:Wall ;
+    fbo-dk:FireResistance "EI60" ;
+    fbo-dk:IsExternal false .
+
+ex:wall-3 a fbo-dk:Wall ;
+    fbo-dk:FireResistance "EI60" ;
+    fbo-dk:IsExternal false .
+
+ex:compartment-high-risk a fbo-dk:FireCompartment ;
+    fbo:hasSubitem ex:door-3,
+        ex:room-3,
+        ex:wall-3 ;
+    fbo-dk:AreaFireCompartment 800.0 ;
+    fbo-dk:HasAutomaticFireSprinklersystem true ;
+    fbo-dk:NumberOfBuildingStoreys 1 ;
+    fbo-dk:RiskClass "RK4" ;
+    fbo-dk:UseCategory "AK2" .
+
+ex:compartment-multi-storey-no-sprinkler a fbo-dk:FireCompartment ;
+    fbo:hasSubitem ex:door-2,
+        ex:room-2,
+        ex:wall-2 ;
+    fbo-dk:AreaFireCompartment 1200.0 ;
+    fbo-dk:HasAutomaticFireSprinklersystem false ;
+    fbo-dk:NumberOfBuildingStoreys 2 ;
+    fbo-dk:RiskClass "RK2" ;
+    fbo-dk:UseCategory "AK2" .

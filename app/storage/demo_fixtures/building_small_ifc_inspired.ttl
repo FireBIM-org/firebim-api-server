@@ -1,0 +1,62 @@
+@prefix fbo: <http://example.org/fbo/1.0/> .
+@prefix ex: <https://firebim.org/examples/buildings/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:site-small a fbo:Site ;
+    fbo:Name "Small Test Site" ;
+    fbo:FireExit true ;
+    fbo:hasBuilding ex:building-small .
+
+ex:building-small a fbo:Building ;
+    fbo:Name "Building Small" ;
+    fbo:FireRating "R60" ;
+    fbo:BuildingHeight "8.5"^^xsd:decimal ;
+    fbo:hasStorey ex:storey-small-01 .
+
+ex:storey-small-01 a fbo:Storey ;
+    fbo:Name "Storey 01" ;
+    fbo:StoreyNumber 1 ;
+    fbo:hasZone ex:zone-small-a ;
+    fbo:hasStair ex:stair-small-01 .
+
+ex:zone-small-a a fbo:Zone ;
+    fbo:Name "Zone A" ;
+    fbo:FireCompartmentId "ZA-01" ;
+    fbo:hasRoom ex:room-small-101 .
+
+ex:room-small-101 a fbo:Room ;
+    fbo:Name "Room 101" ;
+    fbo:roomArea "18.5"^^xsd:decimal ;
+    fbo:OccupancyType "office" ;
+    fbo:NumberOfOccupants 2 ;
+    fbo:boundedByWall ex:wall-small-101-a ;
+    fbo:hasWindow ex:window-small-101-a ;
+    fbo:hasFloor ex:floor-small-101 ;
+    fbo:hasCeiling ex:ceiling-small-101 ;
+    fbo:containsSensor ex:sensor-small-smoke-01 .
+
+ex:wall-small-101-a a fbo:Wall ;
+    fbo:Name "Wall A" ;
+    fbo:FireRating "EI60" ;
+    fbo:LoadBearing true .
+
+ex:window-small-101-a a fbo:Window ;
+    fbo:Name "Window A" ;
+    fbo:FireRating "E30" ;
+    fbo:HasBuiltInAlarm false .
+
+ex:floor-small-101 a fbo:Floor ;
+    fbo:Name "Floor 101" ;
+    fbo:FireRating "REI60" .
+
+ex:ceiling-small-101 a fbo:Ceiling ;
+    fbo:Name "Ceiling 101" ;
+    fbo:FireRating "EI30" .
+
+ex:stair-small-01 a fbo:Stair ;
+    fbo:Name "Main Stair" ;
+    fbo:FireExit true .
+
+ex:sensor-small-smoke-01 a fbo:SensorTypeSmokeSensor ;
+    fbo:Name "Smoke Sensor 01" ;
+    fbo:HasBuiltInAlarm true .

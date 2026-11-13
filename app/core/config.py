@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     # 60 minutes * 24 hours * 8 days = 8 days
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     # FRONTEND_HOST: str = "http://localhost:5173"
-    ENVIRONMENT: Literal["local", "staging", "production"] = "local"
+    ENVIRONMENT: Literal["local", "staging", "production", "test"] = "local"
 
     BACKEND_CORS_ORIGINS: Annotated[list[AnyUrl] | str, BeforeValidator(parse_cors)] = []
 
@@ -64,9 +64,9 @@ class Settings(BaseSettings):
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> PostgresDsn:
         return MultiHostUrl.build(
-            scheme="postgresql+psycopg",
+            scheme="postgresql",
             username=self.POSTGRES_USER,
-            password=self.POSTGRES_PASSWORD,
+            password=self.POSTGRES_PASSWORD.get_secret_value(),
             host=self.POSTGRES_HOST,
             port=self.POSTGRES_PORT,
             path=self.POSTGRES_DB,
@@ -77,6 +77,15 @@ class Settings(BaseSettings):
     # Optional: internal URL for JWKS fetching when running inside Docker.
     # If not set, falls back to AUTHENTIK_ISSUER_URL.
     AUTHENTIK_INTERNAL_URL: str = ""
+
+    # Public ontology registry (firebim.org) used by POST /ontologies/sync.
+    # Any URL serving an index in the same format may be used as source_url per request.
+    ONTOLOGY_REGISTRY_URL: str = "https://firebim.org/documentation/ontologies/index.json"
+    ONTOLOGY_SYNC_TIMEOUT_SECONDS: float = 120.0
+
+    # Local development only: (re)publish the bundled demo graphs and demo rules at startup.
+    # Set to false to keep a hand-curated workspace — nothing is seeded and nothing you deleted comes back.
+    SEED_DEMO_CONTENT: bool = True
 
     # S3
     S3_ENDPOINT_URL: str

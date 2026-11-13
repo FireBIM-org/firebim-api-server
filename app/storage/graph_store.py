@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import logging
+from time import monotonic
 from urllib.parse import quote, unquote
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
-from rdflib import Graph
+from rdflib import DCTERMS, RDFS, Graph, URIRef
 
 from app.core.config import settings
+from app.core.observability import is_request_profiling_enabled, log_event, record_metric
+
+logger = logging.getLogger(__name__)
 
 
 class GraphStoreError(Exception):
@@ -66,12 +71,59 @@ class GraphStoreClient:
 
     @staticmethod
     def _triple_count(ttl: str) -> int:
+        return len(GraphStoreClient._parse(ttl))
+
+    @staticmethod
+    def _parse(ttl: str) -> Graph:
         graph = Graph()
         try:
             graph.parse(data=ttl, format="turtle")
         except Exception as exc:
             raise ValueError(f"Invalid Turtle content: {exc}") from exc
-        return len(graph)
+        return graph
+
+    @staticmethod
+    def _self_description(graph: Graph, graph_uri: str) -> dict[str, str]:
+        """`label` / `description` a graph states about itself (rdfs:label / rdfs:comment / dcterms:* on the graph URI).
+
+        Stored as object metadata so a listing can show what a graph is for without fetching it. S3 metadata must be
+        ASCII and small, so the text is percent-encoded and capped."""
+        subject = URIRef(graph_uri)
+        found: dict[str, str] = {}
+        # S3 allows 2 KB of user metadata per object in total; graph-uri and triple-count take a little of it.
+        # The caps apply to the *encoded* text (non-ASCII becomes %XX%XX…), cut at a whole character.
+        for key, predicates, limit in (
+            ("label", (RDFS.label, DCTERMS.title), 240),
+            ("description", (RDFS.comment, DCTERMS.description), 1400),
+        ):
+            for predicate in predicates:
+                value = graph.value(subject, predicate)
+                if value is not None and str(value).strip():
+                    found[key] = GraphStoreClient._encode_capped(str(value).strip(), limit)
+                    break
+        return found
+
+    @staticmethod
+    def _encode_capped(text: str, limit: int) -> str:
+        encoded = quote(text, safe="")
+        if len(encoded) <= limit:
+            return encoded
+        ellipsis = quote("…", safe="")
+        out = ""
+        for char in text:
+            piece = quote(char, safe="")
+            if len(out) + len(piece) + len(ellipsis) > limit:
+                break
+            out += piece
+        return out + ellipsis
+
+    @staticmethod
+    def _decode_self_description(metadata: dict) -> dict[str, str | None]:
+        out: dict[str, str | None] = {}
+        for key in ("label", "description"):
+            raw = metadata.get(key)
+            out[key] = unquote(raw) if raw else None
+        return out
 
     @staticmethod
     def _is_not_found(exc: ClientError) -> bool:
@@ -90,8 +142,17 @@ class GraphStoreClient:
         except (BotoCoreError, ClientError):
             return False
 
-    def put_graph_ttl(self, dataset: str, graph_uri: str, ttl: str) -> None:
-        triple_count = self._triple_count(ttl)
+    def put_graph_ttl(
+        self,
+        dataset: str,
+        graph_uri: str,
+        ttl: str,
+        *,
+        triple_count: int | None = None,
+    ) -> None:
+        graph = self._parse(ttl)
+        if triple_count is None:
+            triple_count = len(graph)
         key = self._object_key(dataset, graph_uri)
         try:
             self.client.put_object(
@@ -102,12 +163,14 @@ class GraphStoreClient:
                 Metadata={
                     "graph-uri": graph_uri,
                     "triple-count": str(triple_count),
+                    **self._self_description(graph, graph_uri),
                 },
             )
         except (BotoCoreError, ClientError) as exc:
             raise GraphStoreError(f"Graph store publish failed: {exc}") from exc
 
     def get_graph_ttl(self, dataset: str, graph_uri: str) -> str:
+        started_at = monotonic()
         key = self._object_key(dataset, graph_uri)
         try:
             response = self.client.get_object(Bucket=self.bucket_name, Key=key)
@@ -119,7 +182,19 @@ class GraphStoreClient:
             raise GraphStoreError(f"Graph store fetch failed: {exc}") from exc
 
         body = response["Body"].read()
-        return body.decode("utf-8")
+        ttl = body.decode("utf-8")
+        duration_ms = round((monotonic() - started_at) * 1000, 3)
+        record_metric("graph_store.get_graph_ttl_ms", duration_ms, append=True)
+        if is_request_profiling_enabled():
+            log_event(
+                logger,
+                "graph_store.get_graph_ttl",
+                dataset=dataset,
+                graph_uri=graph_uri,
+                duration_ms=duration_ms,
+                byte_size=len(body),
+            )
+        return ttl
 
     def delete_graph(self, dataset: str, graph_uri: str) -> None:
         key = self._object_key(dataset, graph_uri)
@@ -162,31 +237,25 @@ class GraphStoreClient:
                 if not graph_uri.startswith(base_uri):
                     continue
 
+                # list_objects_v2 does not return user metadata; one HEAD per graph gives count, label, description
+                try:
+                    head = self.client.head_object(Bucket=self.bucket_name, Key=key)
+                except (BotoCoreError, ClientError) as exc:
+                    raise GraphStoreError(f"Graph store list failed: {exc}") from exc
+                metadata = head.get("Metadata") or {}
                 triple_count = None
-                metadata = obj.get("Metadata") or {}
-                if "triple-count" in metadata:
+                raw_count = metadata.get("triple-count")
+                if raw_count is not None:
                     try:
-                        triple_count = int(metadata["triple-count"])
+                        triple_count = int(raw_count)
                     except (TypeError, ValueError):
                         triple_count = None
-
-                if triple_count is None:
-                    try:
-                        head = self.client.head_object(Bucket=self.bucket_name, Key=key)
-                    except (BotoCoreError, ClientError) as exc:
-                        raise GraphStoreError(f"Graph store list failed: {exc}") from exc
-                    metadata = head.get("Metadata") or {}
-                    raw_count = metadata.get("triple-count")
-                    if raw_count is not None:
-                        try:
-                            triple_count = int(raw_count)
-                        except (TypeError, ValueError):
-                            triple_count = None
 
                 items.append(
                     {
                         "graph_uri": graph_uri,
                         "triple_count": triple_count,
+                        **self._decode_self_description(metadata),
                     }
                 )
 

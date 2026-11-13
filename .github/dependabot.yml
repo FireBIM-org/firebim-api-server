@@ -20,6 +20,7 @@ updates:
     directory: "/docker/api"
     schedule:
       interval: "weekly"
+    rebase-strategy: "disabled"
     labels:
       - "dependencies"
       - "docker"
@@ -28,6 +29,7 @@ updates:
     directory: "/docker/worker"
     schedule:
       interval: "weekly"
+    rebase-strategy: "disabled"
     labels:
       - "dependencies"
       - "docker"

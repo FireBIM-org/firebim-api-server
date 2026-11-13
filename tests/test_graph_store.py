@@ -82,10 +82,56 @@ def test_graph_store_round_trip_and_list(store: GraphStoreClient):
         {
             "graph_uri": graph_uri,
             "triple_count": 1,
+            "label": None,
+            "description": None,
         }
     ]
+
+
+def test_graph_store_lists_the_graphs_self_description(store: GraphStoreClient):
+    """A graph that labels its own graph URI is listed with that label and comment (non-ASCII survives)."""
+    graph_uri = "https://firebim.org/graphs/buildings/dk-office-1.0.0"
+    ttl = (
+        "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+        f'<{graph_uri}> rdfs:label "Office · 1.0.0" ;\n'
+        '  rdfs:comment "Expected: dk-compartments-size-ak1 → Pass; dk-unit-composition → Fail (≥ 1 exit)" .\n'
+    )
+    store.put_graph_ttl("buildings", graph_uri, ttl)
+    metadata = store.client.objects[next(iter(store.client.objects))]["metadata"]
+    assert metadata["label"].isascii() and metadata["description"].isascii()
+
+    [item] = store.list_named_graphs("buildings", "https://firebim.org/graphs/buildings/")
+    assert item["label"] == "Office · 1.0.0"
+    assert item["description"].startswith("Expected: dk-compartments-size-ak1 → Pass")
 
 
 def test_graph_store_delete_missing_raises(store: GraphStoreClient):
     with pytest.raises(GraphStoreNotFoundError):
         store.delete_graph("rulebook", "https://firebim.org/graphs/rulebook/missing")
+
+
+def test_graph_store_uses_precomputed_triple_count(store: GraphStoreClient, monkeypatch):
+    graph_uri = "https://firebim.org/graphs/ontologies/large"
+    ttl = '@prefix ex: <http://example.org/> .\nex:a ex:b "c" .'
+
+    def fail_if_parsed(_ttl: str) -> int:
+        raise AssertionError("TTL should not be parsed twice")
+
+    monkeypatch.setattr(store, "_triple_count", fail_if_parsed)
+    store.put_graph_ttl("ontologies", graph_uri, ttl, triple_count=123)
+
+    key = store._object_key("ontologies", graph_uri)
+    assert store.client.objects[key]["metadata"]["triple-count"] == "123"
+
+
+def test_graph_store_caps_self_description_to_the_s3_metadata_budget(store: GraphStoreClient):
+    """A long, non-ASCII rdfs:comment is cut to fit S3's 2 KB user-metadata limit, at a whole character."""
+    graph_uri = "https://firebim.org/graphs/buildings/long"
+    comment = "• dk-compartments-size → Pass ×15 · " * 80  # ~2.9 K characters, ~7 K bytes once percent-encoded
+    ttl = f'@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n<{graph_uri}> rdfs:comment """{comment}""" .'
+    store.put_graph_ttl("buildings", graph_uri, ttl)
+    metadata = store.client.objects[next(iter(store.client.objects))]["metadata"]
+    assert len(metadata["description"]) <= 1400
+    assert sum(len(k) + len(v) for k, v in metadata.items()) < 2048
+    [item] = store.list_named_graphs("buildings", "https://firebim.org/graphs/buildings/")
+    assert item["description"].startswith("• dk-compartments-size → Pass ×15") and item["description"].endswith("…")

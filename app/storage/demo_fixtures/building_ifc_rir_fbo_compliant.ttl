@@ -1,0 +1,207 @@
+@prefix ifc: <https://firebim.org/ontologies/ifc/global/2026.04#> .
+@prefix fbo-dk: <https://firebim.org/ontologies/fbo/dk/2026.04#> .
+@prefix rir: <https://firebim.org/ontologies/rir/global/2026.04#> .
+@prefix ex: <https://firebim.org/examples/buildings/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:site-full-stack a ifc:IfcSite ;
+    ifc:Name "IFC RIR FBO Demo Site" ;
+    ifc:Description "Site for a full-stack ontology demo graph." ;
+    ifc:GlobalId "ifc-rir-fbo-site-001" ;
+    ifc:RefElevation "10.9"^^xsd:decimal .
+
+ex:building-full-stack a ifc:IfcBuilding, rir:cPset_BuildingSummary, rir:cPset_BuildingConnections ;
+    ifc:Name "IFC RIR FBO Demo Building" ;
+    ifc:Description "Building combining IFC structure, RIR regulatory metadata and FBO fire concepts." ;
+    ifc:GlobalId "ifc-rir-fbo-building-001" ;
+    ifc:BuildingID "B-FULL-001" ;
+    rir:HasElectricity true ;
+    rir:HasSewerage true ;
+    rir:HasElevator false ;
+    rir:HasElectricityNetworkConnection true ;
+    rir:HasFireWaterNetworkConnection true ;
+    rir:HasSewerageNetworkConnection true .
+
+ex:storey-full-stack-01 a ifc:IfcBuildingStorey ;
+    ifc:Name "Ground Floor" ;
+    ifc:Description "Ground floor in the full-stack demo building." ;
+    ifc:GlobalId "ifc-rir-fbo-storey-001" ;
+    ifc:AboveGround true .
+
+ex:storey-full-stack-02 a ifc:IfcBuildingStorey ;
+    ifc:Name "First Floor" ;
+    ifc:Description "First floor in the full-stack demo building." ;
+    ifc:GlobalId "ifc-rir-fbo-storey-002" ;
+    ifc:AboveGround true .
+
+ex:space-full-stack-101 a ifc:IfcSpace, rir:cPset_SpaceRegulatory ;
+    ifc:Name "Office 101" ;
+    ifc:Description "Regulated office space on the ground floor." ;
+    ifc:GlobalId "ifc-rir-fbo-space-101" ;
+    ifc:LongName "Office 101" ;
+    ifc:CompositionType "ELEMENT" ;
+    ifc:Area "41.0"^^xsd:decimal ;
+    rir:DetailedUse "Office workspace" ;
+    rir:HasSpecialFireHazard false ;
+    rir:IsProtected true ;
+    rir:ClaimedEscapeTravelDistance "21.0"^^xsd:decimal .
+
+ex:space-full-stack-102 a ifc:IfcSpace, rir:cPset_SpaceRegulatory ;
+    ifc:Name "Reception 102" ;
+    ifc:Description "Regulated reception space on the ground floor." ;
+    ifc:GlobalId "ifc-rir-fbo-space-102" ;
+    ifc:LongName "Reception 102" ;
+    ifc:CompositionType "ELEMENT" ;
+    ifc:Area "35.0"^^xsd:decimal ;
+    rir:DetailedUse "Reception and visitor waiting area" ;
+    rir:HasSpecialFireHazard false ;
+    rir:IsProtected true ;
+    rir:WheelchairCapacity "4"^^xsd:integer .
+
+ex:space-full-stack-201 a ifc:IfcSpace, rir:cPset_SpaceRegulatory ;
+    ifc:Name "Meeting 201" ;
+    ifc:Description "Regulated meeting room on the first floor." ;
+    ifc:GlobalId "ifc-rir-fbo-space-201" ;
+    ifc:LongName "Meeting room 201" ;
+    ifc:CompositionType "ELEMENT" ;
+    ifc:Area "33.5"^^xsd:decimal ;
+    rir:DetailedUse "Meeting and collaboration room" ;
+    rir:HasSpecialFireHazard false ;
+    rir:IsProtected true ;
+    rir:ClaimedEscapeTravelDistance "17.5"^^xsd:decimal .
+
+ex:space-full-stack-202 a ifc:IfcSpace, rir:cPset_SpaceRegulatory ;
+    ifc:Name "Archive 202" ;
+    ifc:Description "Archive room on the first floor." ;
+    ifc:GlobalId "ifc-rir-fbo-space-202" ;
+    ifc:LongName "Archive 202" ;
+    ifc:CompositionType "ELEMENT" ;
+    ifc:Area "18.0"^^xsd:decimal ;
+    rir:DetailedUse "Archive storage" ;
+    rir:HasSpecialFireHazard true ;
+    rir:IsProtected false ;
+    rir:StorageUnits "12"^^xsd:integer .
+
+ex:zone-full-stack-admin a ifc:IfcSpatialZone, fbo-dk:FireCompartment ;
+    ifc:Name "Administrative Fire Zone" ;
+    ifc:Description "Ground-floor fire compartment spanning office and reception." ;
+    ifc:GlobalId "ifc-rir-fbo-zone-admin" ;
+    ifc:LongName "Administrative fire zone" ;
+    ifc:CompositionType "ELEMENT" ;
+    fbo-dk:AreaFireCompartment "118.0"^^xsd:decimal ;
+    fbo-dk:NumberOccupantsSpaceCompartment "28"^^xsd:integer ;
+    fbo-dk:UseCategory "AK2" ;
+    fbo-dk:RoomfunctionOfficespace ex:roomfunction-office-full ;
+    fbo-dk:EvacuationRoutePrimary ex:route-full-main ;
+    fbo-dk:SeparationFire ex:wall-full-stack-001 .
+
+ex:zone-full-stack-meeting a ifc:IfcSpatialZone, fbo-dk:FireCompartment ;
+    ifc:Name "Meeting Fire Zone" ;
+    ifc:Description "First-floor meeting fire compartment." ;
+    ifc:GlobalId "ifc-rir-fbo-zone-meeting" ;
+    ifc:LongName "Meeting fire zone" ;
+    ifc:CompositionType "ELEMENT" ;
+    fbo-dk:AreaFireCompartment "72.0"^^xsd:decimal ;
+    fbo-dk:NumberOccupantsSpaceCompartment "20"^^xsd:integer ;
+    fbo-dk:UseCategory "AK3" ;
+    fbo-dk:RoomfunctionAssemblyrooms true ;
+    fbo-dk:EvacuationRoutePrimary ex:route-full-main ;
+    fbo-dk:SeparationFire ex:wall-full-stack-003 .
+
+ex:zone-full-stack-stair a ifc:IfcSpatialZone, fbo-dk:FireCompartment ;
+    ifc:Name "Protected Stair Zone" ;
+    ifc:Description "Protected stair compartment extending through both storeys." ;
+    ifc:GlobalId "ifc-rir-fbo-zone-stair" ;
+    ifc:LongName "Protected stair zone" ;
+    ifc:CompositionType "ELEMENT" ;
+    fbo-dk:AreaFireCompartment "31.0"^^xsd:decimal ;
+    fbo-dk:NumberOccupantsSpaceCompartment "8"^^xsd:integer ;
+    fbo-dk:UseCategory "AK3" ;
+    fbo-dk:RoomfunctionEscapestaircase true ;
+    fbo-dk:SystemIndependentEvacuationRoute ex:route-full-secondary ;
+    fbo-dk:SeparationFire ex:wall-full-stack-004 .
+
+ex:bffu-full-stack-admin a fbo-dk:BuildingFunctionalFireUnit ;
+    fbo-dk:AreaBuildingFunctionalFireUnit ex:zone-full-stack-admin, ex:zone-full-stack-meeting ;
+    fbo-dk:SystemEvacuationroute ex:route-full-main ;
+    fbo-dk:UseCategoryAK2 ex:use-ak2-full .
+
+ex:bffu-full-stack-egress a fbo-dk:BuildingFunctionalFireUnit ;
+    fbo-dk:AreaBuildingFunctionalFireUnit ex:zone-full-stack-stair ;
+    fbo-dk:SystemIndependentEvacuationRoute ex:route-full-secondary ;
+    fbo-dk:UseCategoryAK3 ex:use-ak3-full .
+
+ex:wall-full-stack-001 a ifc:IfcWall ;
+    ifc:Name "Administrative Separation Wall" ;
+    ifc:Description "Wall referenced by the administrative fire zone." ;
+    ifc:GlobalId "ifc-rir-fbo-wall-001" ;
+    ifc:FireRating "EI60" ;
+    ifc:LoadBearing true ;
+    ifc:AcousticRating "Rw48" ;
+    ifc:IsExternal false .
+
+ex:wall-full-stack-002 a ifc:IfcWall ;
+    ifc:Name "Reception Perimeter Wall" ;
+    ifc:Description "Perimeter wall around the reception area." ;
+    ifc:GlobalId "ifc-rir-fbo-wall-002" ;
+    ifc:FireRating "EI60" ;
+    ifc:LoadBearing true ;
+    ifc:AcousticRating "Rw46" ;
+    ifc:IsExternal true .
+
+ex:wall-full-stack-003 a ifc:IfcWall ;
+    ifc:Name "Meeting Separation Wall" ;
+    ifc:Description "Wall referenced by the meeting fire zone." ;
+    ifc:GlobalId "ifc-rir-fbo-wall-003" ;
+    ifc:FireRating "EI90" ;
+    ifc:LoadBearing true ;
+    ifc:AcousticRating "Rw52" ;
+    ifc:IsExternal false .
+
+ex:wall-full-stack-004 a ifc:IfcWall ;
+    ifc:Name "Stair Separation Wall" ;
+    ifc:Description "Protected stair enclosure wall." ;
+    ifc:GlobalId "ifc-rir-fbo-wall-004" ;
+    ifc:FireRating "EI90" ;
+    ifc:LoadBearing true ;
+    ifc:AcousticRating "Rw54" ;
+    ifc:IsExternal false .
+
+ex:window-full-stack-001 a ifc:IfcWindow, rir:cPset_WindowRegulatory ;
+    ifc:Name "Reception Window" ;
+    ifc:Description "Window serving the reception space." ;
+    ifc:GlobalId "ifc-rir-fbo-window-001" ;
+    ifc:FireRating "E30" ;
+    ifc:Area "3.4"^^xsd:decimal ;
+    ifc:IsExternal true ;
+    ifc:ThermalTransmittance "1.1"^^xsd:decimal ;
+    rir:IsOpenable true ;
+    rir:HasControlsOperableWithOneHand true ;
+    rir:WindowControlsHeight "1.05"^^xsd:decimal .
+
+ex:window-full-stack-002 a ifc:IfcWindow, rir:cPset_WindowRegulatory ;
+    ifc:Name "Office Window" ;
+    ifc:Description "Window serving the office space." ;
+    ifc:GlobalId "ifc-rir-fbo-window-002" ;
+    ifc:FireRating "E30" ;
+    ifc:Area "4.0"^^xsd:decimal ;
+    ifc:IsExternal true ;
+    ifc:ThermalTransmittance "1.0"^^xsd:decimal ;
+    rir:IsOpenable true ;
+    rir:HasControlsOperableWithOneHand true ;
+    rir:WindowControlsHeight "1.10"^^xsd:decimal .
+
+ex:window-full-stack-003 a ifc:IfcWindow, rir:cPset_WindowRegulatory ;
+    ifc:Name "Meeting Window" ;
+    ifc:Description "Window serving the meeting room." ;
+    ifc:GlobalId "ifc-rir-fbo-window-003" ;
+    ifc:FireRating "E30" ;
+    ifc:Area "2.8"^^xsd:decimal ;
+    ifc:IsExternal true ;
+    ifc:ThermalTransmittance "1.1"^^xsd:decimal ;
+    rir:IsOpenable true ;
+    rir:HasControlsOperableWithOneHand false ;
+    rir:WindowControlsHeight "1.15"^^xsd:decimal .
+
+ex:warning-system-full-stack a fbo-dk:AutomaticWarningsystem, fbo-dk:ActiveFireProtection .
+ex:roomfunction-office-full a fbo-dk:Roomfunction .
