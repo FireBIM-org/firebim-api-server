@@ -24,6 +24,8 @@ FireBIM business logic is implemented in separate repositories and consumed here
 - Environment variables are the source of configuration; do not hardcode secrets.
 - Docker images are multi-stage builds.
 - Use UV for dependency management, not `pip` or Poetry.
+- No test-only branches in production code (e.g. `ENVIRONMENT == "test"`); tests stub or patch dependencies instead.
+- Comments explain why, not what the code already says.
 
 ## Local development reality
 - Docker Compose in this repository is for local development only.
@@ -33,6 +35,7 @@ FireBIM business logic is implemented in separate repositories and consumed here
   - database initialization
   - S3 bucket checks
   - ontology bootstrap into S3-backed graph storage
+  - demo graphs and rules, unless `SEED_DEMO_CONTENT=false`
 - A real cold start can therefore take around 1-2 minutes.
 - During this time, `localhost:8000` may refuse or close connections even though the container is running.
 
@@ -52,7 +55,6 @@ Do not assume a startup failure too early if the API is still on:
 ## Testing
 - Backend: pytest
 - Worker: pytest with mocked DB, S3, and RabbitMQ where possible
-- Helm: `helm lint` and `helm template`
 
 ## Preferred verification flow
 Before committing Python changes, prefer:
@@ -64,18 +66,12 @@ uv run pytest
 make openapi
 ```
 
-For Linux-like verification in Docker, prefer:
+For Linux-like verification in Docker, prefer (the separate virtualenv and `--frozen` leave the host `.venv` and `uv.lock` alone):
 
 ```bash
-docker run --rm -v ${PWD}:/app -w /app ghcr.io/astral-sh/uv:python3.12-bookworm-slim \
-  sh -lc "uv sync --dev && uv run ruff check . && uv run pytest -q"
-```
-
-If formatting should be included:
-
-```bash
-docker run --rm -v ${PWD}:/app -w /app ghcr.io/astral-sh/uv:python3.12-bookworm-slim \
-  sh -lc "uv sync --dev && uv run ruff format --check . && uv run ruff check . && uv run pytest -q"
+docker run --rm -v ${PWD}:/app -w /app -e UV_PROJECT_ENVIRONMENT=/tmp/venv \
+  ghcr.io/astral-sh/uv:python3.12-bookworm-slim \
+  sh -lc "uv sync --frozen && uv run ruff format --check . && uv run ruff check . && uv run pytest -q"
 ```
 
 ## Key patterns
@@ -88,5 +84,5 @@ docker run --rm -v ${PWD}:/app -w /app ghcr.io/astral-sh/uv:python3.12-bookworm-
 - Do not treat local Docker Compose readiness as instantaneous.
 - When debugging local startup, check logs before changing architecture.
 - Avoid changing the distinction between local and production setup unless explicitly requested.
-- If local startup is slow, first verify whether startup is still progressing before “fixing” it. In this branch, startup can legitimately be slow because ontology profiling and bootstrap work includes heavier resources such as IFC and similar large ontology sets.
+- If local startup is slow, first verify whether startup is still progressing before “fixing” it. Startup can be slow in local mode because it seeds the bundled ontologies (including IFC) and optional demo content.
 - Keep S3-backed document structures stable and predictable to support clean backups and migrations.

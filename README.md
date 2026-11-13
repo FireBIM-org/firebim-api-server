@@ -28,7 +28,10 @@ The API container can be `Up` before the FastAPI app is actually ready to serve 
 On a real cold start, local startup can take around 1-2 minutes because the app:
 - initializes the database
 - checks or creates the S3 bucket
-- bootstraps default ontologies into S3-backed graph storage
+- publishes the bundled ontologies (including the IFC-scale ones) into S3-backed graph storage
+- publishes the demo graphs and demo rules, unless `SEED_DEMO_CONTENT=false`
+
+The ontology and demo seeding only runs with `ENVIRONMENT=local` (the default).
 
 Good readiness checks are:
 
@@ -60,10 +63,9 @@ curl http://localhost:8000/docs
 ## Local development notes
 
 - The included Docker Compose setup is for local development only.
-- Local mode and production mode are intentionally not the same.
-- A slow cold start is often expected in this branch because startup includes heavier ontology profiling and bootstrap work, including IFC-scale resources. Check the API logs before assuming startup failed.
+- Local mode and production mode are intentionally not the same: only local mode seeds ontologies and demo content at startup.
 - `docker compose ps` only tells you that the container is running, not that the FastAPI app has completed startup.
-- If `localhost:8000` closes the connection during startup, wait for the API log to print `Application startup complete.` and try again.
+  If `localhost:8000` closes the connection, wait for `Application startup complete.` in the API log (see step 4) before assuming startup failed.
 
 ### Updating `openapi.json`
 
@@ -89,19 +91,16 @@ Always run this before committing.
 
 ### Full local verification
 
-For a Linux-like verification flow without leaving Docker, run:
+To run the same checks as CI in a Linux container, run:
 
 ```bash
-docker run --rm -v ${PWD}:/app -w /app ghcr.io/astral-sh/uv:python3.12-bookworm-slim \
-  sh -lc "uv sync --dev && uv run ruff check . && uv run pytest -q"
+docker run --rm -v ${PWD}:/app -w /app -e UV_PROJECT_ENVIRONMENT=/tmp/venv \
+  ghcr.io/astral-sh/uv:python3.12-bookworm-slim \
+  sh -lc "uv sync --frozen && uv run ruff format --check . && uv run ruff check . && uv run pytest -q"
 ```
 
-If you want to include formatting in that check, run:
-
-```bash
-docker run --rm -v ${PWD}:/app -w /app ghcr.io/astral-sh/uv:python3.12-bookworm-slim \
-  sh -lc "uv sync --dev && uv run ruff format --check . && uv run ruff check . && uv run pytest -q"
-```
+`UV_PROJECT_ENVIRONMENT` keeps the container's virtualenv out of your local `.venv`, and `--frozen` stops `uv` from rewriting `uv.lock`.
+The tests need no running services: they use an in-memory SQLite database and mock S3, Celery and Authentik.
 
 ## Syncing ontologies from a public registry
 
